@@ -1,0 +1,44 @@
+<main class="signage-shell">
+  <section class="signage-stage" aria-label="ddadan signage player">
+    @if (currentItem(); as item) {
+      @if (item.type === 'video') {
+        <video
+          class="signage-media"
+          [src]="item.src"
+          autoplay
+          muted
+          playsinline
+          controls="false"
+          (ended)="onVideoEnded()"
+        ></video>
+      } @else {
+        <img
+          class="signage-media"
+          [src]="item.src"
+          [alt]="item.title"
+          (load)="onImageLoaded()"
+        />
+      }
+
+      <div class="signage-overlay">
+        <div class="branding">
+          <span class="brand">ddadan signage</span>
+          <span class="device">{{ deviceName() }}</span>
+        </div>
+        <div class="content-meta">
+          <h1>{{ item.title }}</h1>
+          <p>라즈베리파이 연결 모니터에서 전체화면으로 재생되는 메뉴판/광고판 웹앱</p>
+        </div>
+      </div>
+    }
+  </section>
+
+  <aside class="control-panel" aria-label="preview controls">
+    <button type="button" (click)="previous()">이전</button>
+    <div class="playlist-status">
+      <strong>{{ currentIndex() + 1 }}</strong>
+      <span>/ {{ playlist().length }}</span>
+    </div>
+    <button type="button" (click)="next()">다음</button>
+  </aside>
+</main>
