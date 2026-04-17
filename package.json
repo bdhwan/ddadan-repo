@@ -1,0 +1,17 @@
+{
+  "name": "ddadan-repo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "services/*"
+  ],
+  "scripts": {
+    "dev:client": "npm run start --workspace ddadan-client-app",
+    "dev:api": "npm run start:dev --workspace ddadan-api-server",
+    "dev:pi": "npm run dev --workspace ddadan-service-pi",
+    "build:client": "npm run build --workspace ddadan-client-app",
+    "build:api": "npm run build --workspace ddadan-api-server",
+    "build:pi": "npm run build --workspace ddadan-service-pi"
+  }
+}
