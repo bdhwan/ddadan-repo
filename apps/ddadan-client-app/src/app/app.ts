@@ -1,96 +1,78 @@
-import { Component, computed, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
+import { environment } from '../environment';
 
-type MediaType = 'image' | 'video';
-
-interface SignageItem {
+interface ScreenItem {
   id: string;
-  type: MediaType;
-  title: string;
-  src: string;
-  duration?: number;
+  kind: 'image' | 'video' | 'text';
+  url?: string;
+  text?: string;
+  fontSize?: number;
+  color?: string;
+  background?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex?: number;
+}
+
+interface ScreenResponse {
+  registered: boolean;
+  deviceName: string | null;
+  width: number;
+  height: number;
+  background?: string;
+  items: ScreenItem[];
+  isFallback?: boolean;
 }
 
 @Component({
   selector: 'app-root',
   templateUrl: './app.html',
-  styleUrl: './app.scss'
+  styleUrl: './app.scss',
 })
-export class App {
-  protected readonly deviceName = signal('DDADAN DISPLAY #01');
-  protected readonly playlist = signal<SignageItem[]>([
-    {
-      id: 'hero-image',
-      type: 'image',
-      title: '시그니처 메뉴 배너',
-      src: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1600&q=80',
-      duration: 8000
-    },
-    {
-      id: 'promo-video',
-      type: 'video',
-      title: '프로모션 영상',
-      src: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
-    },
-    {
-      id: 'event-image',
-      type: 'image',
-      title: '이벤트 공지',
-      src: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1600&q=80',
-      duration: 8000
-    }
-  ]);
-
-  protected readonly currentIndex = signal(0);
-  protected readonly currentItem = computed(() => {
-    const items = this.playlist();
-    return items[this.currentIndex()] ?? null;
+export class App implements OnInit, OnDestroy {
+  private readonly http = inject(HttpClient);
+  protected readonly screen = signal<ScreenResponse | null>(null);
+  protected readonly hardwareId = signal('');
+  protected readonly slot = signal(0);
+  protected readonly aspect = computed(() => {
+    const s = this.screen();
+    return s ? `${s.width} / ${s.height}` : '16 / 9';
   });
 
-  private imageTimer: ReturnType<typeof setTimeout> | null = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
 
-  constructor() {
-    this.scheduleCurrentItem();
+  ngOnInit(): void {
+    const url = new URL(window.location.href);
+    const deviceId = url.searchParams.get('deviceId') ?? 'dev-local';
+    const slot = Number(url.searchParams.get('slot') ?? '0');
+    this.hardwareId.set(deviceId);
+    this.slot.set(slot);
+
+    this.fetch();
+    this.timer = setInterval(() => this.fetch(), environment.pollIntervalMs);
   }
 
-  protected next(): void {
-    const items = this.playlist();
-    if (!items.length) {
-      return;
-    }
-
-    this.currentIndex.update((index) => (index + 1) % items.length);
-    this.scheduleCurrentItem();
+  ngOnDestroy(): void {
+    if (this.timer) clearInterval(this.timer);
   }
 
-  protected previous(): void {
-    const items = this.playlist();
-    if (!items.length) {
-      return;
-    }
-
-    this.currentIndex.update((index) => (index - 1 + items.length) % items.length);
-    this.scheduleCurrentItem();
+  protected absoluteUrl(item: ScreenItem): string | null {
+    if (!item.url) return null;
+    if (item.url.startsWith('http')) return item.url;
+    return `${environment.apiBase.replace(/\/api$/, '')}${item.url}`;
   }
 
-  protected onVideoEnded(): void {
-    this.next();
-  }
-
-  protected onImageLoaded(): void {
-    this.scheduleCurrentItem();
-  }
-
-  private scheduleCurrentItem(): void {
-    if (this.imageTimer) {
-      clearTimeout(this.imageTimer);
-      this.imageTimer = null;
-    }
-
-    const item = this.currentItem();
-    if (!item || item.type !== 'image') {
-      return;
-    }
-
-    this.imageTimer = setTimeout(() => this.next(), item.duration ?? 10000);
+  private fetch() {
+    const hwid = this.hardwareId();
+    if (!hwid) return;
+    this.http
+      .get<ScreenResponse>(`${environment.apiBase}/player/${encodeURIComponent(hwid)}/screen?slot=${this.slot()}`)
+      .subscribe({
+        next: (res) => this.screen.set(res),
+        error: (err) => console.warn('player fetch failed', err.message),
+      });
   }
 }
