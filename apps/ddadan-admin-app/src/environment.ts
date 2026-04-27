@@ -1,11 +1,12 @@
 export const environment = {
   apiBase: 'http://localhost:3000/api',
   firebase: {
-    apiKey: 'REPLACE_ME',
-    authDomain: 'REPLACE_ME.firebaseapp.com',
-    projectId: 'REPLACE_ME',
-    storageBucket: 'REPLACE_ME.appspot.com',
-    messagingSenderId: 'REPLACE_ME',
-    appId: 'REPLACE_ME',
+    apiKey: 'AIzaSyDzPWfvMYNG50HCLUtbNRZalNdxb5DUY4I',
+    authDomain: 'ddadan-ad5b3.firebaseapp.com',
+    projectId: 'ddadan-ad5b3',
+    storageBucket: 'ddadan-ad5b3.firebasestorage.app',
+    messagingSenderId: '810874302605',
+    appId: '1:810874302605:web:e6de923ee19b769959b2c4',
+    measurementId: 'G-LHDHK483W4',
   },
 };
