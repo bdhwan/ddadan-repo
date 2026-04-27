@@ -4,5 +4,17 @@ dist/
 coverage/
 .env
 .env.*
+!.env.example
 *.log
 .DS_Store
+
+# Firebase service account credentials
+**/firebase/service-account.json
+
+# Local asset uploads (user content)
+apps/ddadan-api-server/storage/assets/*
+!apps/ddadan-api-server/storage/assets/.gitkeep
+
+# TypeScript build artifacts
+out-tsc/
+*.tsbuildinfo

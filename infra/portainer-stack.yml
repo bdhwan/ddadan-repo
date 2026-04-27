@@ -1,0 +1,127 @@
+# DDADAN — Portainer Stack
+#
+# Deploy via Portainer → Stacks → "Add stack"
+#   - "Repository" mode: point at the ddadan-repo, set compose path to
+#     `infra/portainer-stack.yml`. Build context comes from the repo root.
+#   - "Web editor" mode: build contexts won't work (Portainer can't build
+#     local images). Either pre-build the three images and replace each
+#     `build: ...` block with `image: <registry>/<name>:<tag>`, or use
+#     repository mode.
+#
+# Required environment variables (set in Portainer's stack form):
+#   FIREBASE_SERVICE_ACCOUNT_JSON   ← paste the entire service-account JSON
+#                                     (single field, multiline OK)
+#   MYSQL_ROOT_PASSWORD             ← change from default
+#   MYSQL_PASSWORD                  ← change from default
+#
+# Optional overrides (defaults shown in `${VAR:-default}`):
+#   API_PORT, ADMIN_PORT, PLAYER_PORT, MYSQL_PORT
+#   CORS_ORIGINS, HEARTBEAT_OFFLINE_AFTER_SECONDS
+#   DB_SYNCHRONIZE (set to "false" once you're confident in the schema)
+
+services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change_me_root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ddadan}
+      MYSQL_USER: ${MYSQL_USER:-ddadan}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change_me}
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-authentication-plugin=caching_sha2_password
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - ddadan
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - ddadan
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: ..
+      dockerfile: apps/ddadan-api-server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: "3000"
+      NODE_ENV: production
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4200,http://localhost:4300}
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USERNAME: ${MYSQL_USER:-ddadan}
+      DB_PASSWORD: ${MYSQL_PASSWORD:-change_me}
+      DB_DATABASE: ${MYSQL_DATABASE:-ddadan}
+      DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-true}
+      DB_LOGGING: ${DB_LOGGING:-false}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      FIREBASE_SERVICE_ACCOUNT_PATH: /app/firebase/service-account.json
+      ASSETS_DIR: /app/storage/assets
+      ASSETS_PUBLIC_PATH: /static/assets
+      HEARTBEAT_OFFLINE_AFTER_SECONDS: ${HEARTBEAT_OFFLINE_AFTER_SECONDS:-60}
+    volumes:
+      - api-assets:/app/storage/assets
+      - api-firebase:/app/firebase
+    ports:
+      - "${API_PORT:-3000}:3000"
+    networks:
+      - ddadan
+
+  admin:
+    build:
+      context: ..
+      dockerfile: apps/ddadan-admin-app/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${ADMIN_PORT:-4200}:80"
+    networks:
+      - ddadan
+
+  player:
+    build:
+      context: ..
+      dockerfile: apps/ddadan-client-app/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${PLAYER_PORT:-4300}:80"
+    networks:
+      - ddadan
+
+volumes:
+  mysql-data:
+  redis-data:
+  api-assets:
+  api-firebase:
+
+networks:
+  ddadan:
+    driver: bridge
