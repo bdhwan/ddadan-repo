@@ -9,14 +9,14 @@ export type AssetType = 'image' | 'video' | 'text';
 @Index(['ownerUserId'])
 @Index(['storeId'])
 export class Asset extends BaseEntity {
-  @Column({ type: 'bigint' })
+  @Column({ type: 'integer' })
   ownerUserId!: number;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'ownerUserId' })
   owner?: User;
 
-  @Column({ type: 'bigint', nullable: true })
+  @Column({ type: 'integer', nullable: true })
   storeId!: number | null;
 
   @ManyToOne(() => Store, { onDelete: 'SET NULL', nullable: true })
@@ -35,7 +35,7 @@ export class Asset extends BaseEntity {
   @Column({ type: 'varchar', length: 100, nullable: true })
   mimeType!: string | null;
 
-  @Column({ type: 'bigint', default: 0 })
+  @Column({ type: 'integer', default: 0 })
   sizeBytes!: number;
 
   @Column({ type: 'text', nullable: true })

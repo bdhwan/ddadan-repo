@@ -6,38 +6,52 @@ import {
   ParseIntPipe,
   Patch,
 } from '@nestjs/common';
-import { CurrentUser } from '../auth/current-user.decorator';
-import type { AuthContext } from '../auth/firebase-auth.guard';
-import { AssignScreenDto, UpdateMonitorPositionDto } from './dto/monitor.dto';
+import { UsersService } from '../users/users.service';
+import { AssignScreenDto, SetMonitorRotationDto, UpdateMonitorPositionDto } from './dto/monitor.dto';
 import { MonitorsService } from './monitors.service';
 
 @Controller()
 export class MonitorsController {
-  constructor(private readonly monitors: MonitorsService) {}
+  constructor(
+    private readonly monitors: MonitorsService,
+    private readonly users: UsersService,
+  ) {}
 
   @Get('devices/:deviceId/monitors')
-  list(
-    @CurrentUser() auth: AuthContext,
-    @Param('deviceId', ParseIntPipe) deviceId: number,
-  ) {
-    return this.monitors.listForDevice(deviceId, auth.userId);
+  list(@Param('deviceId', ParseIntPipe) deviceId: number) {
+    return this.monitors.listForDevice(deviceId, this.users.getLocalUserId());
   }
 
   @Patch('monitors/:id/position')
   updatePosition(
-    @CurrentUser() auth: AuthContext,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateMonitorPositionDto,
   ) {
-    return this.monitors.updatePosition(id, auth.userId, dto.positionX, dto.positionY);
+    return this.monitors.updatePosition(
+      id,
+      this.users.getLocalUserId(),
+      dto.positionX,
+      dto.positionY,
+    );
   }
 
   @Patch('monitors/:id/screen')
   assignScreen(
-    @CurrentUser() auth: AuthContext,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AssignScreenDto,
   ) {
-    return this.monitors.assignScreen(id, auth.userId, dto.screenId);
+    return this.monitors.assignScreen(
+      id,
+      this.users.getLocalUserId(),
+      dto.screenId ?? null,
+    );
+  }
+
+  @Patch('monitors/:id/rotation')
+  setRotation(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: SetMonitorRotationDto,
+  ) {
+    return this.monitors.setRotation(id, this.users.getLocalUserId(), dto);
   }
 }

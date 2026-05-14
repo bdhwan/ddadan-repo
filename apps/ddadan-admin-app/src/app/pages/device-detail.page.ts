@@ -145,16 +145,26 @@ export class DeviceDetailPage implements OnInit {
     this.api.updateMonitorPosition(m.id, m.positionX, m.positionY).subscribe();
   }
 
-  assign(monitor: MonitorView, screenId: number | null) {
-    this.api.assignScreen(monitor.id, screenId).subscribe(() => {
-      const dev = this.device();
-      if (!dev) return;
-      this.device.set({
-        ...dev,
-        monitors: dev.monitors.map((m) =>
-          m.id === monitor.id ? { ...m, currentScreenId: screenId } : m,
-        ),
-      });
+  assign(monitor: MonitorView, raw: number | string | null) {
+    const screenId =
+      raw === null || raw === undefined || raw === ''
+        ? null
+        : typeof raw === 'number'
+          ? raw
+          : Number(raw);
+    const sid = screenId !== null && !Number.isFinite(screenId) ? null : screenId;
+    this.api.assignScreen(monitor.id, sid).subscribe({
+      next: () => {
+        const dev = this.device();
+        if (!dev) return;
+        this.device.set({
+          ...dev,
+          monitors: dev.monitors.map((m) =>
+            m.id === monitor.id ? { ...m, currentScreenId: sid } : m,
+          ),
+        });
+      },
+      error: (err) => console.warn('assign screen failed', err),
     });
   }
 }

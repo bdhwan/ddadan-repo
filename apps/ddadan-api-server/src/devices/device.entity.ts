@@ -8,7 +8,7 @@ export type DeviceStatus = 'unregistered' | 'online' | 'offline';
 @Index(['storeId'])
 @Index(['hardwareId'], { unique: true })
 export class Device extends BaseEntity {
-  @Column({ type: 'bigint', nullable: true })
+  @Column({ type: 'integer', nullable: true })
   storeId!: number | null;
 
   @ManyToOne(() => Store, { onDelete: 'CASCADE', nullable: true })

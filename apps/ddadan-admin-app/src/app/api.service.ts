@@ -21,12 +21,16 @@ export interface MonitorView {
   positionX: number;
   positionY: number;
   currentScreenId: number | null;
+  rotationScreenIds?: number[];
+  rotationIntervalMs?: number;
+  rotationFadeMs?: number;
 }
 
 export interface DeviceView {
   id: number;
   hardwareId: string;
   storeId: number | null;
+  storeName?: string | null;
   name: string | null;
   status: 'unregistered' | 'online' | 'offline';
   lastSeenAt: string | null;
@@ -74,15 +78,6 @@ export interface ScreenView {
   layout: { background?: string; items: ScreenLayoutItem[] };
 }
 
-export interface MeView {
-  id: number;
-  email: string | null;
-  name: string | null;
-  provider: string;
-  firebaseUid: string;
-  createdAt: string;
-}
-
 export interface PolicyDoc {
   id: number;
   kind: 'terms' | 'privacy';
@@ -96,8 +91,19 @@ export class ApiService {
   private readonly http = inject(HttpClient);
   private readonly base = environment.apiBase;
 
-  me(): Observable<MeView> {
-    return this.http.get<MeView>(`${this.base}/users/me`);
+  /**
+   * 정적 파일 기준 URL. dev(apiBase=`http://host:port/api`)에서는 API 호스트,
+   * 배포(apiBase=`/api`)에서는 빈 문자열 → 브라우저가 현재 호스트의 `/static/...` 사용.
+   */
+  readonly assetOrigin = this.base.replace(/\/api\/?$/, '');
+
+  /** API가 돌려주는 /static/... 상대 경로를 img·video src용 절대 URL로 */
+  absoluteAssetUrl(path: string | null | undefined): string {
+    if (path == null || path === '') return '';
+    const p = path.trim();
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+    const prefix = p.startsWith('/') ? p : `/${p}`;
+    return `${this.assetOrigin}${prefix}`;
   }
 
   // Policies
@@ -124,6 +130,9 @@ export class ApiService {
   }
 
   // Devices
+  listAllDevices(): Observable<DeviceView[]> {
+    return this.http.get<DeviceView[]>(`${this.base}/devices`);
+  }
   listDevices(storeId: number): Observable<DeviceView[]> {
     return this.http.get<DeviceView[]>(`${this.base}/stores/${storeId}/devices`);
   }
@@ -148,6 +157,12 @@ export class ApiService {
     return this.http.patch<MonitorView>(`${this.base}/monitors/${monitorId}/screen`, {
       screenId,
     });
+  }
+  setMonitorRotation(
+    monitorId: number,
+    body: { screenIds: number[]; intervalMs: number; fadeMs: number },
+  ): Observable<MonitorView> {
+    return this.http.patch<MonitorView>(`${this.base}/monitors/${monitorId}/rotation`, body);
   }
 
   // Assets
@@ -199,10 +214,5 @@ export class ApiService {
     return this.http.get<Array<{ id: number; name: string; kind: string; payload: ScreenLayoutItem | ScreenLayoutItem[] }>>(
       `${this.base}/screen-components`,
     );
-  }
-
-  // Account
-  withdraw(): Observable<void> {
-    return this.http.delete<void>(`${this.base}/account`);
   }
 }

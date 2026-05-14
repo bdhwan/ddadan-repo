@@ -1,8 +1,8 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import type Redis from 'ioredis';
+import { AppConfig } from '../config/configuration';
 import { DevicesService } from '../devices/devices.service';
-import { REDIS_CLIENT } from '../redis/redis.module';
 
 @Injectable()
 export class HeartbeatService {
@@ -10,15 +10,21 @@ export class HeartbeatService {
 
   constructor(
     private readonly devices: DevicesService,
-    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+    private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async sweepOfflineDevices() {
+    const ttl = this.config.get('heartbeat', { infer: true }).offlineAfterSeconds;
     const all = await this.devices.listAllRegistered();
     for (const device of all) {
-      const alive = await this.redis.exists(`device:${device.id}:heartbeat`);
-      if (!alive && device.status === 'online') {
+      if (device.status !== 'online') continue;
+      const live = DevicesService.liveStatusFromLastSeen(
+        device.lastSeenAt,
+        ttl,
+        device.status,
+      );
+      if (live === 'offline') {
         this.logger.log(`Marking device ${device.id} offline (heartbeat expired)`);
         await this.devices.markOfflineByExpiry(device.id);
       }

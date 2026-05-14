@@ -5,7 +5,7 @@ import { User } from '../users/user.entity';
 @Entity('stores')
 @Index(['ownerUserId'])
 export class Store extends BaseEntity {
-  @Column({ type: 'bigint' })
+  @Column({ type: 'integer' })
   ownerUserId!: number;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

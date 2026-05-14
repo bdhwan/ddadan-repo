@@ -14,35 +14,33 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { CurrentUser } from '../auth/current-user.decorator';
-import type { AuthContext } from '../auth/firebase-auth.guard';
+import { UsersService } from '../users/users.service';
 import { AssetsService } from './assets.service';
 import { AssetQueryDto, CreateTextAssetDto, UpdateAssetDto } from './dto/asset.dto';
 
 @Controller('assets')
 export class AssetsController {
-  constructor(private readonly assets: AssetsService) {}
+  constructor(
+    private readonly assets: AssetsService,
+    private readonly users: UsersService,
+  ) {}
 
   @Get()
-  async list(
-    @CurrentUser() auth: AuthContext,
-    @Query() query: AssetQueryDto,
-  ) {
-    const list = await this.assets.list(auth.userId, query);
+  async list(@Query() query: AssetQueryDto) {
+    const list = await this.assets.list(this.users.getLocalUserId(), query);
     return list.map((a) => this.assets.toView(a));
   }
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 200 * 1024 * 1024 } }))
   async upload(
-    @CurrentUser() auth: AuthContext,
     @UploadedFile() file: Express.Multer.File,
     @Body('storeId') storeIdRaw?: string,
   ) {
     if (!file) throw new BadRequestException('No file uploaded');
     const storeId = storeIdRaw ? Number(storeIdRaw) : undefined;
     const asset = await this.assets.createFromUpload(
-      auth.userId,
+      this.users.getLocalUserId(),
       {
         filename: file.filename,
         originalname: file.originalname,
@@ -55,30 +53,27 @@ export class AssetsController {
   }
 
   @Post('text')
-  async createText(
-    @CurrentUser() auth: AuthContext,
-    @Body() dto: CreateTextAssetDto,
-  ) {
-    const asset = await this.assets.createText(auth.userId, dto);
+  async createText(@Body() dto: CreateTextAssetDto) {
+    const asset = await this.assets.createText(this.users.getLocalUserId(), dto);
     return this.assets.toView(asset);
   }
 
   @Patch(':id')
   async update(
-    @CurrentUser() auth: AuthContext,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateAssetDto,
   ) {
-    const asset = await this.assets.update(id, auth.userId, dto);
+    const asset = await this.assets.update(
+      id,
+      this.users.getLocalUserId(),
+      dto,
+    );
     return this.assets.toView(asset);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  async remove(
-    @CurrentUser() auth: AuthContext,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
-    await this.assets.remove(id, auth.userId);
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    await this.assets.remove(id, this.users.getLocalUserId());
   }
 }

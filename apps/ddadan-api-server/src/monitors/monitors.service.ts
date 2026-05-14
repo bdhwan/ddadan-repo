@@ -5,6 +5,7 @@ import { Device } from '../devices/device.entity';
 import { Screen } from '../screens/screen.entity';
 import { StoresService } from '../stores/stores.service';
 import { Monitor } from './monitor.entity';
+import { SetMonitorRotationDto } from './dto/monitor.dto';
 
 @Injectable()
 export class MonitorsService {
@@ -51,6 +52,52 @@ export class MonitorsService {
       }
     }
     monitor.currentScreenId = screenId;
+    monitor.rotationScreenIdsJson = null;
+    return this.monitors.save(monitor);
+  }
+
+  async setRotation(
+    monitorId: number,
+    ownerUserId: number,
+    dto: SetMonitorRotationDto,
+  ) {
+    const monitor = await this.findOwned(monitorId, ownerUserId);
+    const seen = new Set<number>();
+    const ids: number[] = [];
+    for (const sid of dto.screenIds) {
+      if (!seen.has(sid)) {
+        seen.add(sid);
+        ids.push(sid);
+      }
+    }
+
+    for (const sid of ids) {
+      const screen = await this.screens.findOne({
+        where: { id: sid, deletedAt: IsNull() },
+      });
+      if (!screen) throw new NotFoundException(`Screen ${sid} not found`);
+      if (screen.ownerUserId !== ownerUserId) {
+        throw new ForbiddenException('Not your screen');
+      }
+    }
+
+    monitor.rotationIntervalMs = dto.intervalMs;
+    monitor.rotationFadeMs = dto.fadeMs;
+
+    if (ids.length === 0) {
+      monitor.rotationScreenIdsJson = null;
+      monitor.currentScreenId = null;
+      return this.monitors.save(monitor);
+    }
+
+    if (ids.length === 1) {
+      monitor.rotationScreenIdsJson = null;
+      monitor.currentScreenId = ids[0];
+      return this.monitors.save(monitor);
+    }
+
+    monitor.rotationScreenIdsJson = JSON.stringify(ids);
+    monitor.currentScreenId = ids[0];
     return this.monitors.save(monitor);
   }
 

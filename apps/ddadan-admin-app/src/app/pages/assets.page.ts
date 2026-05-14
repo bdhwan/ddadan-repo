@@ -20,10 +20,10 @@ import { ApiService, AssetView } from '../api.service';
             <div class="preview">
               @switch (a.type) {
                 @case ('image') {
-                  <img [src]="a.url ?? ''" alt="" />
+                  <img [src]="api.absoluteAssetUrl(a.url)" alt="" />
                 }
                 @case ('video') {
-                  <video [src]="a.url ?? ''" muted></video>
+                  <video [src]="api.absoluteAssetUrl(a.url)" muted></video>
                 }
                 @default {
                   <div class="text">{{ a.textContent }}</div>
@@ -89,7 +89,7 @@ import { ApiService, AssetView } from '../api.service';
   ],
 })
 export class AssetsPage implements OnInit {
-  private readonly api = inject(ApiService);
+  readonly api = inject(ApiService);
   readonly assets = signal<AssetView[]>([]);
   textName = '';
   textBody = '';

@@ -6,6 +6,7 @@ import { mkdirSync } from 'fs';
 import { diskStorage } from 'multer';
 import { AppConfig } from '../config/configuration';
 import { StoresModule } from '../stores/stores.module';
+import { UsersModule } from '../users/users.module';
 import { Asset } from './asset.entity';
 import { AssetsController } from './assets.controller';
 import { AssetsService } from './assets.service';
@@ -13,6 +14,7 @@ import { AssetsService } from './assets.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Asset]),
+    UsersModule,
     MulterModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService<AppConfig, true>) => {

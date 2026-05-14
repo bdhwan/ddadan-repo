@@ -1,6 +1,5 @@
-import { Component, inject } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { AuthService } from './auth.service';
+import { Component } from '@angular/core';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 
 @Component({
   selector: 'admin-root',
@@ -12,13 +11,11 @@ import { AuthService } from './auth.service';
         <aside class="nav">
           <div class="brand">DDADAN</div>
           <nav>
-            <a routerLink="/stores" routerLinkActive="active">매장</a>
+            <a routerLink="/devices" routerLinkActive="active">디바이스</a>
             <a routerLink="/assets" routerLinkActive="active">에셋</a>
             <a routerLink="/screens" routerLinkActive="active">화면</a>
-            <a routerLink="/account" routerLinkActive="active">계정</a>
           </nav>
           <div class="footer">
-            <button class="secondary" type="button" (click)="logout()">로그아웃</button>
             <div class="muted small">
               <a routerLink="/terms">이용약관</a> · <a routerLink="/privacy">개인정보</a>
             </div>
@@ -86,19 +83,7 @@ import { AuthService } from './auth.service';
   ],
 })
 export class App {
-  private readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
-
   showNav(): boolean {
-    const url = this.router.url;
-    if (url.startsWith('/login') || url.startsWith('/signup') || url.startsWith('/register')) {
-      return false;
-    }
-    return this.auth.isLoggedIn();
-  }
-
-  async logout() {
-    await this.auth.signOut();
-    this.router.navigateByUrl('/login');
+    return true;
   }
 }

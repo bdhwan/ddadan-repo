@@ -38,7 +38,7 @@ cp apps/ddadan-api-server/.env.example apps/ddadan-api-server/.env
 cp services/ddadan-service-pi/.env.example services/ddadan-service-pi/.env
 
 # 4) 각 워크스페이스 개발 서버
-npm run dev:api      # NestJS, http://localhost:3000/api
+npm run dev:api      # NestJS, http://localhost:7800/api
 npm run dev:admin    # Angular 어드민, http://localhost:4200
 npm run dev:client   # Angular 플레이어 (다른 포트로 실행 권장)
 npm run dev:pi       # Pi 서비스 (DDADAN_LAUNCH_KIOSK=0 으로 dry-run 가능)

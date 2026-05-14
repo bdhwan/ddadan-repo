@@ -1,57 +1,24 @@
 import { Injectable, signal } from '@angular/core';
-import { initializeApp } from 'firebase/app';
-import {
-  GoogleAuthProvider,
-  createUserWithEmailAndPassword,
-  getAuth,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signInWithPopup,
-  signOut,
-  type Auth,
-  type User,
-} from 'firebase/auth';
-import { environment } from '../environment';
 
+/** Local-only admin: no Firebase or bearer tokens. */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly auth: Auth;
-  readonly currentUser = signal<User | null>(null);
-  readonly ready = signal(false);
+  readonly currentUser = signal<null>(null);
+  readonly ready = signal(true);
 
-  constructor() {
-    const app = initializeApp(environment.firebase);
-    this.auth = getAuth(app);
-    onAuthStateChanged(this.auth, (user) => {
-      this.currentUser.set(user);
-      this.ready.set(true);
-    });
-  }
-
-  async signInWithEmail(email: string, password: string): Promise<void> {
-    await signInWithEmailAndPassword(this.auth, email, password);
-  }
-
-  async signUpWithEmail(email: string, password: string): Promise<void> {
-    await createUserWithEmailAndPassword(this.auth, email, password);
-  }
-
-  async signInWithGoogle(): Promise<void> {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(this.auth, provider);
-  }
-
-  async signOut(): Promise<void> {
-    await signOut(this.auth);
+  isLoggedIn(): boolean {
+    return true;
   }
 
   async getIdToken(): Promise<string | null> {
-    const u = this.auth.currentUser;
-    if (!u) return null;
-    return u.getIdToken();
+    return null;
   }
 
-  isLoggedIn(): boolean {
-    return !!this.auth.currentUser;
-  }
+  async signOut(): Promise<void> {}
+
+  async signInWithEmail(_email: string, _password: string): Promise<void> {}
+
+  async signUpWithEmail(_email: string, _password: string): Promise<void> {}
+
+  async signInWithGoogle(): Promise<void> {}
 }

@@ -1,29 +1,23 @@
 import {
   ConflictException,
   ForbiddenException,
-  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import type Redis from 'ioredis';
 import { IsNull, Repository } from 'typeorm';
 import { AppConfig } from '../config/configuration';
 import { Monitor } from '../monitors/monitor.entity';
-import { REDIS_CLIENT } from '../redis/redis.module';
 import { StoresService } from '../stores/stores.service';
 import { Device, DeviceStatus } from './device.entity';
 import { HeartbeatDto, MonitorReportDto, RegisterDeviceDto } from './dto/device.dto';
-
-const HEARTBEAT_KEY = (deviceId: number) => `device:${deviceId}:heartbeat`;
 
 @Injectable()
 export class DevicesService {
   constructor(
     @InjectRepository(Device) private readonly devices: Repository<Device>,
     @InjectRepository(Monitor) private readonly monitors: Repository<Monitor>,
-    @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly stores: StoresService,
     private readonly config: ConfigService<AppConfig, true>,
   ) {}
@@ -44,6 +38,18 @@ export class DevicesService {
     };
   }
 
+  async listAllForOwner(ownerUserId: number) {
+    const rows = await this.devices
+      .createQueryBuilder('d')
+      .innerJoinAndSelect('d.store', 's')
+      .where('s.ownerUserId = :ownerUserId', { ownerUserId })
+      .andWhere('d.deletedAt IS NULL')
+      .andWhere('s.deletedAt IS NULL')
+      .orderBy('d.id', 'ASC')
+      .getMany();
+    return Promise.all(rows.map((d) => this.toView(d)));
+  }
+
   async listForStore(storeId: number, ownerUserId: number) {
     await this.stores.getOwned(storeId, ownerUserId);
     const devices = await this.devices.find({
@@ -61,6 +67,18 @@ export class DevicesService {
     if (!device.storeId) throw new ForbiddenException('Device unregistered');
     await this.stores.getOwned(device.storeId, ownerUserId);
     return device;
+  }
+
+  /** Single-device view for admin detail (avoids list.find id strict-equality pitfalls). */
+  async getViewForOwner(deviceId: number, ownerUserId: number) {
+    const device = await this.devices.findOne({
+      where: { id: deviceId, deletedAt: IsNull() },
+      relations: ['store'],
+    });
+    if (!device) throw new NotFoundException('Device not found');
+    if (!device.storeId) throw new ForbiddenException('Device unregistered');
+    await this.stores.getOwned(device.storeId, ownerUserId);
+    return this.toView(device);
   }
 
   async register(
@@ -113,9 +131,6 @@ export class DevicesService {
       await this.syncMonitors(device.id, dto.monitors);
     }
 
-    const ttl = this.config.get('heartbeat', { infer: true }).offlineAfterSeconds;
-    await this.redis.set(HEARTBEAT_KEY(device.id), Date.now().toString(), 'EX', ttl);
-
     return { ok: true, deviceId: device.id };
   }
 
@@ -143,6 +158,17 @@ export class DevicesService {
     return this.devices.find({
       where: { deletedAt: IsNull() },
     });
+  }
+
+  /** Public for HeartbeatService — same rule as API list views. */
+  static liveStatusFromLastSeen(
+    lastSeenAt: Date | null,
+    offlineAfterSeconds: number,
+    persistedStatus: DeviceStatus,
+  ): DeviceStatus {
+    if (!lastSeenAt) return persistedStatus;
+    const ageMs = Date.now() - lastSeenAt.getTime();
+    return ageMs < offlineAfterSeconds * 1000 ? 'online' : 'offline';
   }
 
   private async ensureDefaultMonitor(deviceId: number) {
@@ -191,17 +217,47 @@ export class DevicesService {
   }
 
   private async toView(device: Device) {
-    const monitors = await this.monitors.find({
+    const monitorsRaw = await this.monitors.find({
       where: { deviceId: device.id, deletedAt: IsNull() },
       order: { slot: 'ASC' },
     });
-    const heartbeatTs = await this.redis.get(HEARTBEAT_KEY(device.id));
+    const monitors = monitorsRaw.map((m) => {
+      let rotationScreenIds: number[] = [];
+      if (m.rotationScreenIdsJson) {
+        try {
+          const parsed = JSON.parse(m.rotationScreenIdsJson) as unknown;
+          if (Array.isArray(parsed)) {
+            rotationScreenIds = parsed.filter((x): x is number => typeof x === 'number');
+          }
+        } catch {
+          rotationScreenIds = [];
+        }
+      }
+      return {
+        id: m.id,
+        deviceId: m.deviceId,
+        slot: m.slot,
+        resolutionW: m.resolutionW,
+        resolutionH: m.resolutionH,
+        positionX: m.positionX,
+        positionY: m.positionY,
+        currentScreenId: m.currentScreenId,
+        rotationScreenIds,
+        rotationIntervalMs: m.rotationIntervalMs ?? 10_000,
+        rotationFadeMs: m.rotationFadeMs ?? 800,
+      };
+    });
     const ttl = this.config.get('heartbeat', { infer: true }).offlineAfterSeconds;
-    const liveStatus: DeviceStatus = heartbeatTs ? 'online' : device.status;
+    const liveStatus = DevicesService.liveStatusFromLastSeen(
+      device.lastSeenAt,
+      ttl,
+      device.status,
+    );
     return {
       id: device.id,
       hardwareId: device.hardwareId,
       storeId: device.storeId,
+      storeName: device.store?.name ?? null,
       name: device.name,
       status: liveStatus,
       lastSeenAt: device.lastSeenAt,

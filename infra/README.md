@@ -53,7 +53,7 @@ Web editor에서는 `build: ...`이 동작하지 않는다. 이 경우:
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `API_PORT` | `3000` | api 컨테이너 호스트 노출 포트 |
+| `API_PORT` | `7800` | api 컨테이너 호스트 노출 포트 |
 | `ADMIN_PORT` | `4200` | admin nginx 호스트 노출 포트 |
 | `PLAYER_PORT` | `4300` | player nginx 호스트 노출 포트 |
 | `CORS_ORIGINS` | `http://localhost:4200,http://localhost:4300` | api가 허용할 어드민/플레이어 origin. 운영 도메인을 콤마로 나열. |
@@ -70,7 +70,7 @@ Web editor에서는 `build: ...`이 동작하지 않는다. 이 경우:
 - **에셋 영속성**: `api-assets` 볼륨이 업로드 파일을 보관한다. 백업 대상.
 - **Firebase 서비스 계정 영속성**: `api-firebase` 볼륨에 entrypoint가 JSON을
   쓰며, 재시작 시 env 값이 비어 있어도 기존 파일이 남아 있어 작동한다.
-- **포트 충돌**: 기본값(3000/4200/4300/3306)이 호스트에서 겹치면
+- **포트 충돌**: 기본값(7800/4200/4300/3306)이 호스트에서 겹치면
   `*_PORT` 변수로 변경.
 - **HTTPS / 도메인**: 본 스택은 평문 HTTP만 노출한다. 프론트(Caddy/Traefik
   /nginx-proxy 등) 리버스 프록시를 별도로 두고 인증서를 발급하거나,

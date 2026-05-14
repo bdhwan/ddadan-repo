@@ -1,26 +1,23 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
-import { CurrentUser } from '../auth/current-user.decorator';
-import type { AuthContext } from '../auth/firebase-auth.guard';
-import { Public } from '../auth/public.decorator';
+import { UsersService } from '../users/users.service';
 import { AcceptPoliciesDto } from './dto/policy.dto';
 import { PoliciesService } from './policies.service';
 
 @Controller('policies')
 export class PoliciesController {
-  constructor(private readonly policies: PoliciesService) {}
+  constructor(
+    private readonly policies: PoliciesService,
+    private readonly users: UsersService,
+  ) {}
 
-  @Public()
   @Get('current')
   current() {
     return this.policies.listAllCurrent();
   }
 
   @Post('accept')
-  async accept(
-    @CurrentUser() auth: AuthContext,
-    @Body() dto: AcceptPoliciesDto,
-  ) {
-    await this.policies.accept(auth.userId, dto.documentIds);
+  async accept(@Body() dto: AcceptPoliciesDto) {
+    await this.policies.accept(this.users.getLocalUserId(), dto.documentIds);
     return { ok: true };
   }
 }

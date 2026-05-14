@@ -33,11 +33,31 @@ interface DragState {
         <div class="editor">
           <div class="library">
             <h3>에셋</h3>
+            <div class="library-add">
+              <input
+                #assetFile
+                type="file"
+                class="file-input"
+                accept="image/*,video/*"
+                (change)="onAssetFile($event)"
+              />
+              <button type="button" class="secondary" (click)="assetFile.click()">파일로 에셋 추가</button>
+              <input [(ngModel)]="newTextName" placeholder="텍스트 이름" />
+              <textarea [(ngModel)]="newTextBody" placeholder="텍스트 내용" rows="2"></textarea>
+              <button
+                type="button"
+                class="secondary"
+                (click)="addTextAsset()"
+                [disabled]="!newTextName.trim() || !newTextBody.trim() || textBusy()"
+              >
+                텍스트 에셋 추가
+              </button>
+            </div>
             <div class="library-list">
               @for (a of assets(); track a.id) {
                 <div class="library-item" (click)="addFromAsset(a)">
                   @switch (a.type) {
-                    @case ('image') { <img [src]="a.url ?? ''" alt="" /> }
+                    @case ('image') { <img [src]="api.absoluteAssetUrl(a.url)" alt="" /> }
                     @case ('video') { <span>🎬</span> }
                     @default { <span>📝</span> }
                   }
@@ -134,11 +154,26 @@ interface DragState {
         font-size: 13px;
         margin: 6px 0 6px;
       }
+      .library-add {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 10px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .library-add input,
+      .library-add textarea {
+        font-size: 12px;
+      }
+      .file-input {
+        display: none;
+      }
       .library-list {
         display: flex;
         flex-direction: column;
         gap: 6px;
-        max-height: 220px;
+        max-height: 180px;
         overflow: auto;
       }
       .library-item {
@@ -204,21 +239,63 @@ interface DragState {
   ],
 })
 export class ScreenEditPage implements OnInit {
-  private readonly api = inject(ApiService);
+  readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   readonly stage = viewChild<ElementRef<HTMLDivElement>>('stage');
   readonly screen = signal<ScreenView | null>(null);
   readonly assets = signal<AssetView[]>([]);
   readonly components = signal<Array<{ id: number; name: string; kind: string; payload: ScreenLayoutItem | ScreenLayoutItem[] }>>([]);
   readonly selected = signal<ScreenLayoutItem | null>(null);
+  newTextName = '';
+  newTextBody = '';
+  readonly textBusy = signal(false);
 
   private drag: DragState | null = null;
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
     this.api.getScreen(id).subscribe((s) => this.screen.set(s));
-    this.api.listAssets().subscribe((a) => this.assets.set(a));
+    this.refreshAssets();
     this.api.listComponents().subscribe((c) => this.components.set(c));
+  }
+
+  private refreshAssets() {
+    this.api.listAssets().subscribe((a) => this.assets.set(a));
+  }
+
+  onAssetFile(ev: Event) {
+    const s = this.screen();
+    if (!s) return;
+    const input = ev.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    this.api.uploadAsset(file, s.storeId ?? undefined).subscribe({
+      next: (asset) => {
+        input.value = '';
+        this.refreshAssets();
+        this.addFromAsset(asset);
+      },
+      error: () => (input.value = ''),
+    });
+  }
+
+  addTextAsset() {
+    const s = this.screen();
+    if (!s) return;
+    const name = this.newTextName.trim();
+    const body = this.newTextBody.trim();
+    if (!name || !body) return;
+    this.textBusy.set(true);
+    this.api.createTextAsset(name, body).subscribe({
+      next: (asset) => {
+        this.newTextName = '';
+        this.newTextBody = '';
+        this.textBusy.set(false);
+        this.refreshAssets();
+        this.addFromAsset(asset);
+      },
+      error: () => this.textBusy.set(false),
+    });
   }
 
   aspectRatio(): string {
@@ -229,7 +306,7 @@ export class ScreenEditPage implements OnInit {
   urlOf(item: ScreenLayoutItem): string {
     if (!item.assetId) return '';
     const asset = this.assets().find((a) => a.id === item.assetId);
-    return asset?.url ?? '';
+    return this.api.absoluteAssetUrl(asset?.url ?? null);
   }
 
   select(ev: MouseEvent, item: ScreenLayoutItem) {

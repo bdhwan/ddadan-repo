@@ -60,7 +60,7 @@ export class LoginPage {
     this.error.set(null);
     try {
       await this.auth.signInWithEmail(this.email, this.password);
-      this.router.navigateByUrl('/stores');
+      this.router.navigateByUrl('/devices');
     } catch (err) {
       this.error.set((err as Error).message);
     } finally {
@@ -73,7 +73,7 @@ export class LoginPage {
     this.error.set(null);
     try {
       await this.auth.signInWithGoogle();
-      this.router.navigateByUrl('/stores');
+      this.router.navigateByUrl('/devices');
     } catch (err) {
       this.error.set((err as Error).message);
     } finally {

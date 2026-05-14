@@ -1,4 +1,83 @@
-@if (screen(); as s) {
+@if (useRotation()) {
+  <div class="stage rot-stage" [style.aspect-ratio]="aspectRot()">
+    <div
+      class="rot-layer layer-back"
+      [style.opacity]="rotOp0()"
+      [style.transition]="rotTransition()"
+    >
+      @if (slideAt(0); as sl) {
+        <div
+          class="slide-fill"
+          [style.background]="sl.background ?? '#0c0f1a'"
+        >
+          @for (item of sl.items; track item.id) {
+            <div
+              class="item"
+              [style.left.%]="(item.x / sl.width) * 100"
+              [style.top.%]="(item.y / sl.height) * 100"
+              [style.width.%]="(item.width / sl.width) * 100"
+              [style.height.%]="(item.height / sl.height) * 100"
+              [style.z-index]="item.zIndex ?? 1"
+              [style.background]="item.background ?? null"
+              [style.color]="item.color ?? null"
+              [style.font-size.px]="item.fontSize ?? null"
+            >
+              @switch (item.kind) {
+                @case ('image') {
+                  <img [src]="absoluteUrl(item) ?? ''" alt="" />
+                }
+                @case ('video') {
+                  <video [src]="absoluteUrl(item) ?? ''" autoplay muted loop playsinline></video>
+                }
+                @default {
+                  <div class="text">{{ item.text }}</div>
+                }
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+    <div
+      class="rot-layer layer-front"
+      [style.opacity]="rotOp1()"
+      [style.transition]="rotTransition()"
+    >
+      @if (slideAt(1); as sl) {
+        <div
+          class="slide-fill"
+          [style.background]="sl.background ?? '#0c0f1a'"
+        >
+          @for (item of sl.items; track item.id) {
+            <div
+              class="item"
+              [style.left.%]="(item.x / sl.width) * 100"
+              [style.top.%]="(item.y / sl.height) * 100"
+              [style.width.%]="(item.width / sl.width) * 100"
+              [style.height.%]="(item.height / sl.height) * 100"
+              [style.z-index]="item.zIndex ?? 1"
+              [style.background]="item.background ?? null"
+              [style.color]="item.color ?? null"
+              [style.font-size.px]="item.fontSize ?? null"
+            >
+              @switch (item.kind) {
+                @case ('image') {
+                  <img [src]="absoluteUrl(item) ?? ''" alt="" />
+                }
+                @case ('video') {
+                  <video [src]="absoluteUrl(item) ?? ''" autoplay muted loop playsinline></video>
+                }
+                @default {
+                  <div class="text">{{ item.text }}</div>
+                }
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+} @else if (screen(); as s) {
   <div class="stage" [style.background]="s.background ?? '#0c0f1a'" [style.aspect-ratio]="aspect()">
     @for (item of s.items; track item.id) {
       <div

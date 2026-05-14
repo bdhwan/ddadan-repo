@@ -1,10 +1,8 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as admin from 'firebase-admin';
 import { DataSource, IsNull, Repository } from 'typeorm';
 import { Asset } from '../assets/asset.entity';
 import { Device } from '../devices/device.entity';
-import { FIREBASE_ADMIN } from '../firebase/firebase.module';
 import { Monitor } from '../monitors/monitor.entity';
 import { ScreenComponent } from '../screens/screen-component.entity';
 import { Screen } from '../screens/screen.entity';
@@ -16,7 +14,6 @@ export class AccountService {
   private readonly logger = new Logger(AccountService.name);
 
   constructor(
-    @Inject(FIREBASE_ADMIN) private readonly firebaseApp: admin.app.App,
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(Store) private readonly stores: Repository<Store>,
     @InjectRepository(Device) private readonly devices: Repository<Device>,
@@ -28,7 +25,7 @@ export class AccountService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async withdraw(userId: number, firebaseUid: string) {
+  async withdraw(userId: number) {
     await this.dataSource.transaction(async (manager) => {
       const storeIds = (
         await manager.find(Store, { where: { ownerUserId: userId, deletedAt: IsNull() } })
@@ -50,15 +47,8 @@ export class AccountService {
       await manager.softDelete(Asset, { ownerUserId: userId });
       await manager.softDelete(Screen, { ownerUserId: userId });
       await manager.softDelete(ScreenComponent, { ownerUserId: userId });
-      await manager.softDelete(User, { id: userId });
     });
 
-    try {
-      await this.firebaseApp.auth().deleteUser(firebaseUid);
-    } catch (err) {
-      this.logger.warn(
-        `Failed to delete Firebase user ${firebaseUid}: ${(err as Error).message}`,
-      );
-    }
+    this.logger.log(`Local user ${userId} data withdrawn (soft delete)`);
   }
 }

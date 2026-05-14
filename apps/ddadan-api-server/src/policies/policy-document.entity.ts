@@ -12,7 +12,7 @@ export class PolicyDocument extends BaseEntity {
   @Column({ type: 'varchar', length: 32 })
   version!: string;
 
-  @Column({ type: 'mediumtext' })
+  @Column({ type: 'text' })
   content!: string;
 
   @Column({ type: 'datetime', precision: 6 })

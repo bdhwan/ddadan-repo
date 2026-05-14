@@ -6,7 +6,7 @@ import { ScreenLayoutItem } from './screen.entity';
 @Entity('screen_components')
 @Index(['ownerUserId'])
 export class ScreenComponent extends BaseEntity {
-  @Column({ type: 'bigint' })
+  @Column({ type: 'integer' })
   ownerUserId!: number;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })

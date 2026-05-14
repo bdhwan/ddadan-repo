@@ -67,7 +67,7 @@ services:
       redis:
         condition: service_healthy
     environment:
-      PORT: "3000"
+      PORT: "7800"
       NODE_ENV: production
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4200,http://localhost:4300}
       DB_HOST: mysql
@@ -88,7 +88,7 @@ services:
       - api-assets:/app/storage/assets
       - api-firebase:/app/firebase
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "${API_PORT:-7800}:7800"
     networks:
       - ddadan
 

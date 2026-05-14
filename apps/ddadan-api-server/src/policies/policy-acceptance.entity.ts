@@ -13,17 +13,17 @@ import { PolicyDocument } from './policy-document.entity';
 @Entity('policy_acceptances')
 @Index(['userId'])
 export class PolicyAcceptance {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id!: number;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'integer' })
   userId!: number;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   user?: User;
 
-  @Column({ type: 'bigint' })
+  @Column({ type: 'integer' })
   documentId!: number;
 
   @ManyToOne(() => PolicyDocument, { onDelete: 'CASCADE' })

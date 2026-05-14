@@ -6,7 +6,7 @@ import {
 } from 'typeorm';
 
 export abstract class BaseEntity {
-  @PrimaryGeneratedColumn({ type: 'bigint' })
+  @PrimaryGeneratedColumn({ type: 'integer' })
   id!: number;
 
   @CreateDateColumn({ type: 'datetime', precision: 6 })

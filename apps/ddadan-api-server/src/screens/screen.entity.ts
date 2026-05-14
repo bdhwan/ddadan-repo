@@ -29,14 +29,14 @@ export interface ScreenLayout {
 @Index(['ownerUserId'])
 @Index(['storeId'])
 export class Screen extends BaseEntity {
-  @Column({ type: 'bigint' })
+  @Column({ type: 'integer' })
   ownerUserId!: number;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'ownerUserId' })
   owner?: User;
 
-  @Column({ type: 'bigint', nullable: true })
+  @Column({ type: 'integer', nullable: true })
   storeId!: number | null;
 
   @ManyToOne(() => Store, { onDelete: 'SET NULL', nullable: true })

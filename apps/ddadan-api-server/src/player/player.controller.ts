@@ -8,10 +8,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { Public } from '../auth/public.decorator';
 import { AppConfig } from '../config/configuration';
 import { Asset } from '../assets/asset.entity';
-import { AssetsService } from '../assets/assets.service';
 import { Device } from '../devices/device.entity';
 import { Monitor } from '../monitors/monitor.entity';
 import { Screen, ScreenLayoutItem } from '../screens/screen.entity';
@@ -23,11 +21,9 @@ export class PlayerController {
     @InjectRepository(Monitor) private readonly monitors: Repository<Monitor>,
     @InjectRepository(Screen) private readonly screens: Repository<Screen>,
     @InjectRepository(Asset) private readonly assets: Repository<Asset>,
-    private readonly assetsService: AssetsService,
     private readonly config: ConfigService<AppConfig, true>,
   ) {}
 
-  @Public()
   @Get(':hardwareId/screen')
   async getScreen(
     @Param('hardwareId') hardwareId: string,
@@ -44,28 +40,93 @@ export class PlayerController {
     const monitor = await this.monitors.findOne({
       where: { deviceId: device.id, slot, deletedAt: IsNull() },
     });
-    if (!monitor || monitor.currentScreenId == null) {
+    if (!monitor) {
       return this.fallbackInfoScreen({
         hardwareId,
         slot,
         registered: true,
         deviceName: device.name,
-        resolutionW: monitor?.resolutionW ?? 1920,
-        resolutionH: monitor?.resolutionH ?? 1080,
+        resolutionW: 1920,
+        resolutionH: 1080,
+      });
+    }
+
+    const rotationIds = this.parseRotationIds(monitor.rotationScreenIdsJson);
+    if (rotationIds.length >= 2) {
+      const loaded = await Promise.all(
+        rotationIds.map((id) =>
+          this.screens.findOne({ where: { id, deletedAt: IsNull() } }),
+        ),
+      );
+      if (loaded.some((s) => !s)) {
+        throw new NotFoundException('Assigned screen missing');
+      }
+      const slides = await Promise.all(
+        loaded.map((sc) => this.buildSlidePayload(sc!)),
+      );
+      const base = slides[0];
+      return {
+        registered: true,
+        deviceName: device.name,
+        mode: 'rotation' as const,
+        width: base.width,
+        height: base.height,
+        background: base.background,
+        items: base.items,
+        rotation: {
+          intervalMs: monitor.rotationIntervalMs ?? 10_000,
+          fadeMs: monitor.rotationFadeMs ?? 800,
+          slides,
+        },
+      };
+    }
+
+    const activeId =
+      rotationIds.length === 1 ? rotationIds[0] : monitor.currentScreenId;
+    if (activeId == null) {
+      return this.fallbackInfoScreen({
+        hardwareId,
+        slot,
+        registered: true,
+        deviceName: device.name,
+        resolutionW: monitor.resolutionW ?? 1920,
+        resolutionH: monitor.resolutionH ?? 1080,
       });
     }
 
     const screen = await this.screens.findOne({
-      where: { id: monitor.currentScreenId, deletedAt: IsNull() },
+      where: { id: activeId, deletedAt: IsNull() },
     });
     if (!screen) {
       throw new NotFoundException('Assigned screen missing');
     }
 
-    const items = await this.expandLayout(screen.layout.items);
+    const payload = await this.buildSlidePayload(screen);
     return {
       registered: true,
       deviceName: device.name,
+      mode: 'single' as const,
+      width: payload.width,
+      height: payload.height,
+      background: payload.background,
+      items: payload.items,
+    };
+  }
+
+  private parseRotationIds(json: string | null): number[] {
+    if (!json) return [];
+    try {
+      const parsed = JSON.parse(json) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((x): x is number => typeof x === 'number');
+    } catch {
+      return [];
+    }
+  }
+
+  private async buildSlidePayload(screen: Screen) {
+    const items = await this.expandLayout(screen.layout.items);
+    return {
       width: screen.width,
       height: screen.height,
       background: screen.layout.background,
@@ -109,6 +170,7 @@ export class PlayerController {
     return {
       registered: info.registered,
       deviceName: info.deviceName ?? null,
+      mode: 'single' as const,
       width: info.resolutionW ?? 1920,
       height: info.resolutionH ?? 1080,
       background: '#0c0f1a',

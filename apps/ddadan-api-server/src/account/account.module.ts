@@ -6,6 +6,7 @@ import { Monitor } from '../monitors/monitor.entity';
 import { ScreenComponent } from '../screens/screen-component.entity';
 import { Screen } from '../screens/screen.entity';
 import { Store } from '../stores/store.entity';
+import { UsersModule } from '../users/users.module';
 import { User } from '../users/user.entity';
 import { AccountController } from './account.controller';
 import { AccountService } from './account.service';
@@ -21,6 +22,7 @@ import { AccountService } from './account.service';
       Screen,
       ScreenComponent,
     ]),
+    UsersModule,
   ],
   providers: [AccountService],
   controllers: [AccountController],

@@ -1,6 +1,4 @@
 import { Controller, Get } from '@nestjs/common';
-import { CurrentUser } from '../auth/current-user.decorator';
-import type { AuthContext } from '../auth/firebase-auth.guard';
 import { UsersService } from './users.service';
 
 @Controller('users')
@@ -8,8 +6,8 @@ export class UsersController {
   constructor(private readonly users: UsersService) {}
 
   @Get('me')
-  async me(@CurrentUser() auth: AuthContext) {
-    const user = await this.users.findById(auth.userId);
+  async me() {
+    const user = await this.users.findById(this.users.getLocalUserId());
     return {
       id: user.id,
       firebaseUid: user.firebaseUid,

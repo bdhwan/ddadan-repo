@@ -18,7 +18,7 @@ const intEnv = (v: string | undefined, fallback: number) => {
 
 export function loadConfig(): PiConfig {
   return {
-    apiBase: process.env.DDADAN_API_BASE ?? 'http://localhost:3000/api',
+    apiBase: process.env.DDADAN_API_BASE ?? 'http://localhost:7800/api',
     adminBase: process.env.DDADAN_ADMIN_BASE ?? 'http://localhost:4200',
     playerBase: process.env.DDADAN_PLAYER_BASE ?? 'http://localhost:4300',
     heartbeatIntervalSec: intEnv(process.env.DDADAN_HEARTBEAT_INTERVAL_S, 20),

@@ -1,5 +1,5 @@
 export const environment = {
-  apiBase: 'http://localhost:3000/api',
+  apiBase: 'http://localhost:7800/api',
   pollIntervalMs: 5000,
   firebase: {
     apiKey: 'AIzaSyDzPWfvMYNG50HCLUtbNRZalNdxb5DUY4I',

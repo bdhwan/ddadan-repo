@@ -66,7 +66,7 @@ export class SignupPage {
     try {
       await this.auth.signUpWithEmail(this.email, this.password);
       await this.acceptCurrentPolicies();
-      this.router.navigateByUrl('/stores');
+      this.router.navigateByUrl('/devices');
     } catch (err) {
       this.error.set((err as Error).message);
     } finally {
@@ -80,7 +80,7 @@ export class SignupPage {
     try {
       await this.auth.signInWithGoogle();
       await this.acceptCurrentPolicies();
-      this.router.navigateByUrl('/stores');
+      this.router.navigateByUrl('/devices');
     } catch (err) {
       this.error.set((err as Error).message);
     } finally {

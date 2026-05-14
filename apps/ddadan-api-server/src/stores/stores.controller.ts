@@ -9,48 +9,43 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { CurrentUser } from '../auth/current-user.decorator';
-import type { AuthContext } from '../auth/firebase-auth.guard';
+import { UsersService } from '../users/users.service';
 import { CreateStoreDto, UpdateStoreDto } from './dto/store.dto';
 import { StoresService } from './stores.service';
 
 @Controller('stores')
 export class StoresController {
-  constructor(private readonly stores: StoresService) {}
+  constructor(
+    private readonly stores: StoresService,
+    private readonly users: UsersService,
+  ) {}
 
   @Get()
-  list(@CurrentUser() auth: AuthContext) {
-    return this.stores.list(auth.userId);
+  list() {
+    return this.stores.list(this.users.getLocalUserId());
   }
 
   @Post()
-  create(@CurrentUser() auth: AuthContext, @Body() dto: CreateStoreDto) {
-    return this.stores.create(auth.userId, dto);
+  create(@Body() dto: CreateStoreDto) {
+    return this.stores.create(this.users.getLocalUserId(), dto);
   }
 
   @Get(':id')
-  get(
-    @CurrentUser() auth: AuthContext,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
-    return this.stores.getOwned(id, auth.userId);
+  get(@Param('id', ParseIntPipe) id: number) {
+    return this.stores.getOwned(id, this.users.getLocalUserId());
   }
 
   @Patch(':id')
   update(
-    @CurrentUser() auth: AuthContext,
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateStoreDto,
   ) {
-    return this.stores.update(id, auth.userId, dto);
+    return this.stores.update(id, this.users.getLocalUserId(), dto);
   }
 
   @Delete(':id')
   @HttpCode(204)
-  async remove(
-    @CurrentUser() auth: AuthContext,
-    @Param('id', ParseIntPipe) id: number,
-  ) {
-    await this.stores.remove(id, auth.userId);
+  async remove(@Param('id', ParseIntPipe) id: number) {
+    await this.stores.remove(id, this.users.getLocalUserId());
   }
 }

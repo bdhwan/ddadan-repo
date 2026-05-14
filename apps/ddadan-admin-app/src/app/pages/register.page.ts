@@ -1,11 +1,11 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiService, Store } from '../api.service';
 
 @Component({
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   template: `
     <div class="wrap">
       <div class="panel" style="width:520px">
@@ -30,11 +30,26 @@ import { ApiService, Store } from '../api.service';
         @if (error()) {
           <div class="error">{{ error() }}</div>
         }
+        @if (stores().length === 0) {
+          <div class="field">
+            <label>새 매장 만들기</label>
+            <input [(ngModel)]="newStoreName" placeholder="매장 이름" />
+            <button
+              type="button"
+              class="secondary"
+              style="width:100%; margin-top:8px"
+              (click)="addStore()"
+              [disabled]="storeBusy() || !newStoreName.trim()"
+            >
+              매장 추가 후 계속
+            </button>
+          </div>
+        }
         <button (click)="register()" [disabled]="busy() || !selectedStoreId" style="width:100%; margin-top:6px">
           이 매장에 등록
         </button>
         <p class="muted" style="margin-top:12px">
-          매장이 없다면 먼저 <a (click)="goToStores()">매장 만들기</a>를 진행하세요.
+          매장은 <a routerLink="/devices">디바이스</a> 화면에서도 추가할 수 있습니다.
         </p>
       </div>
     </div>
@@ -57,14 +72,40 @@ export class RegisterPage implements OnInit {
   readonly hardwareId = signal('');
   readonly stores = signal<Store[]>([]);
   selectedStoreId: number | null = null;
+  newStoreName = '';
   name = '';
   readonly busy = signal(false);
+  readonly storeBusy = signal(false);
   readonly error = signal<string | null>(null);
 
   ngOnInit() {
     const id = this.route.snapshot.queryParamMap.get('deviceId') ?? '';
     this.hardwareId.set(id);
-    this.api.listStores().subscribe((s) => this.stores.set(s));
+    this.api.listStores().subscribe((s) => {
+      this.stores.set(s);
+      if (s.length && this.selectedStoreId == null) {
+        this.selectedStoreId = s[0].id;
+      }
+    });
+  }
+
+  addStore() {
+    const name = this.newStoreName.trim();
+    if (!name) return;
+    this.storeBusy.set(true);
+    this.error.set(null);
+    this.api.createStore(name).subscribe({
+      next: (created) => {
+        this.newStoreName = '';
+        this.storeBusy.set(false);
+        this.selectedStoreId = created.id;
+        this.api.listStores().subscribe((s) => this.stores.set(s));
+      },
+      error: (err) => {
+        this.storeBusy.set(false);
+        this.error.set(err?.error?.message ?? err.message);
+      },
+    });
   }
 
   register() {
@@ -74,16 +115,12 @@ export class RegisterPage implements OnInit {
     this.api.registerDevice(this.selectedStoreId, this.hardwareId(), this.name || undefined).subscribe({
       next: () => {
         this.busy.set(false);
-        this.router.navigate(['/stores', this.selectedStoreId, 'devices']);
+        this.router.navigate(['/devices']);
       },
       error: (err) => {
         this.busy.set(false);
         this.error.set(err?.error?.message ?? err.message);
       },
     });
-  }
-
-  goToStores() {
-    this.router.navigateByUrl('/stores');
   }
 }
