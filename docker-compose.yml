@@ -1,26 +1,61 @@
 services:
-  mysql:
-    image: mysql:8.0
+  api:
+    build:
+      context: .
+      dockerfile: apps/ddadan-api-server/Dockerfile
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: rootpw
-      MYSQL_DATABASE: ddadan
-      MYSQL_USER: ddadan
-      MYSQL_PASSWORD: ddadan
-    command: --default-authentication-plugin=caching_sha2_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-    ports:
-      - '3306:3306'
+      PORT: "7800"
+      NODE_ENV: production
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://100.87.216.19:4200,http://100.87.216.19:7300,http://localhost:4200,http://localhost:7300}
+      DB_PATH: /app/data/ddadan.sqlite
+      DB_SYNCHRONIZE: "true"
+      DB_LOGGING: "false"
+      ASSETS_DIR: /app/storage/assets
+      ASSETS_PUBLIC_PATH: /static/assets
+      HEARTBEAT_OFFLINE_AFTER_SECONDS: "60"
     volumes:
-      - mysql-data:/var/lib/mysql
+      - api-data:/app/data
+      - api-assets:/app/storage/assets
+    ports:
+      - "${API_PORT:-7800}:7800"
+    networks:
+      - ddadan
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:7800/api/health/live || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
-  redis:
-    image: redis:7-alpine
+  admin:
+    build:
+      context: .
+      dockerfile: apps/ddadan-admin-app/Dockerfile
     restart: unless-stopped
+    depends_on:
+      - api
     ports:
-      - '6379:6379'
-    volumes:
-      - redis-data:/data
+      - "${ADMIN_PORT:-4200}:80"
+    networks:
+      - ddadan
+
+  player:
+    build:
+      context: .
+      dockerfile: apps/ddadan-client-app/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "${PLAYER_PORT:-7300}:80"
+    networks:
+      - ddadan
 
 volumes:
-  mysql-data:
-  redis-data:
+  api-data:
+  api-assets:
+
+networks:
+  ddadan:
+    driver: bridge

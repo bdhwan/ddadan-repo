@@ -76,15 +76,51 @@ export class App implements OnInit, OnDestroy {
   private rotWaitTimer: ReturnType<typeof setTimeout> | null = null;
   private rotFadeTimer: ReturnType<typeof setTimeout> | null = null;
 
+  protected readonly editingDeviceId = signal(false);
+  protected readonly draftDeviceId = signal('');
+  protected readonly needsRegister = computed(() => {
+    const s = this.screen();
+    return s !== null && (s.registered === false || s.isFallback === true);
+  });
+
   ngOnInit(): void {
     const url = new URL(window.location.href);
-    const deviceId = url.searchParams.get('deviceId') ?? 'dev-local';
+    const queryDeviceId = url.searchParams.get('deviceId');
+    let stored: string | null = null;
+    try {
+      stored = localStorage.getItem('ddadan.deviceId');
+    } catch {
+      // ignore (private mode, etc.)
+    }
+    const deviceId = queryDeviceId ?? stored ?? 'dev-local';
     const slot = Number(url.searchParams.get('slot') ?? '0');
     this.hardwareId.set(deviceId);
     this.slot.set(slot);
 
     this.fetch();
     this.timer = setInterval(() => this.fetch(), environment.pollIntervalMs);
+  }
+
+  protected openDeviceIdEditor() {
+    this.draftDeviceId.set(this.hardwareId());
+    this.editingDeviceId.set(true);
+  }
+
+  protected cancelDeviceIdEditor() {
+    this.editingDeviceId.set(false);
+  }
+
+  protected applyDeviceId(value: string) {
+    const next = value.trim();
+    if (!next) return;
+    try {
+      localStorage.setItem('ddadan.deviceId', next);
+    } catch {
+      // ignore
+    }
+    this.hardwareId.set(next);
+    this.editingDeviceId.set(false);
+    this.fetch();
   }
 
   ngOnDestroy(): void {

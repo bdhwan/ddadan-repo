@@ -69,3 +69,116 @@
   font-size: 24px;
   opacity: 0.7;
 }
+
+.device-id-badge {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 50;
+  padding: 10px 16px;
+  background: rgba(20, 24, 36, 0.85);
+  color: #fff;
+  border-radius: 999px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  user-select: none;
+
+  strong {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .device-id-edit {
+    font-size: 12px;
+    padding: 2px 8px;
+    background: #2c7be5;
+    border-radius: 999px;
+  }
+}
+
+.device-id-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(5, 7, 14, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.device-id-card {
+  width: min(420px, 92vw);
+  padding: 24px 28px;
+  background: #11151f;
+  border-radius: 16px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  h2 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+  }
+
+  .hint {
+    margin: 0;
+    font-size: 13px;
+    opacity: 0.65;
+  }
+
+  input {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 16px;
+    background: #0a0d14;
+    color: #fff;
+    border: 1px solid #2a3142;
+    border-radius: 10px;
+    outline: none;
+
+    &:focus {
+      border-color: #2c7be5;
+    }
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+
+  .btn {
+    padding: 10px 18px;
+    font-size: 14px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .btn-cancel {
+    background: transparent;
+    color: #c7ccd6;
+
+    &:hover {
+      background: #1a1f2c;
+    }
+  }
+
+  .btn-apply {
+    background: #2c7be5;
+    color: #fff;
+
+    &:hover {
+      background: #2168c9;
+    }
+  }
+}

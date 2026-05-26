@@ -3,6 +3,16 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService, AssetView, ScreenLayoutItem, ScreenView } from '../api.service';
 
+function newId(): string {
+  const c: Crypto | undefined = typeof crypto !== 'undefined' ? crypto : undefined;
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (ch) => {
+    const r = (Math.random() * 16) | 0;
+    const v = ch === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 interface DragState {
   itemId: string;
   mode: 'move' | 'resize';
@@ -24,7 +34,12 @@ interface DragState {
         <div class="toolbar">
           <input [(ngModel)]="s.name" />
           <span class="muted">{{ s.width }} × {{ s.height }}</span>
-          <button (click)="save()">저장</button>
+          <button (click)="save()" [disabled]="saveBusy()">
+            {{ saveBusy() ? '저장 중…' : '저장' }}
+          </button>
+          @if (saveMessage(); as msg) {
+            <span class="save-toast" [class.error]="saveError()">{{ msg }}</span>
+          }
           @if (selected()) {
             <button class="secondary" (click)="saveAsComponent()">컴포넌트로 저장</button>
             <button class="secondary danger" (click)="removeSelected()">선택 삭제</button>
@@ -79,8 +94,6 @@ interface DragState {
             #stage
             class="stage"
             [style.aspect-ratio]="aspectRatio()"
-            (mousemove)="onDrag($event)"
-            (mouseup)="endDrag()"
             (click)="clearSelection($event)"
           >
             @for (item of s.layout.items; track item.id) {
@@ -235,6 +248,31 @@ interface DragState {
         border-radius: 50%;
         cursor: nwse-resize;
       }
+      .save-toast {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 10px;
+        margin-left: 6px;
+        background: #1f8c4d;
+        color: #fff;
+        border-radius: 12px;
+        font-size: 12px;
+        line-height: 1.4;
+        animation: fadeIn 0.15s ease-out;
+      }
+      .save-toast.error {
+        background: #c0392b;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-2px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
     `,
   ],
 })
@@ -333,7 +371,7 @@ export class ScreenEditPage implements OnInit {
     const s = this.screen();
     if (!s) return;
     const item: ScreenLayoutItem = {
-      id: crypto.randomUUID(),
+      id: newId(),
       kind: a.type,
       assetId: a.id,
       x: 100,
@@ -352,7 +390,7 @@ export class ScreenEditPage implements OnInit {
     const s = this.screen();
     if (!s) return;
     const items = Array.isArray(c.payload) ? c.payload : [c.payload];
-    const cloned = items.map((i) => ({ ...i, id: crypto.randomUUID() }));
+    const cloned = items.map((i) => ({ ...i, id: newId() }));
     this.screen.set({
       ...s,
       layout: { ...s.layout, items: [...s.layout.items, ...cloned] },
@@ -370,8 +408,12 @@ export class ScreenEditPage implements OnInit {
     this.selected.set(null);
   }
 
+  private dragMoveListener: ((ev: MouseEvent) => void) | null = null;
+  private dragUpListener: (() => void) | null = null;
+
   startDrag(ev: MouseEvent, item: ScreenLayoutItem, mode: 'move' | 'resize') {
     ev.stopPropagation();
+    ev.preventDefault();
     this.selected.set(item);
     this.drag = {
       itemId: item.id,
@@ -383,6 +425,27 @@ export class ScreenEditPage implements OnInit {
       startItemW: item.width,
       startItemH: item.height,
     };
+    this.detachDragListeners();
+    const move = (e: MouseEvent) => this.onDrag(e);
+    const up = () => {
+      this.endDrag();
+      this.detachDragListeners();
+    };
+    this.dragMoveListener = move;
+    this.dragUpListener = up;
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  }
+
+  private detachDragListeners() {
+    if (this.dragMoveListener) {
+      window.removeEventListener('mousemove', this.dragMoveListener);
+      this.dragMoveListener = null;
+    }
+    if (this.dragUpListener) {
+      window.removeEventListener('mouseup', this.dragUpListener);
+      this.dragUpListener = null;
+    }
   }
 
   onDrag(ev: MouseEvent) {
@@ -400,10 +463,23 @@ export class ScreenEditPage implements OnInit {
       if (this.drag!.mode === 'move') {
         return { ...i, x: Math.round(this.drag!.startItemX + dx), y: Math.round(this.drag!.startItemY + dy) };
       }
+      const startW = this.drag!.startItemW;
+      const startH = this.drag!.startItemH;
+      let newW = Math.max(40, startW + dx);
+      let newH = Math.max(40, startH + dy);
+      const preserveAspect = !ev.shiftKey && startW > 0 && startH > 0;
+      if (preserveAspect) {
+        const aspect = startW / startH;
+        if (Math.abs(dx) * startH >= Math.abs(dy) * startW) {
+          newH = Math.max(40, newW / aspect);
+        } else {
+          newW = Math.max(40, newH * aspect);
+        }
+      }
       return {
         ...i,
-        width: Math.max(40, Math.round(this.drag!.startItemW + dx)),
-        height: Math.max(40, Math.round(this.drag!.startItemH + dy)),
+        width: Math.round(newW),
+        height: Math.round(newH),
       };
     });
     this.screen.set({ ...s, layout: { ...s.layout, items } });
@@ -415,12 +491,34 @@ export class ScreenEditPage implements OnInit {
     this.drag = null;
   }
 
+  readonly saveBusy = signal(false);
+  readonly saveMessage = signal<string | null>(null);
+  readonly saveError = signal(false);
+  private saveMsgTimer: ReturnType<typeof setTimeout> | null = null;
+
   save() {
     const s = this.screen();
     if (!s) return;
+    this.saveBusy.set(true);
+    this.saveMessage.set(null);
+    this.saveError.set(false);
+    if (this.saveMsgTimer) clearTimeout(this.saveMsgTimer);
     this.api
       .updateScreen(s.id, { name: s.name, width: s.width, height: s.height, layout: s.layout })
-      .subscribe();
+      .subscribe({
+        next: () => {
+          this.saveBusy.set(false);
+          this.saveError.set(false);
+          this.saveMessage.set('저장 완료');
+          this.saveMsgTimer = setTimeout(() => this.saveMessage.set(null), 2000);
+        },
+        error: (err) => {
+          this.saveBusy.set(false);
+          this.saveError.set(true);
+          this.saveMessage.set(`저장 실패: ${err?.error?.message ?? err?.message ?? '오류'}`);
+          this.saveMsgTimer = setTimeout(() => this.saveMessage.set(null), 4000);
+        },
+      });
   }
 
   saveAsComponent() {

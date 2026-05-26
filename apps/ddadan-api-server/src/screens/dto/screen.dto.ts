@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  Allow,
   IsArray,
   IsIn,
   IsInt,
@@ -126,5 +127,6 @@ export class CreateScreenComponentDto {
   @IsIn(['image', 'video', 'text', 'group'])
   kind!: 'image' | 'video' | 'text' | 'group';
 
+  @Allow()
   payload!: unknown;
 }
