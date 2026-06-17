@@ -1,20 +1,24 @@
-import { SlicePipe } from '@angular/common';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { ApiService, DeviceView, MonitorView, ScreenView } from '../api.service';
 
-interface RotForm {
-  screenIds: number[];
-  intervalSec: number;
-  fadeMs: number;
-}
-
 @Component({
   standalone: true,
-  imports: [FormsModule, RouterLink, SlicePipe],
+  imports: [FormsModule, RouterLink],
   template: `
     <h1>디바이스</h1>
+    <div class="panel quick-previews">
+      <div class="quick-title">화면 미리보기</div>
+      <div class="quick-links">
+        @for (id of quickPreviewIds; track id) {
+          <a class="preview-chip" [href]="previewUrl(id)" target="_blank" rel="noopener">
+            {{ id }}
+            <span class="path">{{ previewPath(id) }}</span>
+          </a>
+        }
+      </div>
+    </div>
     <div class="panel">
       <div class="toolbar">
         <input [(ngModel)]="hardwareId" placeholder="하드웨어 ID (Pi에서 표시되는 코드)" />
@@ -32,8 +36,8 @@ interface RotForm {
             <th>이름</th>
             <th>하드웨어 ID</th>
             <th>상태</th>
-            <th>마지막 접속</th>
-            <th>화면 로테이션</th>
+            <th>화면 할당</th>
+            <th>미리보기</th>
             <th></th>
           </tr>
         </thead>
@@ -49,53 +53,19 @@ interface RotForm {
                   {{ d.status }}
                 </span>
               </td>
-              <td>{{ d.lastSeenAt ? (d.lastSeenAt | slice: 0:19) : '-' }}</td>
-              <td class="screen-col">
+              <td class="assign-col">
                 @for (m of d.monitors; track m.id) {
-                  <div class="monitor-rot">
-                    <div class="slot">슬롯 {{ m.slot }}</div>
-                    <div class="checks">
-                      @for (s of screens(); track s.id) {
-                        <label class="chk">
-                          <input
-                            type="checkbox"
-                            [checked]="isPicked(m.id, s.id)"
-                            (change)="togglePick(m.id, s.id, $any($event.target).checked)"
-                          />
-                          <span>{{ s.name }}</span>
-                        </label>
-                      }
-                    </div>
-                    <div class="rot-opts">
-                      <label>
-                        간격(초)
-                        <input
-                          type="number"
-                          min="2"
-                          step="1"
-                          [ngModel]="form(m.id).intervalSec"
-                          (ngModelChange)="patchForm(m.id, { intervalSec: +$event })"
-                        />
-                      </label>
-                      <label>
-                        페이드(ms)
-                        <input
-                          type="number"
-                          min="200"
-                          step="100"
-                          [ngModel]="form(m.id).fadeMs"
-                          (ngModelChange)="patchForm(m.id, { fadeMs: +$event })"
-                        />
-                      </label>
-                      <button type="button" class="secondary" (click)="applyRotation(m.id)">적용</button>
-                    </div>
-                    <p class="hint muted">
-                      2개 이상 선택 시 크로스 페이드 로테이션. 1개만 선택 시 고정 화면.
-                    </p>
+                  <div class="slot-summary">
+                    <span class="slot-label">슬롯 {{ m.slot }}</span>
+                    <span>{{ assignmentSummary(m) }}</span>
                   </div>
                 } @empty {
                   <span class="muted">—</span>
                 }
+                <a class="edit-link" [routerLink]="['/devices', d.id]">상세에서 편집 →</a>
+              </td>
+              <td class="preview-col">
+                <a [href]="previewUrl(d.hardwareId)" target="_blank" rel="noopener">{{ previewPath(d.hardwareId) }}</a>
               </td>
               <td><button class="secondary" (click)="unregister(d.id)">등록 해제</button></td>
             </tr>
@@ -121,68 +91,77 @@ interface RotForm {
       .offline {
         color: var(--muted);
       }
-      .screen-col {
+      .assign-col {
         vertical-align: top;
-        min-width: 260px;
-        max-width: 420px;
+        min-width: 200px;
       }
-      .monitor-rot {
-        margin-bottom: 12px;
-        padding-bottom: 10px;
-        border-bottom: 1px solid var(--border);
-      }
-      .monitor-rot:last-child {
-        border-bottom: none;
-        margin-bottom: 0;
-        padding-bottom: 0;
-      }
-      .slot {
+      .slot-summary {
+        display: flex;
+        gap: 8px;
         font-size: 12px;
+        margin-bottom: 4px;
+      }
+      .slot-label {
         font-weight: 600;
-        margin-bottom: 6px;
+        min-width: 52px;
       }
-      .checks {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        max-height: 140px;
-        overflow: auto;
-        margin-bottom: 8px;
-      }
-      .chk {
-        display: flex;
-        align-items: flex-start;
-        gap: 6px;
+      .edit-link {
+        display: inline-block;
+        margin-top: 6px;
         font-size: 12px;
-        cursor: pointer;
       }
-      .rot-opts {
+      .quick-previews {
+        margin-bottom: 14px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+      }
+      .quick-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 10px;
+      }
+      .quick-links {
         display: flex;
         flex-wrap: wrap;
-        align-items: flex-end;
-        gap: 8px;
+        gap: 10px;
       }
-      .rot-opts label {
+      .preview-chip {
         display: flex;
         flex-direction: column;
         gap: 2px;
-        font-size: 11px;
+        padding: 10px 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fafbfd;
+        text-decoration: none;
+        color: var(--text);
+        min-width: 200px;
       }
-      .rot-opts input[type='number'] {
-        width: 72px;
+      .preview-chip:hover {
+        border-color: var(--accent);
+        background: #eef3ff;
       }
-      .hint {
+      .preview-chip .path {
         font-size: 11px;
-        margin: 6px 0 0;
+        color: var(--accent);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .preview-col {
+        font-size: 12px;
+        vertical-align: top;
+      }
+      .preview-col a {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        word-break: break-all;
       }
     `,
   ],
 })
 export class DevicesPage implements OnInit {
   private readonly api = inject(ApiService);
+  readonly quickPreviewIds = ['display-1', 'display-2', 'display-3'];
   readonly devices = signal<DeviceView[]>([]);
   readonly screens = signal<ScreenView[]>([]);
-  readonly rotForms = signal<Record<number, RotForm>>({});
   readonly registerStoreId = signal<number | null>(null);
   hardwareId = '';
   alias = '';
@@ -195,94 +174,34 @@ export class DevicesPage implements OnInit {
   }
 
   refresh() {
-    this.api.listAllDevices().subscribe((d) => {
-      this.devices.set(d);
-      this.rotForms.update((prev) => {
-        const next = { ...prev };
-        for (const dev of d) {
-          for (const m of dev.monitors) {
-            if (next[m.id] === undefined) {
-              next[m.id] = this.initForm(m);
-            }
-          }
-        }
-        return next;
-      });
-    });
+    this.api.listAllDevices().subscribe((d) => this.devices.set(d));
     this.api.listScreens().subscribe((s) => this.screens.set(s));
   }
 
-  private initForm(m: MonitorView): RotForm {
-    let screenIds: number[] = [];
+  previewPath(hardwareId: string): string {
+    return `/preview/${encodeURIComponent(hardwareId)}`;
+  }
+
+  previewUrl(hardwareId: string): string {
+    return `${window.location.origin}${this.previewPath(hardwareId)}`;
+  }
+
+  assignmentSummary(m: MonitorView): string {
     const rot = m.rotationScreenIds ?? [];
     if (rot.length >= 2) {
-      screenIds = [...rot];
-    } else if (m.currentScreenId != null) {
-      screenIds = [m.currentScreenId];
+      const names = rot
+        .map((id) => this.screens().find((s) => s.id === id)?.name ?? `#${id}`)
+        .join(' → ');
+      return `로테이션 ${rot.length}장 (${names})`;
     }
-    return {
-      screenIds,
-      intervalSec: Math.max(2, Math.round((m.rotationIntervalMs ?? 10_000) / 1000)),
-      fadeMs: Math.max(200, m.rotationFadeMs ?? 800),
-    };
-  }
-
-  form(monitorId: number): RotForm {
-    return this.rotForms()[monitorId] ?? { screenIds: [], intervalSec: 10, fadeMs: 800 };
-  }
-
-  isPicked(monitorId: number, screenId: number): boolean {
-    return this.form(monitorId).screenIds.includes(screenId);
-  }
-
-  togglePick(monitorId: number, screenId: number, checked: boolean) {
-    const order = this.screens().map((s) => s.id);
-    const f = this.form(monitorId);
-    let ids = [...f.screenIds];
-    if (checked) {
-      if (!ids.includes(screenId)) ids.push(screenId);
-    } else {
-      ids = ids.filter((id) => id !== screenId);
+    if (rot.length === 1) {
+      const name = this.screens().find((s) => s.id === rot[0])?.name ?? `#${rot[0]}`;
+      return name;
     }
-    ids.sort((a, b) => order.indexOf(a) - order.indexOf(b));
-    this.patchForm(monitorId, { screenIds: ids });
-  }
-
-  patchForm(monitorId: number, patch: Partial<RotForm>) {
-    this.rotForms.update((forms) => ({
-      ...forms,
-      [monitorId]: { ...this.form(monitorId), ...patch },
-    }));
-  }
-
-  applyRotation(monitorId: number) {
-    const f = this.form(monitorId);
-    this.api
-      .setMonitorRotation(monitorId, {
-        screenIds: f.screenIds,
-        intervalMs: Math.max(2000, Math.round(f.intervalSec * 1000)),
-        fadeMs: Math.max(200, f.fadeMs),
-      })
-      .subscribe(() => {
-        this.api.listAllDevices().subscribe((d) => {
-          this.devices.set(d);
-          const m = d.flatMap((dev) => dev.monitors).find((x) => x.id === monitorId);
-          this.rotForms.update((prev) => {
-            const next = { ...prev };
-            for (const dev of d) {
-              for (const mon of dev.monitors) {
-                if (next[mon.id] === undefined) {
-                  next[mon.id] = this.initForm(mon);
-                }
-              }
-            }
-            if (m) {
-              next[monitorId] = this.initForm(m);
-            }
-            return next;
-          });
-        });
-      });
+    if (m.currentScreenId != null) {
+      return this.screens().find((s) => s.id === m.currentScreenId)?.name ?? `#${m.currentScreenId}`;
+    }
+    return '미할당';
   }
 
   private ensureRegisterStore() {

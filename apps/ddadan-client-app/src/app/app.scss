@@ -54,10 +54,33 @@
   white-space: pre-wrap;
   display: flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
   padding: 12px;
   box-sizing: border-box;
+}
+
+.item .text.menu-line {
+  align-items: baseline;
+  gap: 12px;
+}
+
+.item .menu-line .label {
+  flex: 0 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.item .menu-line .dots {
+  flex: 1 1 auto;
+  border-bottom: 2px dotted currentColor;
+  opacity: 0.45;
+  min-width: 24px;
+  margin-bottom: 0.25em;
+}
+
+.item .menu-line .price {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .loading {

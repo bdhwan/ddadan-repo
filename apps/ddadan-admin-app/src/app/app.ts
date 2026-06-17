@@ -1,12 +1,14 @@
-import { Component } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Component, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map, startWith } from 'rxjs';
 
 @Component({
   selector: 'admin-root',
   standalone: true,
   imports: [RouterOutlet, RouterLink, RouterLinkActive],
   template: `
-    <div class="layout">
+    <div class="layout" [class.preview-layout]="!showNav()">
       @if (showNav()) {
         <aside class="nav">
           <div class="brand">DDADAN</div>
@@ -22,7 +24,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
           </div>
         </aside>
       }
-      <main class="content">
+      <main class="content" [class.preview-content]="!showNav()">
         <router-outlet></router-outlet>
       </main>
     </div>
@@ -32,6 +34,9 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
       .layout {
         display: flex;
         min-height: 100vh;
+      }
+      .layout.preview-layout {
+        min-height: 100dvh;
       }
       .nav {
         width: 200px;
@@ -79,11 +84,25 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
         padding: 22px 28px;
         max-width: 1200px;
       }
+      .content.preview-content {
+        padding: 0;
+        max-width: none;
+      }
     `,
   ],
 })
 export class App {
+  private readonly router = inject(Router);
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((e) => e instanceof NavigationEnd),
+      map(() => this.router.url),
+      startWith(this.router.url),
+    ),
+    { initialValue: this.router.url },
+  );
+
   showNav(): boolean {
-    return true;
+    return !this.url().startsWith('/preview/');
   }
 }

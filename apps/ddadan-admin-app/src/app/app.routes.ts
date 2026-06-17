@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { unsavedChangesGuard } from './unsaved-changes.guard';
 
 export const routes: Routes = [
   {
@@ -49,6 +50,10 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/device-detail.page').then((m) => m.DeviceDetailPage),
   },
   {
+    path: 'preview/:hardwareId',
+    loadComponent: () => import('./pages/device-preview.page').then((m) => m.DevicePreviewPage),
+  },
+  {
     path: 'assets',
     loadComponent: () => import('./pages/assets.page').then((m) => m.AssetsPage),
   },
@@ -59,6 +64,7 @@ export const routes: Routes = [
   {
     path: 'screens/:id',
     loadComponent: () => import('./pages/screen-edit.page').then((m) => m.ScreenEditPage),
+    canDeactivate: [unsavedChangesGuard],
   },
   { path: '**', redirectTo: 'devices' },
 ];

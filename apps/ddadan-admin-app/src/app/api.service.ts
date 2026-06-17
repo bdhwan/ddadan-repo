@@ -64,6 +64,8 @@ export interface ScreenLayoutItem {
   fontWeight?: number;
   textAlign?: 'left' | 'center' | 'right';
   lineHeight?: number;
+  textVariant?: 'plain' | 'menuLine';
+  textSecondary?: string;
   x: number;
   y: number;
   width: number;
@@ -88,6 +90,50 @@ export interface PolicyDoc {
   version: string;
   content: string;
   effectiveAt: string;
+}
+
+export interface PlayerScreenItem {
+  id: string;
+  kind: 'image' | 'video' | 'text';
+  url?: string;
+  text?: string;
+  fontSize?: number;
+  color?: string;
+  background?: string;
+  opacity?: number;
+  fontWeight?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  lineHeight?: number;
+  textVariant?: 'plain' | 'menuLine';
+  textSecondary?: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  zIndex?: number;
+}
+
+export interface PlayerSlidePayload {
+  width: number;
+  height: number;
+  background?: string;
+  items: PlayerScreenItem[];
+}
+
+export interface PlayerScreenResponse {
+  registered: boolean;
+  deviceName: string | null;
+  mode?: 'single' | 'rotation';
+  width: number;
+  height: number;
+  background?: string;
+  items: PlayerScreenItem[];
+  rotation?: {
+    intervalMs: number;
+    fadeMs: number;
+    slides: PlayerSlidePayload[];
+  };
+  isFallback?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -217,6 +263,12 @@ export class ApiService {
   listComponents() {
     return this.http.get<Array<{ id: number; name: string; kind: string; payload: ScreenLayoutItem | ScreenLayoutItem[] }>>(
       `${this.base}/screen-components`,
+    );
+  }
+
+  getPlayerScreen(hardwareId: string, slot = 0): Observable<PlayerScreenResponse> {
+    return this.http.get<PlayerScreenResponse>(
+      `${this.base}/player/${encodeURIComponent(hardwareId)}/screen?slot=${slot}`,
     );
   }
 }

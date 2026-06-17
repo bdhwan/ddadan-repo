@@ -14,6 +14,8 @@ interface ScreenItem {
   fontWeight?: number;
   textAlign?: 'left' | 'center' | 'right';
   lineHeight?: number;
+  textVariant?: 'plain' | 'menuLine';
+  textSecondary?: string;
   x: number;
   y: number;
   width: number;
@@ -89,7 +91,7 @@ export class App implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const url = new URL(window.location.href);
-    const queryDeviceId = url.searchParams.get('deviceId');
+    const queryDeviceId = url.searchParams.get('deviceId') ?? url.searchParams.get('device');
     let stored: string | null = null;
     try {
       stored = localStorage.getItem('ddadan.deviceId');
@@ -137,6 +139,14 @@ export class App implements OnInit, OnDestroy {
     if (this.rotFadeTimer) clearTimeout(this.rotFadeTimer);
     this.rotWaitTimer = null;
     this.rotFadeTimer = null;
+  }
+
+  protected isMenuLine(item: ScreenItem): boolean {
+    return item.textVariant === 'menuLine';
+  }
+
+  protected textAlign(item: ScreenItem): string {
+    return item.textAlign ?? (this.isMenuLine(item) ? 'left' : 'center');
   }
 
   protected absoluteUrl(item: ScreenItem): string | null {

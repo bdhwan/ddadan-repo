@@ -59,6 +59,14 @@ export class ScreenLayoutItemDto {
   @IsNumber()
   lineHeight?: number;
 
+  @IsOptional()
+  @IsIn(['plain', 'menuLine'])
+  textVariant?: 'plain' | 'menuLine';
+
+  @IsOptional()
+  @IsString()
+  textSecondary?: string;
+
   @IsNumber()
   x!: number;
 

@@ -2,10 +2,15 @@ import { Component, ElementRef, computed, inject, OnInit, signal, viewChild } fr
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, ScreenView } from '../api.service';
+import {
+  MonitorRotationPanelComponent,
+  RotForm,
+} from '../components/monitor-rotation-panel.component';
+import { isMenuLine, textAlignStyle } from '../screen-utils';
 
 @Component({
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, MonitorRotationPanelComponent],
   template: `
     <h1>디바이스 상세</h1>
     @if (device(); as d) {
@@ -15,9 +20,12 @@ import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, Scree
             <strong>{{ d.name ?? '이름 없음' }}</strong>
             <span class="muted"> · {{ d.hardwareId }}</span>
           </div>
-          <div class="muted">상태: {{ d.status }} · 마지막 접속 {{ d.lastSeenAt ?? '-' }}</div>
+          <div class="row-actions">
+            <a class="secondary btn-link" [href]="previewUrl(d)" target="_blank" rel="noopener">화면 미리보기</a>
+            <span class="muted">상태: {{ d.status }} · 마지막 접속 {{ d.lastSeenAt ?? '-' }}</span>
+          </div>
         </div>
-        <p class="muted">캔버스에서 모니터를 드래그해 위치를 지정하세요. 위치는 해상도(px) 단위입니다.</p>
+        <p class="muted">캔버스에서 모니터를 드래그해 위치를 지정하세요. 각 모니터 하단에서 화면·로테이션을 설정합니다.</p>
         <div #canvas class="canvas" (mouseup)="endDrag()" (mousemove)="onDrag($event)">
           @for (m of d.monitors; track m.id) {
             <div
@@ -29,11 +37,8 @@ import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, Scree
               (mousedown)="startDrag($event, m)"
             >
               @if (screenFor(m); as scr) {
-                <div
-                  class="preview"
-                  [style.background]="scr.layout.background ?? '#0c0f1a'"
-                >
-                  @for (item of scr.layout.items; track item.id) {
+                <div class="preview" [style.background]="scr.layout.background ?? '#0c0f1a'">
+                  @for (item of sortedItems(scr); track item.id) {
                     <div
                       class="prev-item"
                       [style.left.%]="(item.x / scr.width) * 100"
@@ -43,6 +48,9 @@ import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, Scree
                       [style.z-index]="item.zIndex ?? 1"
                       [style.background]="item.background ?? null"
                       [style.color]="item.color ?? null"
+                      [style.font-weight]="item.fontWeight ?? null"
+                      [style.text-align]="textAlignStyle(item)"
+                      [style.opacity]="item.opacity ?? null"
                     >
                       @switch (item.kind) {
                         @case ('image') {
@@ -56,7 +64,15 @@ import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, Scree
                           }
                         }
                         @default {
-                          <span class="prev-text" [style.font-size.px]="previewFontSize(item, scr)">{{ item.text }}</span>
+                          @if (isMenuLine(item)) {
+                            <span class="prev-text menu-line">
+                              <span class="label">{{ item.text }}</span>
+                              <span class="dots"></span>
+                              <span class="price">{{ item.textSecondary }}</span>
+                            </span>
+                          } @else {
+                            <span class="prev-text" [style.font-size.px]="previewFontSize(item, scr)">{{ item.text }}</span>
+                          }
                         }
                       }
                     </div>
@@ -67,17 +83,15 @@ import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, Scree
               }
               <div class="overlay">
                 <div class="overlay-top">Slot {{ m.slot }} · {{ m.resolutionW }}×{{ m.resolutionH }}</div>
-                <div class="overlay-bottom screen-pick">
-                  <select
-                    [ngModel]="m.currentScreenId"
-                    (ngModelChange)="assign(m, $event)"
-                    (mousedown)="$event.stopPropagation()"
-                  >
-                    <option [ngValue]="null">— 기본 화면 —</option>
-                    @for (s of screens(); track s.id) {
-                      <option [ngValue]="s.id">{{ s.name }}</option>
-                    }
-                  </select>
+                <div class="overlay-bottom">
+                  <app-monitor-rotation-panel
+                    [monitor]="m"
+                    [screens]="screens()"
+                    [assets]="assets()"
+                    [form]="form(m.id)"
+                    (formChange)="patchForm(m.id, $event)"
+                    (apply)="applyRotation(m.id)"
+                  />
                 </div>
               </div>
             </div>
@@ -91,16 +105,28 @@ import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, Scree
       .row {
         display: flex;
         justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
         margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+      .row-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+      .btn-link {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 6px;
+        text-decoration: none;
+        font-size: 12px;
+        font-weight: 600;
       }
       .canvas {
         position: relative;
         width: 100%;
-        height: 460px;
+        height: 520px;
         background: #f0f3fa;
         border: 1px dashed var(--border);
         border-radius: 8px;
-        overflow: hidden;
+        overflow: auto;
         margin-top: 10px;
       }
       .monitor {
@@ -111,8 +137,8 @@ import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, Scree
         cursor: move;
         user-select: none;
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-        min-width: 120px;
-        min-height: 80px;
+        min-width: 280px;
+        min-height: 200px;
         overflow: hidden;
       }
       .preview {
@@ -152,6 +178,15 @@ import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, Scree
         box-sizing: border-box;
         overflow: hidden;
       }
+      .prev-text.menu-line {
+        align-items: baseline;
+        justify-content: flex-start;
+        gap: 4px;
+        padding: 2px 4px;
+      }
+      .prev-text.menu-line .label { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .prev-text.menu-line .dots { flex: 1 1 auto; border-bottom: 1px dotted currentColor; opacity: 0.45; min-width: 8px; }
+      .prev-text.menu-line .price { flex: 0 0 auto; white-space: nowrap; }
       .overlay {
         position: absolute;
         inset: 0;
@@ -168,18 +203,11 @@ import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, Scree
         color: #fff;
       }
       .overlay-bottom {
-        padding: 4px;
-        background: linear-gradient(to top, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+        padding: 6px;
+        background: linear-gradient(to top, rgba(0, 0, 0, 0.82), rgba(0, 0, 0, 0.35));
         pointer-events: auto;
-      }
-      .screen-pick select {
-        background: rgba(20, 26, 40, 0.85);
-        color: #fff;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 3px;
-        width: 100%;
-        font-size: 11px;
-        padding: 2px 4px;
+        max-height: 55%;
+        overflow: auto;
       }
     `,
   ],
@@ -191,26 +219,89 @@ export class DeviceDetailPage implements OnInit {
   readonly device = signal<DeviceView | null>(null);
   readonly screens = signal<ScreenView[]>([]);
   readonly assets = signal<AssetView[]>([]);
+  readonly rotForms = signal<Record<number, RotForm>>({});
   private readonly assetMap = computed(() => {
     const map = new Map<number, AssetView>();
     for (const a of this.assets()) map.set(a.id, a);
     return map;
   });
 
-  // Pixels per displayed pixel (1 displayed px = `scale` real px on monitor)
   readonly scale = 8;
   private dragging: { id: number; offsetX: number; offsetY: number } | null = null;
 
+  isMenuLine = isMenuLine;
+  textAlignStyle = textAlignStyle;
+
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
-    this.api.getDevice(id).subscribe((d) => this.device.set(d));
+    this.api.getDevice(id).subscribe((d) => {
+      this.device.set(d);
+      this.rotForms.update((prev) => {
+        const next = { ...prev };
+        for (const m of d.monitors) next[m.id] = this.initForm(m);
+        return next;
+      });
+    });
     this.api.listScreens().subscribe((s) => this.screens.set(s));
     this.api.listAssets().subscribe((a) => this.assets.set(a));
   }
 
+  previewUrl(d: DeviceView): string {
+    return `${window.location.origin}/preview/${encodeURIComponent(d.hardwareId)}`;
+  }
+
+  sortedItems(scr: ScreenView): ScreenLayoutItem[] {
+    return [...scr.layout.items].sort((a, b) => (a.zIndex ?? 1) - (b.zIndex ?? 1));
+  }
+
+  form(monitorId: number): RotForm {
+    return this.rotForms()[monitorId] ?? { screenIds: [], intervalSec: 10, fadeMs: 800 };
+  }
+
+  private initForm(m: MonitorView): RotForm {
+    let screenIds: number[] = [];
+    const rot = m.rotationScreenIds ?? [];
+    if (rot.length >= 2) {
+      screenIds = [...rot];
+    } else if (m.currentScreenId != null) {
+      screenIds = [m.currentScreenId];
+    } else if (rot.length === 1) {
+      screenIds = [...rot];
+    }
+    return {
+      screenIds,
+      intervalSec: Math.max(2, Math.round((m.rotationIntervalMs ?? 10_000) / 1000)),
+      fadeMs: Math.max(200, m.rotationFadeMs ?? 800),
+    };
+  }
+
+  patchForm(monitorId: number, form: RotForm) {
+    this.rotForms.update((forms) => ({ ...forms, [monitorId]: form }));
+  }
+
+  applyRotation(monitorId: number) {
+    const f = this.form(monitorId);
+    this.api
+      .setMonitorRotation(monitorId, {
+        screenIds: f.screenIds,
+        intervalMs: Math.max(2000, Math.round(f.intervalSec * 1000)),
+        fadeMs: Math.max(200, f.fadeMs),
+      })
+      .subscribe(() => {
+        const id = Number(this.route.snapshot.paramMap.get('id'));
+        this.api.getDevice(id).subscribe((d) => {
+          this.device.set(d);
+          const m = d.monitors.find((x) => x.id === monitorId);
+          if (m) this.rotForms.update((forms) => ({ ...forms, [monitorId]: this.initForm(m) }));
+        });
+      });
+  }
+
   screenFor(m: MonitorView): ScreenView | null {
-    if (m.currentScreenId == null) return null;
-    return this.screens().find((s) => s.id === m.currentScreenId) ?? null;
+    const rot = m.rotationScreenIds ?? [];
+    const id = rot.length >= 1 ? rot[0] : m.currentScreenId;
+    if (id == null) return null;
+    return this.screens().find((s) => s.id === id) ?? null;
   }
 
   urlFor(item: ScreenLayoutItem): string | null {
@@ -228,9 +319,7 @@ export class DeviceDetailPage implements OnInit {
 
   startDrag(ev: MouseEvent, m: MonitorView) {
     const src = ev.target as HTMLElement | null;
-    if (src?.closest('select, option, input, textarea, button, .screen-pick')) {
-      return;
-    }
+    if (src?.closest('select, option, input, textarea, button, label, .rot-panel, a')) return;
     ev.preventDefault();
     const target = ev.currentTarget as HTMLDivElement;
     const rect = target.getBoundingClientRect();
@@ -265,28 +354,5 @@ export class DeviceDetailPage implements OnInit {
     const m = this.device()?.monitors.find((x) => x.id === id);
     if (!m) return;
     this.api.updateMonitorPosition(m.id, m.positionX, m.positionY).subscribe();
-  }
-
-  assign(monitor: MonitorView, raw: number | string | null) {
-    const screenId =
-      raw === null || raw === undefined || raw === ''
-        ? null
-        : typeof raw === 'number'
-          ? raw
-          : Number(raw);
-    const sid = screenId !== null && !Number.isFinite(screenId) ? null : screenId;
-    this.api.assignScreen(monitor.id, sid).subscribe({
-      next: () => {
-        const dev = this.device();
-        if (!dev) return;
-        this.device.set({
-          ...dev,
-          monitors: dev.monitors.map((m) =>
-            m.id === monitor.id ? { ...m, currentScreenId: sid } : m,
-          ),
-        });
-      },
-      error: (err) => console.warn('assign screen failed', err),
-    });
   }
 }

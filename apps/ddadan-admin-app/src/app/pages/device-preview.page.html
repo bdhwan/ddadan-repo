@@ -1,15 +1,10 @@
-@if (useRotation()) {
+@if (loadError(); as err) {
+  <div class="state error">{{ err }}</div>
+} @else if (useRotation()) {
   <div class="stage rot-stage" [style.aspect-ratio]="aspectRot()">
-    <div
-      class="rot-layer layer-back"
-      [style.opacity]="rotOp0()"
-      [style.transition]="rotTransition()"
-    >
+    <div class="rot-layer layer-back" [style.opacity]="rotOp0()" [style.transition]="rotTransition()">
       @if (slideAt(0); as sl) {
-        <div
-          class="slide-fill"
-          [style.background]="sl.background ?? '#0c0f1a'"
-        >
+        <div class="slide-fill" [style.background]="sl.background ?? '#0c0f1a'">
           @for (item of sl.items; track item.id) {
             <div
               class="item"
@@ -50,16 +45,9 @@
         </div>
       }
     </div>
-    <div
-      class="rot-layer layer-front"
-      [style.opacity]="rotOp1()"
-      [style.transition]="rotTransition()"
-    >
+    <div class="rot-layer layer-front" [style.opacity]="rotOp1()" [style.transition]="rotTransition()">
       @if (slideAt(1); as sl) {
-        <div
-          class="slide-fill"
-          [style.background]="sl.background ?? '#0c0f1a'"
-        >
+        <div class="slide-fill" [style.background]="sl.background ?? '#0c0f1a'">
           @for (item of sl.items; track item.id) {
             <div
               class="item"
@@ -121,10 +109,10 @@
       >
         @switch (item.kind) {
           @case ('image') {
-            <img [src]="absoluteUrl(item)" alt="" />
+            <img [src]="absoluteUrl(item) ?? ''" alt="" />
           }
           @case ('video') {
-            <video [src]="absoluteUrl(item)" autoplay muted loop playsinline></video>
+            <video [src]="absoluteUrl(item) ?? ''" autoplay muted loop playsinline></video>
           }
           @default {
             @if (isMenuLine(item)) {
@@ -142,36 +130,7 @@
     }
   </div>
 } @else {
-  <div class="loading">DDADAN 플레이어 연결 중...</div>
+  <div class="state">화면 불러오는 중…</div>
 }
 
-@if (needsRegister()) {
-  <div class="device-id-badge" (click)="openDeviceIdEditor()" title="등록코드 변경">
-    등록코드: <strong>{{ hardwareId() }}</strong>
-    <span class="device-id-edit">변경</span>
-  </div>
-}
-
-@if (editingDeviceId()) {
-  <div class="device-id-modal" (click)="cancelDeviceIdEditor()">
-    <div class="device-id-card" (click)="$event.stopPropagation()">
-      <h2>등록코드 입력</h2>
-      <p class="hint">디바이스에 부여된 등록코드를 입력하세요.</p>
-      <input
-        #devIdInput
-        type="text"
-        autocomplete="off"
-        autocapitalize="off"
-        spellcheck="false"
-        [value]="draftDeviceId()"
-        (keydown.enter)="applyDeviceId(devIdInput.value)"
-        (keydown.escape)="cancelDeviceIdEditor()"
-        placeholder="예: display-1"
-      />
-      <div class="actions">
-        <button class="btn btn-cancel" (click)="cancelDeviceIdEditor()">취소</button>
-        <button class="btn btn-apply" (click)="applyDeviceId(devIdInput.value)">적용</button>
-      </div>
-    </div>
-  </div>
-}
+<div class="badge">{{ hardwareId() }} · slot {{ slot() }}</div>

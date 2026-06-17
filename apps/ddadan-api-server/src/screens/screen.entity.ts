@@ -16,6 +16,9 @@ export interface ScreenLayoutItem {
   fontWeight?: number;
   textAlign?: 'left' | 'center' | 'right';
   lineHeight?: number;
+  /** 'menuLine' renders label + dot leader + price (textSecondary). */
+  textVariant?: 'plain' | 'menuLine';
+  textSecondary?: string;
   x: number;
   y: number;
   width: number;

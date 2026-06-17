@@ -12,6 +12,8 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { ApiService, AssetView, ScreenLayoutItem, ScreenView } from '../api.service';
+import { isMenuLine, snapToGrid, textAlignStyle } from '../screen-utils';
+import { HasUnsavedChanges } from '../unsaved-changes.guard';
 
 function newId(): string {
   const c: Crypto | undefined = typeof crypto !== 'undefined' ? crypto : undefined;
@@ -42,7 +44,7 @@ interface DragState {
     @if (screen(); as s) {
       <div class="panel">
         <div class="toolbar">
-          <input [(ngModel)]="s.name" (ngModelChange)="markDirty()" />
+          <input [(ngModel)]="s.name" (ngModelChange)="onNameChange()" />
           <span class="muted">{{ s.width }} × {{ s.height }}</span>
           <button (click)="save()" [disabled]="saveBusy()">
             {{ saveBusy() ? '저장 중…' : '저장' }}
@@ -54,6 +56,29 @@ interface DragState {
             <span class="save-toast" [class.error]="saveError()">{{ msg }}</span>
           }
           <span class="spacer"></span>
+          <label class="snap-toggle">
+            <input type="checkbox" [ngModel]="snapGrid()" (ngModelChange)="snapGrid.set($event)" />
+            8px 스냅
+          </label>
+          <label class="zoom-label">
+            줌
+            <input type="range" min="0.35" max="1.5" step="0.05" [ngModel]="stageZoom()" (ngModelChange)="stageZoom.set(+$event)" />
+          </label>
+          <button class="secondary" (click)="undo()" [disabled]="!canUndo()">↶</button>
+          <button class="secondary" (click)="redo()" [disabled]="!canRedo()">↷</button>
+          <button class="secondary" (click)="previewOpen.set(true)">미리보기</button>
+          @if (selectedIds().size >= 2) {
+            <button class="secondary" (click)="alignSelected('left')">←</button>
+            <button class="secondary" (click)="alignSelected('centerX')">↔</button>
+            <button class="secondary" (click)="alignSelected('right')">→</button>
+            <button class="secondary" (click)="alignSelected('top')">↑</button>
+            <button class="secondary" (click)="alignSelected('centerY')">↕</button>
+            <button class="secondary" (click)="alignSelected('bottom')">↓</button>
+            @if (selectedIds().size >= 3) {
+              <button class="secondary" (click)="distributeSelected('h')">H분배</button>
+              <button class="secondary" (click)="distributeSelected('v')">V분배</button>
+            }
+          }
           @if (selected()) {
             <button class="secondary" (click)="duplicateSelected()">복제</button>
             <button class="secondary" (click)="saveAsComponent()">컴포넌트로 저장</button>
@@ -73,6 +98,14 @@ interface DragState {
           <button class="secondary" (click)="setScreenBg('')">배경 지우기</button>
           <span class="div"></span>
           <button class="secondary" (click)="addDimLayer()">＋ 딤 레이어</button>
+            <button class="secondary" (click)="addGradientDim()">＋ 그라데이션 딤</button>
+            <button class="secondary" (click)="addMenuLine()">＋ 메뉴 줄</button>
+          <select class="bg-asset" [ngModel]="bgAssetId()" (ngModelChange)="setScreenBgFromAsset(+$event || 0)">
+            <option [ngValue]="0">배경 이미지 선택…</option>
+            @for (a of imageAssets(); track a.id) {
+              <option [ngValue]="a.id">{{ a.originalName }}</option>
+            }
+          </select>
           <span class="hint muted">이미지를 배경으로: 선택 후 “화면 채우기” → “맨 뒤로”</span>
         </div>
 
@@ -125,17 +158,20 @@ interface DragState {
             </div>
           </div>
 
+          <div class="stage-wrap">
           <div
             #stage
             class="stage"
             [style.aspect-ratio]="aspectRatio()"
             [style.background]="s.layout.background || '#1c2436'"
+            [style.transform]="'scale(' + stageZoom() + ')'"
+            [style.transform-origin]="'top left'"
             (click)="clearSelection($event)"
           >
             @for (item of sortedItems(); track item.id) {
               <div
                 class="item"
-                [class.selected]="selected()?.id === item.id"
+                [class.selected]="isSelected(item)"
                 [style.left.%]="(item.x / s.width) * 100"
                 [style.top.%]="(item.y / s.height) * 100"
                 [style.width.%]="(item.width / s.width) * 100"
@@ -144,7 +180,7 @@ interface DragState {
                 [style.color]="item.color ?? null"
                 [style.font-size.px]="item.fontSize ?? null"
                 [style.font-weight]="item.fontWeight ?? null"
-                [style.text-align]="item.textAlign ?? null"
+                [style.text-align]="textAlignStyle(item)"
                 [style.line-height]="item.lineHeight ?? null"
                 [style.opacity]="item.opacity ?? null"
                 [style.z-index]="item.zIndex ?? 1"
@@ -154,11 +190,22 @@ interface DragState {
                 @switch (item.kind) {
                   @case ('image') { <img [src]="urlOf(item)" alt="" /> }
                   @case ('video') { <video [src]="urlOf(item)" muted autoplay loop></video> }
-                  @case ('text') { <div class="text">{{ item.text }}</div> }
+                  @case ('text') {
+                    @if (isMenuLine(item)) {
+                      <div class="text menu-line">
+                        <span class="label">{{ item.text }}</span>
+                        <span class="dots"></span>
+                        <span class="price">{{ item.textSecondary }}</span>
+                      </div>
+                    } @else {
+                      <div class="text">{{ item.text }}</div>
+                    }
+                  }
                 }
                 <div class="handle" (mousedown)="startDrag($event, item, 'resize')"></div>
               </div>
             }
+          </div>
           </div>
 
           <div class="inspector">
@@ -189,8 +236,20 @@ interface DragState {
               <input [ngModel]="it.background ?? ''" (ngModelChange)="patch(it, 'background', $event)" placeholder="rgba(0,0,0,0.5)" />
 
               @if (it.kind === 'text') {
-                <label>텍스트</label>
-                <input [ngModel]="it.text" (ngModelChange)="patch(it, 'text', $event)" />
+                <label>텍스트 유형</label>
+                <select [ngModel]="it.textVariant ?? 'plain'" (ngModelChange)="setTextVariant(it, $event)">
+                  <option ngValue="plain">일반 텍스트</option>
+                  <option ngValue="menuLine">메뉴 줄 (이름 ··· 가격)</option>
+                </select>
+                @if (isMenuLine(it)) {
+                  <label>메뉴명</label>
+                  <input [ngModel]="it.text" (ngModelChange)="patch(it, 'text', $event)" />
+                  <label>가격</label>
+                  <input [ngModel]="it.textSecondary ?? ''" (ngModelChange)="patch(it, 'textSecondary', $event)" />
+                } @else {
+                  <label>텍스트</label>
+                  <input [ngModel]="it.text" (ngModelChange)="patch(it, 'text', $event)" />
+                }
                 <div class="grid2">
                   <label>글자 크기<input type="number" [ngModel]="it.fontSize" (ngModelChange)="patch(it, 'fontSize', +$event)" /></label>
                   <label>줄간격<input type="number" step="0.1" [ngModel]="it.lineHeight ?? 1.2" (ngModelChange)="patch(it, 'lineHeight', +$event)" /></label>
@@ -224,6 +283,59 @@ interface DragState {
         </div>
       </div>
     }
+
+    @if (previewOpen()) {
+      <div class="preview-modal" (click)="previewOpen.set(false)">
+        <div class="preview-box" (click)="$event.stopPropagation()">
+          <div class="preview-head">
+            <strong>실사이즈 미리보기</strong>
+            <button class="secondary" (click)="previewOpen.set(false)">닫기</button>
+          </div>
+          @if (screen(); as ps) {
+            <div
+              class="preview-stage"
+              [style.width.px]="ps.width"
+              [style.height.px]="ps.height"
+              [style.background]="ps.layout.background || '#1c2436'"
+            >
+              @for (item of sortedItems(); track item.id) {
+                <div
+                  class="prev-item"
+                  [style.left.px]="item.x"
+                  [style.top.px]="item.y"
+                  [style.width.px]="item.width"
+                  [style.height.px]="item.height"
+                  [style.background]="item.background ?? null"
+                  [style.color]="item.color ?? null"
+                  [style.font-size.px]="item.fontSize ?? null"
+                  [style.font-weight]="item.fontWeight ?? null"
+                  [style.text-align]="textAlignStyle(item)"
+                  [style.line-height]="item.lineHeight ?? null"
+                  [style.opacity]="item.opacity ?? null"
+                  [style.z-index]="item.zIndex ?? 1"
+                >
+                  @switch (item.kind) {
+                    @case ('image') { <img [src]="urlOf(item)" alt="" /> }
+                    @case ('video') { <video [src]="urlOf(item)" muted autoplay loop></video> }
+                    @case ('text') {
+                      @if (isMenuLine(item)) {
+                        <div class="text menu-line">
+                          <span class="label">{{ item.text }}</span>
+                          <span class="dots"></span>
+                          <span class="price">{{ item.textSecondary }}</span>
+                        </div>
+                      } @else {
+                        <div class="text">{{ item.text }}</div>
+                      }
+                    }
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    }
   `,
   styles: [
     `
@@ -240,6 +352,7 @@ interface DragState {
       .bg-hex { width: 150px; font-size: 12px; }
       .bg-bar .div { width: 1px; height: 20px; background: var(--border); }
       .bg-bar .hint { font-size: 11px; }
+      .bg-asset { width: 140px; font-size: 12px; }
       .editor { display: grid; grid-template-columns: 230px 1fr 260px; gap: 12px; margin-top: 12px; }
       .library, .inspector { background: #fafbfd; padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
       .library h3, .inspector h3 { font-size: 13px; margin: 6px 0 6px; }
@@ -256,11 +369,18 @@ interface DragState {
       .library-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
       .library-item img { width: 36px; height: 24px; object-fit: cover; border-radius: 3px; }
       .library-item .name { font-size: 12px; line-height: 1.2; word-break: break-all; }
+      .stage-wrap { overflow: auto; max-height: min(72vh, 820px); border-radius: 8px; border: 1px solid var(--border); background: #e8ebf2; padding: 8px; }
       .stage { position: relative; border-radius: 8px; overflow: hidden; }
       .item { position: absolute; background: rgba(255, 255, 255, 0.05); border: 1px solid transparent; cursor: move; overflow: hidden; }
       .item.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(42, 108, 255, 0.4); }
       .item img, .item video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-      .item .text { padding: 6px; white-space: pre-wrap; width: 100%; height: 100%; box-sizing: border-box; }
+      .item .text { padding: 6px; white-space: pre-wrap; width: 100%; height: 100%; box-sizing: border-box; display: flex; align-items: center; }
+      .item .text.menu-line { align-items: baseline; gap: 6px; padding: 4px 8px; }
+      .item .menu-line .label { flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .item .menu-line .dots { flex: 1 1 auto; border-bottom: 1px dotted currentColor; opacity: 0.45; min-width: 12px; margin-bottom: 0.2em; }
+      .item .menu-line .price { flex: 0 0 auto; white-space: nowrap; }
+      .snap-toggle, .zoom-label { font-size: 11px; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+      .zoom-label input { width: 80px; }
       .handle { position: absolute; right: -4px; bottom: -4px; width: 12px; height: 12px; background: var(--accent); border-radius: 50%; cursor: nwse-resize; z-index: 9999; }
       .inspector label { display: block; font-size: 11px; color: var(--muted); margin: 8px 0 2px; }
       .inspector .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -278,10 +398,24 @@ interface DragState {
       }
       .save-toast.error { background: #c0392b; }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: translateY(0); } }
+      .preview-modal {
+        position: fixed; inset: 0; z-index: 1000; background: rgba(10, 12, 18, 0.72);
+        display: flex; align-items: center; justify-content: center; padding: 24px;
+      }
+      .preview-box { background: #fff; border-radius: 12px; max-width: 96vw; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; }
+      .preview-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+      .preview-stage { position: relative; overflow: auto; margin: 12px; flex: 1; transform-origin: top left; }
+      .preview-stage .prev-item { position: absolute; overflow: hidden; }
+      .preview-stage img, .preview-stage video { width: 100%; height: 100%; object-fit: cover; }
+      .preview-stage .text { width: 100%; height: 100%; display: flex; align-items: center; padding: 8px; box-sizing: border-box; }
+      .preview-stage .text.menu-line { align-items: baseline; gap: 8px; }
+      .preview-stage .menu-line .label { flex: 0 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .preview-stage .menu-line .dots { flex: 1 1 auto; border-bottom: 1px dotted currentColor; opacity: 0.45; min-width: 16px; margin-bottom: 0.2em; }
+      .preview-stage .menu-line .price { flex: 0 0 auto; white-space: nowrap; }
     `,
   ],
 })
-export class ScreenEditPage implements OnInit, OnDestroy {
+export class ScreenEditPage implements OnInit, OnDestroy, HasUnsavedChanges {
   readonly api = inject(ApiService);
   private readonly route = inject(ActivatedRoute);
   readonly stage = viewChild<ElementRef<HTMLDivElement>>('stage');
@@ -289,6 +423,11 @@ export class ScreenEditPage implements OnInit, OnDestroy {
   readonly assets = signal<AssetView[]>([]);
   readonly components = signal<Array<{ id: number; name: string; kind: string; payload: ScreenLayoutItem | ScreenLayoutItem[] }>>([]);
   readonly selected = signal<ScreenLayoutItem | null>(null);
+  readonly selectedIds = signal<Set<string>>(new Set());
+  readonly stageZoom = signal(1);
+  readonly snapGrid = signal(true);
+  readonly previewOpen = signal(false);
+  readonly bgAssetId = signal(0);
   readonly dirty = signal(false);
   newTextName = '';
   newTextBody = '';
@@ -299,6 +438,9 @@ export class ScreenEditPage implements OnInit, OnDestroy {
   readonly saveError = signal(false);
   private saveMsgTimer: ReturnType<typeof setTimeout> | null = null;
   private autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private history: ScreenView[] = [];
+  private historyIndex = -1;
+  private applyingHistory = false;
 
   private drag: DragState | null = null;
   private dragMoveListener: ((ev: MouseEvent) => void) | null = null;
@@ -314,9 +456,68 @@ export class ScreenEditPage implements OnInit, OnDestroy {
 
   ngOnInit() {
     const id = Number(this.route.snapshot.paramMap.get('id'));
-    this.api.getScreen(id).subscribe((s) => this.screen.set(s));
+    this.api.getScreen(id).subscribe((s) => {
+      this.screen.set(s);
+      this.pushHistory(s);
+    });
     this.refreshAssets();
     this.api.listComponents().subscribe((c) => this.components.set(c));
+  }
+
+  hasUnsavedChanges(): boolean {
+    return this.dirty();
+  }
+
+  onNameChange() {
+    this.commitState();
+    this.markDirty();
+  }
+
+  isMenuLine = isMenuLine;
+  textAlignStyle = textAlignStyle;
+
+  imageAssets(): AssetView[] {
+    return this.assets().filter((a) => a.type === 'image');
+  }
+
+  isSelected(item: ScreenLayoutItem): boolean {
+    return this.selectedIds().has(item.id);
+  }
+
+  private pushHistory(s: ScreenView) {
+    const snap = structuredClone(s);
+    this.history = [snap];
+    this.historyIndex = 0;
+  }
+
+  canUndo(): boolean {
+    return this.historyIndex > 0;
+  }
+
+  canRedo(): boolean {
+    return this.historyIndex < this.history.length - 1;
+  }
+
+  undo() {
+    if (!this.canUndo()) return;
+    this.historyIndex--;
+    this.applyHistory(this.history[this.historyIndex]);
+  }
+
+  redo() {
+    if (!this.canRedo()) return;
+    this.historyIndex++;
+    this.applyHistory(this.history[this.historyIndex]);
+  }
+
+  private applyHistory(s: ScreenView) {
+    this.applyingHistory = true;
+    this.screen.set(structuredClone(s));
+    this.selected.set(null);
+    this.selectedIds.set(new Set());
+    this.dirty.set(true);
+    this.applyingHistory = false;
+    this.scheduleAutosave();
   }
 
   ngOnDestroy() {
@@ -344,6 +545,19 @@ export class ScreenEditPage implements OnInit, OnDestroy {
   markDirty() {
     this.dirty.set(true);
     this.scheduleAutosave();
+  }
+
+  private commitState() {
+    const s = this.screen();
+    if (!s || this.applyingHistory) return;
+    const snap = structuredClone(s);
+    this.history = this.history.slice(0, this.historyIndex + 1);
+    this.history.push(snap);
+    if (this.history.length > 40) {
+      this.history.shift();
+    } else {
+      this.historyIndex++;
+    }
   }
 
   private scheduleAutosave() {
@@ -404,11 +618,24 @@ export class ScreenEditPage implements OnInit, OnDestroy {
 
   select(ev: MouseEvent, item: ScreenLayoutItem) {
     ev.stopPropagation();
-    this.selected.set(item);
+    const multi = ev.metaKey || ev.ctrlKey || ev.shiftKey;
+    if (multi) {
+      const next = new Set(this.selectedIds());
+      if (next.has(item.id)) next.delete(item.id);
+      else next.add(item.id);
+      this.selectedIds.set(next);
+      this.selected.set(item);
+    } else {
+      this.selectedIds.set(new Set([item.id]));
+      this.selected.set(item);
+    }
   }
 
   clearSelection(ev: MouseEvent) {
-    if (ev.target === ev.currentTarget) this.selected.set(null);
+    if (ev.target === ev.currentTarget) {
+      this.selected.set(null);
+      this.selectedIds.set(new Set());
+    }
   }
 
   patch<K extends keyof ScreenLayoutItem>(item: ScreenLayoutItem, key: K, value: ScreenLayoutItem[K]) {
@@ -422,6 +649,7 @@ export class ScreenEditPage implements OnInit, OnDestroy {
     this.screen.set({ ...s, layout: { ...s.layout, items } });
     const updated = items.find((i) => i.id === item.id);
     if (updated) this.selected.set(updated);
+    this.commitState();
     this.markDirty();
   }
 
@@ -436,6 +664,8 @@ export class ScreenEditPage implements OnInit, OnDestroy {
     if (!s) return;
     this.screen.set({ ...s, layout: { ...s.layout, items: [...s.layout.items, item] } });
     this.selected.set(item);
+    this.selectedIds.set(new Set([item.id]));
+    this.commitState();
     this.markDirty();
   }
 
@@ -462,6 +692,7 @@ export class ScreenEditPage implements OnInit, OnDestroy {
     const items = Array.isArray(c.payload) ? c.payload : [c.payload];
     const cloned = items.map((i) => ({ ...i, id: newId() }));
     this.screen.set({ ...s, layout: { ...s.layout, items: [...s.layout.items, ...cloned] } });
+    this.commitState();
     this.markDirty();
   }
 
@@ -480,6 +711,140 @@ export class ScreenEditPage implements OnInit, OnDestroy {
       height: s.height,
       zIndex: this.nextZ(),
     });
+  }
+
+  addGradientDim() {
+    const s = this.screen();
+    if (!s) return;
+    this.addItem({
+      id: newId(),
+      kind: 'text',
+      text: '',
+      background: 'linear-gradient(to top, rgba(8,10,16,0.78) 0%, rgba(8,10,16,0.35) 45%, rgba(8,10,16,0.08) 100%)',
+      x: 0,
+      y: 0,
+      width: s.width,
+      height: s.height,
+      zIndex: this.nextZ(),
+    });
+  }
+
+  addMenuLine() {
+    const s = this.screen();
+    if (!s) return;
+    const y = 120 + (s.layout.items.length % 12) * 44;
+    this.addItem({
+      id: newId(),
+      kind: 'text',
+      textVariant: 'menuLine',
+      text: '메뉴명',
+      textSecondary: '₩5,500',
+      textAlign: 'left',
+      fontSize: 32,
+      color: '#ffffff',
+      x: 80,
+      y,
+      width: s.width - 160,
+      height: 48,
+      zIndex: this.nextZ(),
+    });
+  }
+
+  setScreenBgFromAsset(assetId: number) {
+    if (!assetId) return;
+    const asset = this.assets().find((a) => a.id === assetId);
+    if (!asset?.url) return;
+    const url = this.api.absoluteAssetUrl(asset.url);
+    this.setScreenBg(`url("${url}") center/cover no-repeat`);
+    this.bgAssetId.set(assetId);
+  }
+
+  setTextVariant(item: ScreenLayoutItem, variant: 'plain' | 'menuLine') {
+    if (variant === 'menuLine') {
+      this.patchMany(item, {
+        textVariant: 'menuLine',
+        textAlign: 'left',
+        textSecondary: item.textSecondary ?? '₩0',
+      });
+    } else {
+      this.patchMany(item, { textVariant: 'plain' });
+    }
+  }
+
+  alignSelected(mode: 'left' | 'right' | 'top' | 'bottom' | 'centerX' | 'centerY') {
+    const s = this.screen();
+    if (!s) return;
+    const ids = this.selectedIds();
+    const picked = s.layout.items.filter((i) => ids.has(i.id));
+    if (picked.length < 2) return;
+    const patchMap = new Map<string, Partial<ScreenLayoutItem>>();
+    if (mode === 'left') {
+      const min = Math.min(...picked.map((i) => i.x));
+      for (const i of picked) patchMap.set(i.id, { x: min });
+    } else if (mode === 'right') {
+      const max = Math.max(...picked.map((i) => i.x + i.width));
+      for (const i of picked) patchMap.set(i.id, { x: max - i.width });
+    } else if (mode === 'top') {
+      const min = Math.min(...picked.map((i) => i.y));
+      for (const i of picked) patchMap.set(i.id, { y: min });
+    } else if (mode === 'bottom') {
+      const max = Math.max(...picked.map((i) => i.y + i.height));
+      for (const i of picked) patchMap.set(i.id, { y: max - i.height });
+    } else if (mode === 'centerX') {
+      const cx = picked.reduce((sum, i) => sum + i.x + i.width / 2, 0) / picked.length;
+      for (const i of picked) patchMap.set(i.id, { x: Math.round(cx - i.width / 2) });
+    } else if (mode === 'centerY') {
+      const cy = picked.reduce((sum, i) => sum + i.y + i.height / 2, 0) / picked.length;
+      for (const i of picked) patchMap.set(i.id, { y: Math.round(cy - i.height / 2) });
+    }
+    this.applyBulkPatch(patchMap);
+  }
+
+  distributeSelected(axis: 'h' | 'v') {
+    const s = this.screen();
+    if (!s) return;
+    const ids = this.selectedIds();
+    const picked = s.layout.items.filter((i) => ids.has(i.id));
+    if (picked.length < 3) return;
+    const patchMap = new Map<string, Partial<ScreenLayoutItem>>();
+    if (axis === 'h') {
+      const sorted = [...picked].sort((a, b) => a.x - b.x);
+      const left = sorted[0].x;
+      const right = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width;
+      const totalW = sorted.reduce((sum, i) => sum + i.width, 0);
+      const gap = (right - left - totalW) / (sorted.length - 1);
+      let cursor = left;
+      for (const i of sorted) {
+        patchMap.set(i.id, { x: Math.round(cursor) });
+        cursor += i.width + gap;
+      }
+    } else {
+      const sorted = [...picked].sort((a, b) => a.y - b.y);
+      const top = sorted[0].y;
+      const bottom = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height;
+      const totalH = sorted.reduce((sum, i) => sum + i.height, 0);
+      const gap = (bottom - top - totalH) / (sorted.length - 1);
+      let cursor = top;
+      for (const i of sorted) {
+        patchMap.set(i.id, { y: Math.round(cursor) });
+        cursor += i.height + gap;
+      }
+    }
+    this.applyBulkPatch(patchMap);
+  }
+
+  private applyBulkPatch(patchMap: Map<string, Partial<ScreenLayoutItem>>) {
+    const s = this.screen();
+    if (!s) return;
+    const items = s.layout.items.map((i) => (patchMap.has(i.id) ? { ...i, ...patchMap.get(i.id)! } : i));
+    this.screen.set({ ...s, layout: { ...s.layout, items } });
+    const sel = this.selected();
+    if (sel) {
+      const updated = items.find((i) => i.id === sel.id);
+      if (updated) this.selected.set(updated);
+    }
+    this.commitState();
+    this.markDirty();
   }
 
   duplicateSelected() {
@@ -515,6 +880,7 @@ export class ScreenEditPage implements OnInit, OnDestroy {
     const s = this.screen();
     if (!s) return;
     this.screen.set({ ...s, layout: { ...s.layout, background: value || undefined } });
+    this.commitState();
     this.markDirty();
   }
 
@@ -524,6 +890,8 @@ export class ScreenEditPage implements OnInit, OnDestroy {
     if (!sel || !s) return;
     this.screen.set({ ...s, layout: { ...s.layout, items: s.layout.items.filter((i) => i.id !== sel.id) } });
     this.selected.set(null);
+    this.selectedIds.set(new Set());
+    this.commitState();
     this.markDirty();
   }
 
@@ -577,12 +945,22 @@ export class ScreenEditPage implements OnInit, OnDestroy {
     const items = s.layout.items.map((i) => {
       if (i.id !== this.drag!.itemId) return i;
       if (this.drag!.mode === 'move') {
-        return { ...i, x: Math.round(this.drag!.startItemX + dx), y: Math.round(this.drag!.startItemY + dy) };
+        let x = Math.round(this.drag!.startItemX + dx);
+        let y = Math.round(this.drag!.startItemY + dy);
+        if (this.snapGrid()) {
+          x = snapToGrid(x);
+          y = snapToGrid(y);
+        }
+        return { ...i, x, y };
       }
       const startW = this.drag!.startItemW;
       const startH = this.drag!.startItemH;
       let newW = Math.max(40, startW + dx);
       let newH = Math.max(40, startH + dy);
+      if (this.snapGrid()) {
+        newW = Math.max(40, snapToGrid(newW));
+        newH = Math.max(40, snapToGrid(newH));
+      }
       const preserveAspect = !ev.shiftKey && startW > 0 && startH > 0;
       if (preserveAspect) {
         const aspect = startW / startH;
@@ -600,7 +978,10 @@ export class ScreenEditPage implements OnInit, OnDestroy {
   }
 
   endDrag() {
-    if (this.drag) this.markDirty();
+    if (this.drag) {
+      this.commitState();
+      this.markDirty();
+    }
     this.drag = null;
   }
 

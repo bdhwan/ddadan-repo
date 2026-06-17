@@ -8,8 +8,18 @@ import { ApiService, AssetView } from '../api.service';
   template: `
     <h1>에셋</h1>
     <div class="panel">
+      <div
+        class="dropzone"
+        [class.drag]="dragOver()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="dragOver.set(false)"
+        (drop)="onDrop($event)"
+      >
+        <input #fileInput type="file" class="hidden" accept="image/*,video/*" multiple (change)="onFiles($event)" />
+        <p>파일을 여기에 드래그하거나</p>
+        <button type="button" class="secondary" (click)="fileInput.click()">여러 파일 선택</button>
+      </div>
       <div class="toolbar">
-        <input type="file" (change)="onFile($event)" accept="image/*,video/*" />
         <input [(ngModel)]="textName" placeholder="텍스트 이름" />
         <input [(ngModel)]="textBody" placeholder="텍스트 내용" />
         <button (click)="addText()" [disabled]="!textName.trim() || !textBody.trim()">텍스트 추가</button>
@@ -44,6 +54,16 @@ import { ApiService, AssetView } from '../api.service';
   `,
   styles: [
     `
+      .dropzone {
+        border: 2px dashed var(--border);
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        margin-bottom: 12px;
+        background: #fafbfd;
+      }
+      .dropzone.drag { border-color: var(--accent); background: #eef3ff; }
+      .hidden { display: none; }
       .grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -91,6 +111,7 @@ import { ApiService, AssetView } from '../api.service';
 export class AssetsPage implements OnInit {
   readonly api = inject(ApiService);
   readonly assets = signal<AssetView[]>([]);
+  readonly dragOver = signal(false);
   textName = '';
   textBody = '';
 
@@ -102,14 +123,38 @@ export class AssetsPage implements OnInit {
     this.api.listAssets().subscribe((a) => this.assets.set(a));
   }
 
-  onFile(ev: Event) {
+  onDragOver(ev: DragEvent) {
+    ev.preventDefault();
+    this.dragOver.set(true);
+  }
+
+  onDrop(ev: DragEvent) {
+    ev.preventDefault();
+    this.dragOver.set(false);
+    const files = Array.from(ev.dataTransfer?.files ?? []);
+    this.uploadFiles(files);
+  }
+
+  onFiles(ev: Event) {
     const input = ev.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    this.api.uploadAsset(file).subscribe(() => {
-      input.value = '';
-      this.refresh();
-    });
+    const files = Array.from(input.files ?? []);
+    this.uploadFiles(files);
+    input.value = '';
+  }
+
+  private uploadFiles(files: File[]) {
+    if (!files.length) return;
+    let remaining = files.length;
+    for (const file of files) {
+      this.api.uploadAsset(file).subscribe({
+        next: () => {
+          if (--remaining === 0) this.refresh();
+        },
+        error: () => {
+          if (--remaining === 0) this.refresh();
+        },
+      });
+    }
   }
 
   addText() {

@@ -62,7 +62,18 @@ if [ -z "$NEED" ] && monitor_connected && ! pgrep -f -- '--kiosk' >/dev/null 2>&
 fi
 
 # 3. keep outputs on / blanking off (cheap, idempotent, best-effort).
-command -v wlopm >/dev/null 2>&1 && wlopm --on '*' >/dev/null 2>&1 || true
+if command -v wlopm >/dev/null 2>&1; then
+  wlopm --on '*' >/dev/null 2>&1 || true
+  if wlopm 2>/dev/null | grep -q ' off$' && command -v wlr-randr >/dev/null 2>&1; then
+    OUT="$(wlr-randr 2>/dev/null | awk '/^HDMI|^DP|^eDP|^VGA|^DVI/{print $1; exit}')"
+    if [ -n "$OUT" ]; then
+      wlr-randr --output "$OUT" --off >/dev/null 2>&1 || true
+      sleep 1
+      wlr-randr --output "$OUT" --on >/dev/null 2>&1 || true
+      wlopm --on '*' >/dev/null 2>&1 || true
+    fi
+  fi
+fi
 if [ -z "${WAYLAND_DISPLAY:-}" ] && command -v xset >/dev/null 2>&1; then
   xset s off 2>/dev/null; xset s noblank 2>/dev/null; xset -dpms 2>/dev/null
 fi
