@@ -47,12 +47,22 @@ def won(n):
     return f"{n:,}"
 
 
-def base_layout(bg_asset, section):
+def base_layout(bg_asset, section, brand=True):
+    # The three displays form one continuous wall, so the brand name is shown
+    # only once (on the bread panel). Other panels carry just a section title,
+    # kept at the same vertical rhythm so menu rows line up across the seam.
     it = [img(bg_asset, 0, 0, 1920, 1080, 0), box(0, 0, 1920, 1080, 1, DIM)]
-    it.append(txt("브로트베르크", 0, 96, 1920, 92, 5, 80, WHITE, 800, "center"))
-    it.append(txt("B A K E R Y   ·   C O F F E E", 0, 196, 1920, 38, 5, 23, GOLD, 600, "center"))
+    if brand:
+        it.append(txt("브로트베르크", 0, 96, 1920, 92, 5, 80, WHITE, 800, "center"))
+        it.append(txt("B A K E R Y   ·   C O F F E E", 0, 196, 1920, 38, 5, 23, GOLD, 600, "center"))
+        it.append(box(835, 252, 250, 2, 5, LINE))
+        it.append(txt(section, 0, 272, 1920, 40, 5, 25, GOLD, 700, "center"))
+        return it
+    # No-brand panel: the section title itself is the header (shown once).
+    en, ko = section.split("·")[0].strip(), section.split("·")[-1].strip()
+    it.append(txt(en, 0, 104, 1920, 80, 5, 64, WHITE, 800, "center"))
+    it.append(txt(ko, 0, 196, 1920, 38, 5, 26, GOLD, 600, "center"))
     it.append(box(835, 252, 250, 2, 5, LINE))
-    it.append(txt(section, 0, 272, 1920, 40, 5, 25, GOLD, 700, "center"))
     return it
 
 
@@ -69,8 +79,8 @@ def add_rows(it, items, per_col, top, line_h, size):
         it.append(box(x, y + line_h - 8, col_w, 1, 6, ROW))
 
 
-def build_board(bg_asset, section, items, per_col, top, line_h, size, footer):
-    it = base_layout(bg_asset, section)
+def build_board(bg_asset, section, items, per_col, top, line_h, size, footer, brand=True):
+    it = base_layout(bg_asset, section, brand=brand)
     add_rows(it, items, per_col, top, line_h, size)
     it.append(txt(footer, 0, 1004, 1920, 40, 6, 22, SUB, 400, "center"))
     return {"width": 1920, "height": 1080, "layout": {"items": it}}
@@ -96,9 +106,10 @@ def main():
 
     menu = json.load(open(os.path.join(os.path.dirname(__file__), "menu.json")))
     bread = build_board(args.bg_asset, "BREAD   ·   빵", menu["bread"], 8, 366, 80, 35,
-                        "매장에서 갓 구워낸 빵 · 매일 오전 11시 출고")
+                        "매장에서 갓 구워낸 빵 · 매일 오전 11시 출고", brand=True)
+    # Beverage panel sits next to the bread panel on the wall — no brand repeat.
     bev = build_board(args.bg_asset, "BEVERAGE   ·   음료", menu["beverage"], 6, 392, 98, 37,
-                      "핸드드립 커피 · 생과일 주스는 매일 신선하게")
+                      "핸드드립 커피 · 생과일 주스는 매일 신선하게", brand=False)
     upsert(args.api, args.bread_screen, "브로트베르크-빵메뉴판", bread)
     upsert(args.api, args.beverage_screen, "브로트베르크-음료메뉴판", bev)
     print("done.")
