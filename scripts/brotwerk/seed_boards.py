@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
-"""Seed the Brotwerk (브로트베르크) bread & beverage menu boards.
+"""Seed the Brotwerk store-wall menu boards (BAKERY + BEVERAGE).
 
-Builds two 1920x1080 menu-board screens — a dimmed background photo with a
-centered brand header and a two-column name/price menu (no product images) —
-and PATCHes them onto existing screen ids (or creates them).
+The three displays form ONE continuous wall, so:
+  - no brand name on the menu panels (just the section title BAKERY / BEVERAGE),
+  - each menu panel rotates through several background photos, and
+  - every display draws from a DISJOINT image pool, so no two screens ever
+    show the same picture at the same time.
+
+For each panel this builds one screen per background image (same menu, different
+backdrop) and sets the monitor to crossfade-rotate through them.
 
 Usage:
     python3 seed_boards.py --api http://display-1:4200/api \
-        --bg-asset 18 --bread-screen 12 --beverage-screen 13
+        --bakery-bgs 28,29,30   --bakery-monitor 3 \
+        --beverage-bgs 31,32,33 --beverage-monitor 4
 
-`--bg-asset` is an uploaded image asset id used as the dimmed backdrop.
-Omit `--bread-screen`/`--beverage-screen` to create new screens instead.
-Run from this directory (reads ./menu.json).
+Background asset ids must already be uploaded (admin → assets). Run from this
+directory (reads ./menu.json).
 """
 import argparse, json, os, uuid, urllib.request
 
@@ -24,7 +29,7 @@ def api(base, method, path, body=None):
         base + path,
         data=json.dumps(body).encode() if body is not None else None,
         method=method, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=20) as r:
+    with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
 
 
@@ -47,23 +52,10 @@ def won(n):
     return f"{n:,}"
 
 
-def base_layout(bg_asset, section, brand=True):
-    # The three displays form one continuous wall, so the brand name is shown
-    # only once (on the bread panel). Other panels carry just a section title,
-    # kept at the same vertical rhythm so menu rows line up across the seam.
-    it = [img(bg_asset, 0, 0, 1920, 1080, 0), box(0, 0, 1920, 1080, 1, DIM)]
-    if brand:
-        it.append(txt("브로트베르크", 0, 96, 1920, 92, 5, 80, WHITE, 800, "center"))
-        it.append(txt("B A K E R Y   ·   C O F F E E", 0, 196, 1920, 38, 5, 23, GOLD, 600, "center"))
-        it.append(box(835, 252, 250, 2, 5, LINE))
-        it.append(txt(section, 0, 272, 1920, 40, 5, 25, GOLD, 700, "center"))
-        return it
-    # No-brand panel: the section title itself is the header (shown once).
-    en, ko = section.split("·")[0].strip(), section.split("·")[-1].strip()
-    it.append(txt(en, 0, 104, 1920, 80, 5, 64, WHITE, 800, "center"))
-    it.append(txt(ko, 0, 196, 1920, 38, 5, 26, GOLD, 600, "center"))
-    it.append(box(835, 252, 250, 2, 5, LINE))
-    return it
+def header(it, title_en, title_ko):
+    it.append(txt(title_en, 0, 104, 1920, 80, 5, 66, WHITE, 800, "center"))
+    it.append(txt(title_ko, 0, 198, 1920, 38, 5, 26, GOLD, 600, "center"))
+    it.append(box(835, 256, 250, 2, 5, LINE))
 
 
 def add_rows(it, items, per_col, top, line_h, size):
@@ -79,39 +71,52 @@ def add_rows(it, items, per_col, top, line_h, size):
         it.append(box(x, y + line_h - 8, col_w, 1, 6, ROW))
 
 
-def build_board(bg_asset, section, items, per_col, top, line_h, size, footer, brand=True):
-    it = base_layout(bg_asset, section, brand=brand)
+def build_layout(bg_asset, title_en, title_ko, items, per_col, top, line_h, size, footer):
+    it = [img(bg_asset, 0, 0, 1920, 1080, 0), box(0, 0, 1920, 1080, 1, DIM)]
+    header(it, title_en, title_ko)
     add_rows(it, items, per_col, top, line_h, size)
     it.append(txt(footer, 0, 1004, 1920, 40, 6, 22, SUB, 400, "center"))
     return {"width": 1920, "height": 1080, "layout": {"items": it}}
 
 
-def upsert(base, screen_id, name, payload):
-    if screen_id:
-        api(base, "PATCH", f"/screens/{screen_id}", payload)
-        print(f"  updated screen {screen_id}: {name}")
-        return screen_id
-    created = api(base, "POST", "/screens", {"name": name, **payload})
-    print(f"  created screen {created['id']}: {name}")
-    return created["id"]
+def seed_panel(base, name, title_en, title_ko, items, per_col, top, line_h, size,
+               footer, bg_assets, monitor, interval_ms, fade_ms):
+    screen_ids = []
+    for i, bg in enumerate(bg_assets, 1):
+        payload = {"name": f"{title_en} {i}", **build_layout(bg, title_en, title_ko, items, per_col, top, line_h, size, footer)}
+        sid = api(base, "POST", "/screens", payload)["id"]
+        screen_ids.append(sid)
+        print(f"  {title_en} bg#{i} (asset {bg}) -> screen {sid}")
+    api(base, "PATCH", f"/monitors/{monitor}/rotation",
+        {"screenIds": screen_ids, "intervalMs": interval_ms, "fadeMs": fade_ms})
+    print(f"  monitor {monitor} rotation -> {screen_ids} ({interval_ms}ms)")
+    return screen_ids
+
+
+def csv_ints(s):
+    return [int(x) for x in s.split(",") if x.strip()]
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", default="http://display-1:4200/api")
-    ap.add_argument("--bg-asset", type=int, required=True)
-    ap.add_argument("--bread-screen", type=int)
-    ap.add_argument("--beverage-screen", type=int)
+    ap.add_argument("--bakery-bgs", type=csv_ints, required=True)
+    ap.add_argument("--bakery-monitor", type=int, required=True)
+    ap.add_argument("--beverage-bgs", type=csv_ints, required=True)
+    ap.add_argument("--beverage-monitor", type=int, required=True)
+    ap.add_argument("--interval-ms", type=int, default=9000)
+    ap.add_argument("--fade-ms", type=int, default=900)
     args = ap.parse_args()
 
     menu = json.load(open(os.path.join(os.path.dirname(__file__), "menu.json")))
-    bread = build_board(args.bg_asset, "BREAD   ·   빵", menu["bread"], 8, 366, 80, 35,
-                        "매장에서 갓 구워낸 빵 · 매일 오전 11시 출고", brand=True)
-    # Beverage panel sits next to the bread panel on the wall — no brand repeat.
-    bev = build_board(args.bg_asset, "BEVERAGE   ·   음료", menu["beverage"], 6, 392, 98, 37,
-                      "핸드드립 커피 · 생과일 주스는 매일 신선하게", brand=False)
-    upsert(args.api, args.bread_screen, "브로트베르크-빵메뉴판", bread)
-    upsert(args.api, args.beverage_screen, "브로트베르크-음료메뉴판", bev)
+    print("BAKERY panel:")
+    seed_panel(args.api, "bakery", "BAKERY", "베이커리", menu["bread"], 8, 344, 80, 35,
+               "매장에서 갓 구워낸 빵 · 매일 오전 11시 출고",
+               args.bakery_bgs, args.bakery_monitor, args.interval_ms, args.fade_ms)
+    print("BEVERAGE panel:")
+    seed_panel(args.api, "beverage", "BEVERAGE", "음료", menu["beverage"], 6, 372, 98, 37,
+               "핸드드립 커피 · 생과일 주스는 매일 신선하게",
+               args.beverage_bgs, args.beverage_monitor, args.interval_ms, args.fade_ms)
     print("done.")
 
 
