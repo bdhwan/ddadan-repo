@@ -14,6 +14,7 @@ async function bootstrap() {
   const api = new DdadanApi(config);
   const kiosk = new KioskSupervisor({
     browserBin: config.browserBin,
+    launcher: config.kioskLauncher,
     enabled: config.launchKiosk,
   });
 
@@ -48,17 +49,24 @@ async function refreshTargetUrl(args: {
   kiosk: KioskSupervisor;
 }) {
   const { api, config, hardwareId, monitors, kiosk } = args;
+  const playerUrl = `${config.playerBase}/?deviceId=${encodeURIComponent(hardwareId)}`;
   try {
     const result = await api.check(hardwareId, monitors);
     if (!result.registered) {
       const url = `${config.adminBase}/register?deviceId=${encodeURIComponent(hardwareId)}`;
       kiosk.setUrl(url);
     } else {
-      const url = `${config.playerBase}/?deviceId=${encodeURIComponent(hardwareId)}`;
-      kiosk.setUrl(url);
+      kiosk.setUrl(playerUrl);
     }
   } catch (err) {
     console.warn(`[ddadan-pi] check failed: ${(err as Error).message}`);
+    // Never leave the screen blank on a transient API error: if nothing is
+    // showing yet, fall back to the player URL (the page itself tolerates an
+    // offline API). An already-running kiosk keeps its current URL.
+    if (!kiosk.hasUrl()) {
+      console.warn('[ddadan-pi] no URL yet — falling back to player URL');
+      kiosk.setUrl(playerUrl);
+    }
   }
 }
 

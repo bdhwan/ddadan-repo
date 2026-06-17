@@ -21,6 +21,10 @@
               [style.background]="item.background ?? null"
               [style.color]="item.color ?? null"
               [style.font-size.px]="item.fontSize ?? null"
+              [style.font-weight]="item.fontWeight ?? null"
+              [style.text-align]="item.textAlign ?? null"
+              [style.line-height]="item.lineHeight ?? null"
+              [style.opacity]="item.opacity ?? null"
             >
               @switch (item.kind) {
                 @case ('image') {
@@ -59,6 +63,10 @@
               [style.background]="item.background ?? null"
               [style.color]="item.color ?? null"
               [style.font-size.px]="item.fontSize ?? null"
+              [style.font-weight]="item.fontWeight ?? null"
+              [style.text-align]="item.textAlign ?? null"
+              [style.line-height]="item.lineHeight ?? null"
+              [style.opacity]="item.opacity ?? null"
             >
               @switch (item.kind) {
                 @case ('image') {
@@ -90,6 +98,10 @@
         [style.background]="item.background ?? null"
         [style.color]="item.color ?? null"
         [style.font-size.px]="item.fontSize ?? null"
+        [style.font-weight]="item.fontWeight ?? null"
+        [style.text-align]="item.textAlign ?? null"
+        [style.line-height]="item.lineHeight ?? null"
+        [style.opacity]="item.opacity ?? null"
       >
         @switch (item.kind) {
           @case ('image') {

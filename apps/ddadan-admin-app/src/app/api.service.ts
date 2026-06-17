@@ -60,6 +60,10 @@ export interface ScreenLayoutItem {
   fontSize?: number;
   color?: string;
   background?: string;
+  opacity?: number;
+  fontWeight?: number;
+  textAlign?: 'left' | 'center' | 'right';
+  lineHeight?: number;
   x: number;
   y: number;
   width: number;

@@ -7,6 +7,7 @@ export interface PiConfig {
   heartbeatIntervalSec: number;
   hardwareIdOverride: string | undefined;
   browserBin: string | undefined;
+  kioskLauncher: string | undefined;
   launchKiosk: boolean;
   appVersion: string;
 }
@@ -24,6 +25,7 @@ export function loadConfig(): PiConfig {
     heartbeatIntervalSec: intEnv(process.env.DDADAN_HEARTBEAT_INTERVAL_S, 20),
     hardwareIdOverride: process.env.DDADAN_HARDWARE_ID || undefined,
     browserBin: process.env.DDADAN_BROWSER_BIN || undefined,
+    kioskLauncher: process.env.DDADAN_KIOSK_LAUNCHER || undefined,
     launchKiosk: process.env.DDADAN_LAUNCH_KIOSK === '1',
     appVersion: process.env.DDADAN_APP_VERSION ?? '0.1.0',
   };

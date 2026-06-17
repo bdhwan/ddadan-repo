@@ -43,6 +43,22 @@ export class ScreenLayoutItemDto {
   @IsString()
   background?: string;
 
+  @IsOptional()
+  @IsNumber()
+  opacity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  fontWeight?: number;
+
+  @IsOptional()
+  @IsIn(['left', 'center', 'right'])
+  textAlign?: 'left' | 'center' | 'right';
+
+  @IsOptional()
+  @IsNumber()
+  lineHeight?: number;
+
   @IsNumber()
   x!: number;
 

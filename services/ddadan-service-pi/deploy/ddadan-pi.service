@@ -1,0 +1,29 @@
+# DDADAN Pi kiosk — systemd *user* service (template).
+# Installed to ~/.config/systemd/user/ddadan-pi.service by install.sh, which
+# substitutes __APPDIR__ and __NODE__. Runs inside the user's graphical
+# (Wayland/labwc) session so chromium can reach the wayland-0 socket.
+[Unit]
+Description=DDADAN Pi kiosk display service
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+WorkingDirectory=__APPDIR__
+
+# Kiosk on + use the hardened launcher. WAYLAND_DISPLAY is fixed for labwc;
+# XDG_RUNTIME_DIR is provided automatically by the user manager (%t).
+Environment=DDADAN_LAUNCH_KIOSK=1
+Environment=DDADAN_KIOSK_LAUNCHER=__APPDIR__/deploy/kiosk-launch.sh
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=%t
+
+ExecStart=__NODE__ __APPDIR__/dist/index.js
+
+# Always recover; tolerate rapid restarts during boot (before labwc is up).
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=0
+
+[Install]
+WantedBy=default.target

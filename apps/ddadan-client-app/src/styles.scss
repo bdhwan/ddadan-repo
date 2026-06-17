@@ -1,1 +1,28 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global kiosk reset: edge-to-edge fullscreen, no body margin, no scrollbars. */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050505;
+  overscroll-behavior: none;
+}
+
+app-root {
+  display: block;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Hide scrollbars everywhere (kiosk has no pointer scrolling). */
+* {
+  scrollbar-width: none; /* Firefox */
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* Chromium/WebKit */
+}
