@@ -19,8 +19,10 @@ Usage:
 """
 import argparse, json, os, uuid, urllib.request
 
-BG = "#f6f2ea"; TITLE = "#3a2e22"; KO = "#b0894a"; NAME = "#4a3f33"
-PRICE = "#b07a2e"; ROWL = "rgba(60,46,34,0.10)"; FOOT = "#9a8e7c"; DIV = "rgba(60,46,34,0.16)"
+# Bright, colorful franchise-board palette
+BG = "#fdfcf9"; TITLE = "#21395f"; KO = "#5a7aa6"; NAME = "#2f2a24"
+PRICE = "#e0552f"; ROWL = "rgba(33,57,95,0.09)"; FOOT = "#9a948a"; DIV = "rgba(33,57,95,0.18)"
+BADGE_BG = "#2f6fd0"; BADGE_FG = "#ffffff"
 W, H = 1920, 1080
 IMG_W = 620
 
@@ -74,7 +76,14 @@ def panel_layout(side, title_en, title_ko, items, per_col, top, line_h, size, fo
     for i, m in enumerate(items):
         c = min(i // per_col, 1)
         x, y = xs[c], top + (i % per_col) * line_h
-        it.append(txt(m["name"], x, y, name_w, line_h - 14, 6, size, NAME, 500))
+        nx = x
+        badge = m.get("badge") or ("ICE" if "아이스" in m["name"] else None)
+        if badge:
+            bw = 52
+            it.append(box(x, y + 2, bw, size + 6, 6, BADGE_BG))
+            it.append(txt(badge, x, y + 5, bw, size, 7, int(size * 0.6), BADGE_FG, 700, "center"))
+            nx = x + bw + 12
+        it.append(txt(m["name"], nx, y, name_w, line_h - 14, 6, size, NAME, 500))
         it.append(txt(won(m["price"]), x + col_w - 150, y, 150, line_h - 14, 6, size, PRICE, 700, "right"))
         it.append(box(x, y + line_h - 10, col_w, 1, 6, ROWL))
 
