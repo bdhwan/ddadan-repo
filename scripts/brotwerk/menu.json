@@ -3,8 +3,7 @@
   "tagline": "BAKERY · COFFEE",
   "source": "매가시티빵집(브로트베르크) 사장님 제공 메뉴 — 쿠팡잇츠 기준",
   "bread": [
-    { "name": "팥빵", "price": 2800 },
-    { "name": "소금빵", "price": 3000 },
+    { "name": "소금빵", "price": 2800 },
     { "name": "크림치즈빵", "price": 3800 },
     { "name": "식빵", "price": 6000 },
     { "name": "쌀식빵", "price": 7000 },
@@ -13,6 +12,7 @@
     { "name": "소보로", "price": 3000 },
     { "name": "소세지빵", "price": 3600 },
     { "name": "고구마팥빵", "price": 3600 },
+    { "name": "단호박팥빵", "price": 3600 },
     { "name": "러스크", "price": 4800 },
     { "name": "사과잼빵", "price": 3800 },
     { "name": "마말레이드", "price": 3800 },
@@ -22,7 +22,7 @@
   ],
   "beverage": [
     { "name": "아메리카노", "price": 3200 },
-    { "name": "아이스 아메리카노", "price": 3500 },
+    { "name": "아이스 아메리카노", "price": 3000 },
     { "name": "카페라떼", "price": 4000 },
     { "name": "고구마라떼", "price": 4000 },
     { "name": "흑임자라떼", "price": 4000 },

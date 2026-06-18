@@ -1,33 +1,33 @@
 #!/usr/bin/env python3
-"""Seed the Brotwerk store-wall menu boards (BAKERY + BEVERAGE).
+"""Seed the Brotwerk store-wall menu boards — bright cafe style.
 
-The three displays form ONE continuous wall, so:
-  - no brand name on the menu panels (just the section title BAKERY / BEVERAGE),
-  - each menu panel rotates through several background photos, and
-  - every display draws from a DISJOINT image pool, so no two screens ever
-    show the same picture at the same time.
+Layout (per panel, 1920x1080), inspired by a typical bright franchise menu wall:
+  - warm-white menu panel with dark text and accent prices, and
+  - a full-height product-photo strip on the OUTER edge of the wall
+    (BAKERY on display-2 → photo on the left; BEVERAGE on display-3 → photo
+    on the right), so the wall is framed by appetizing product shots.
 
-For each panel this builds one screen per background image (same menu, different
-backdrop) and sets the monitor to crossfade-rotate through them.
+Each panel rotates through several product photos (same menu, different photo),
+and the three displays draw from DISJOINT image pools so no two screens ever
+show the same picture at once. No brand name on the menu panels (shown once
+elsewhere on the wall) — just the section title BAKERY / BEVERAGE.
 
 Usage:
     python3 seed_boards.py --api http://display-1:4200/api \
-        --bakery-bgs 28,29,30   --bakery-monitor 3 \
-        --beverage-bgs 31,32,33 --beverage-monitor 4
-
-Background asset ids must already be uploaded (admin → assets). Run from this
-directory (reads ./menu.json).
+        --bakery-imgs 48,49,50   --bakery-monitor 3 \
+        --beverage-imgs 51,52,53 --beverage-monitor 4
 """
 import argparse, json, os, uuid, urllib.request
 
-WHITE = "#f7f4ee"; GOLD = "#e8c98c"; CREAM = "#e9e3d6"; SUB = "#9aa6c0"
-DIM = "rgba(7,11,24,0.76)"; LINE = "rgba(232,201,140,0.5)"; ROW = "rgba(255,255,255,0.08)"
+BG = "#f6f2ea"; TITLE = "#3a2e22"; KO = "#b0894a"; NAME = "#4a3f33"
+PRICE = "#b07a2e"; ROWL = "rgba(60,46,34,0.10)"; FOOT = "#9a8e7c"; DIV = "rgba(60,46,34,0.16)"
+W, H = 1920, 1080
+IMG_W = 620
 
 
 def api(base, method, path, body=None):
     req = urllib.request.Request(
-        base + path,
-        data=json.dumps(body).encode() if body is not None else None,
+        base + path, data=json.dumps(body).encode() if body is not None else None,
         method=method, headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=30) as r:
         return json.load(r)
@@ -52,45 +52,49 @@ def won(n):
     return f"{n:,}"
 
 
-def header(it, title_en, title_ko):
-    it.append(txt(title_en, 0, 104, 1920, 80, 5, 66, WHITE, 800, "center"))
-    it.append(txt(title_ko, 0, 198, 1920, 38, 5, 26, GOLD, 600, "center"))
-    it.append(box(835, 256, 250, 2, 5, LINE))
+def panel_layout(side, title_en, title_ko, items, per_col, top, line_h, size, footer, img_asset):
+    it = [box(0, 0, W, H, 0, BG)]
+    if side == "left":
+        img_x, div_x, menu_l = 0, IMG_W, IMG_W + 90
+    else:
+        img_x, div_x, menu_l = W - IMG_W, W - IMG_W - 3, 90
+    it.append(img(img_asset, img_x, 0, IMG_W, H, 1))
+    it.append(box(div_x, 0, 3, H, 2, "rgba(60,46,34,0.12)"))
+    menu_r = (W - 90) if side == "left" else (W - IMG_W - 90)
+    menu_w = menu_r - menu_l
 
+    it.append(txt(title_en, menu_l, 72, menu_w, 80, 5, 60, TITLE, 800, "left"))
+    it.append(txt(title_ko, menu_l, 154, menu_w, 36, 5, 24, KO, 600, "left"))
+    it.append(box(menu_l, 206, int(menu_w * 0.5), 2, 5, DIV))
 
-def add_rows(it, items, per_col, top, line_h, size):
-    col_w, gap = 700, 120
-    left = (1920 - (col_w * 2 + gap)) // 2
-    xs = [left, left + col_w + gap]
-    name_w, price_off = 440, 470
+    col_gap = 70
+    col_w = (menu_w - col_gap) // 2
+    xs = [menu_l, menu_l + col_w + col_gap]
+    name_w = col_w - 130
     for i, m in enumerate(items):
         c = min(i // per_col, 1)
         x, y = xs[c], top + (i % per_col) * line_h
-        it.append(txt(m["name"], x, y, name_w, line_h - 12, 6, size, CREAM, 500))
-        it.append(txt(won(m["price"]), x + price_off, y, col_w - price_off, line_h - 12, 6, size, GOLD, 700, "right"))
-        it.append(box(x, y + line_h - 8, col_w, 1, 6, ROW))
+        it.append(txt(m["name"], x, y, name_w, line_h - 14, 6, size, NAME, 500))
+        it.append(txt(won(m["price"]), x + col_w - 150, y, 150, line_h - 14, 6, size, PRICE, 700, "right"))
+        it.append(box(x, y + line_h - 10, col_w, 1, 6, ROWL))
+
+    it.append(txt(footer, menu_l, 996, menu_w, 36, 6, 21, FOOT, 400, "left"))
+    return {"width": W, "height": H, "layout": {"items": it}}
 
 
-def build_layout(bg_asset, title_en, title_ko, items, per_col, top, line_h, size, footer):
-    it = [img(bg_asset, 0, 0, 1920, 1080, 0), box(0, 0, 1920, 1080, 1, DIM)]
-    header(it, title_en, title_ko)
-    add_rows(it, items, per_col, top, line_h, size)
-    it.append(txt(footer, 0, 1004, 1920, 40, 6, 22, SUB, 400, "center"))
-    return {"width": 1920, "height": 1080, "layout": {"items": it}}
-
-
-def seed_panel(base, name, title_en, title_ko, items, per_col, top, line_h, size,
-               footer, bg_assets, monitor, interval_ms, fade_ms):
-    screen_ids = []
-    for i, bg in enumerate(bg_assets, 1):
-        payload = {"name": f"{title_en} {i}", **build_layout(bg, title_en, title_ko, items, per_col, top, line_h, size, footer)}
+def seed_panel(base, side, title_en, title_ko, items, per_col, top, line_h, size,
+               footer, img_assets, monitor, interval_ms, fade_ms):
+    ids = []
+    for i, a in enumerate(img_assets, 1):
+        payload = {"name": f"{title_en} {i}",
+                   **panel_layout(side, title_en, title_ko, items, per_col, top, line_h, size, footer, a)}
         sid = api(base, "POST", "/screens", payload)["id"]
-        screen_ids.append(sid)
-        print(f"  {title_en} bg#{i} (asset {bg}) -> screen {sid}")
+        ids.append(sid)
+        print(f"  {title_en} img#{i} (asset {a}) -> screen {sid}")
     api(base, "PATCH", f"/monitors/{monitor}/rotation",
-        {"screenIds": screen_ids, "intervalMs": interval_ms, "fadeMs": fade_ms})
-    print(f"  monitor {monitor} rotation -> {screen_ids} ({interval_ms}ms)")
-    return screen_ids
+        {"screenIds": ids, "intervalMs": interval_ms, "fadeMs": fade_ms})
+    print(f"  monitor {monitor} rotation -> {ids}")
+    return ids
 
 
 def csv_ints(s):
@@ -100,23 +104,23 @@ def csv_ints(s):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--api", default="http://display-1:4200/api")
-    ap.add_argument("--bakery-bgs", type=csv_ints, required=True)
+    ap.add_argument("--bakery-imgs", type=csv_ints, required=True)
     ap.add_argument("--bakery-monitor", type=int, required=True)
-    ap.add_argument("--beverage-bgs", type=csv_ints, required=True)
+    ap.add_argument("--beverage-imgs", type=csv_ints, required=True)
     ap.add_argument("--beverage-monitor", type=int, required=True)
     ap.add_argument("--interval-ms", type=int, default=9000)
     ap.add_argument("--fade-ms", type=int, default=900)
     args = ap.parse_args()
 
     menu = json.load(open(os.path.join(os.path.dirname(__file__), "menu.json")))
-    print("BAKERY panel:")
-    seed_panel(args.api, "bakery", "BAKERY", "베이커리", menu["bread"], 8, 344, 80, 35,
+    print("BAKERY panel (photo left):")
+    seed_panel(args.api, "left", "BAKERY", "베이커리", menu["bread"], 8, 248, 78, 30,
                "매장에서 갓 구워낸 빵 · 매일 오전 11시 출고",
-               args.bakery_bgs, args.bakery_monitor, args.interval_ms, args.fade_ms)
-    print("BEVERAGE panel:")
-    seed_panel(args.api, "beverage", "BEVERAGE", "음료", menu["beverage"], 6, 372, 98, 37,
+               args.bakery_imgs, args.bakery_monitor, args.interval_ms, args.fade_ms)
+    print("BEVERAGE panel (photo right):")
+    seed_panel(args.api, "right", "BEVERAGE", "음료", menu["beverage"], 6, 286, 96, 32,
                "핸드드립 커피 · 생과일 주스는 매일 신선하게",
-               args.beverage_bgs, args.beverage_monitor, args.interval_ms, args.fade_ms)
+               args.beverage_imgs, args.beverage_monitor, args.interval_ms, args.fade_ms)
     print("done.")
 
 
