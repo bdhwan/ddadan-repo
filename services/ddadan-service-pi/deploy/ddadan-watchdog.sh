@@ -10,12 +10,17 @@
 #
 # Runs as the display user (uid 1000) via crontab, so it shares the user's
 # systemd manager and Wayland session.
+#
+# Maintenance mode: `touch ~/.ddadan-maintenance` to stop the watchdog from
+# resurrecting an intentionally-stopped kiosk (debugging, demos). Remove the
+# file to resume normal supervision. No crontab editing needed.
 
 set -u
 
 SERVICE="ddadan-pi.service"
 LOGFILE="$HOME/.local/state/ddadan-watchdog.log"
 MAXLOG=200000  # ~200KB then truncate
+MAINT_FLAG="$HOME/.ddadan-maintenance"
 
 UID_NUM="$(id -u)"
 : "${XDG_RUNTIME_DIR:=/run/user/${UID_NUM}}"
@@ -27,6 +32,12 @@ export WAYLAND_DISPLAY
 export DBUS_SESSION_BUS_ADDRESS
 
 mkdir -p "$(dirname "$LOGFILE")" 2>/dev/null || true
+
+# Maintenance mode: leave everything alone (including a stopped service).
+if [ -f "$MAINT_FLAG" ]; then
+  echo "$(date '+%Y-%m-%d %H:%M:%S') maintenance flag present — skipping" >>"$LOGFILE" 2>/dev/null || true
+  exit 0
+fi
 
 note() {  # journal + capped logfile
   command -v logger >/dev/null 2>&1 && logger -t ddadan-watchdog -- "$*" || true
@@ -62,17 +73,14 @@ if [ -z "$NEED" ] && monitor_connected && ! pgrep -f -- '--kiosk' >/dev/null 2>&
 fi
 
 # 3. keep outputs on / blanking off (cheap, idempotent, best-effort).
+#    NOTE: we intentionally do NOT cycle the output off/on here even if wlopm
+#    reports it stuck "off" — toggling wlr-randr --output X --off/--on tears
+#    down and re-creates the wl_output global, and wayvnc treats that as the
+#    monitor disappearing ("Selected output HDMI-A-1 went away" / "No fallback
+#    outputs left. Exiting"), killing the RPi Connect remote view every time
+#    this ran. A plain `wlopm --on` re-asserts DPMS power without doing that.
 if command -v wlopm >/dev/null 2>&1; then
   wlopm --on '*' >/dev/null 2>&1 || true
-  if wlopm 2>/dev/null | grep -q ' off$' && command -v wlr-randr >/dev/null 2>&1; then
-    OUT="$(wlr-randr 2>/dev/null | awk '/^HDMI|^DP|^eDP|^VGA|^DVI/{print $1; exit}')"
-    if [ -n "$OUT" ]; then
-      wlr-randr --output "$OUT" --off >/dev/null 2>&1 || true
-      sleep 1
-      wlr-randr --output "$OUT" --on >/dev/null 2>&1 || true
-      wlopm --on '*' >/dev/null 2>&1 || true
-    fi
-  fi
 fi
 if [ -z "${WAYLAND_DISPLAY:-}" ] && command -v xset >/dev/null 2>&1; then
   xset s off 2>/dev/null; xset s noblank 2>/dev/null; xset -dpms 2>/dev/null

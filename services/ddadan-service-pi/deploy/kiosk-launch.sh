@@ -80,27 +80,15 @@ trap 'cleanup; exit 0' TERM INT
 # ---------------------------------------------------------------------------
 # Disable screen blanking / keep all outputs powered on.
 # ---------------------------------------------------------------------------
-# wlopm --on can fail on some Pi/labwc combos while wlr-randr still shows the output
-# enabled; cycling the connector wakes the physical HDMI signal.
-cycle_wayland_output() {
-  has wlr-randr || return 0
-  local out
-  out="$(wlr-randr 2>/dev/null | awk -v re="$REAL_OUTPUT_RE" '
-    /^[^[:space:]]/ { if ($1 ~ re) { print $1; exit } }')"
-  [ -n "$out" ] || return 0
-  log "cycling output $out (wlopm stuck off)"
-  wlr-randr --output "$out" --off >/dev/null 2>&1 || true
-  sleep 1
-  wlr-randr --output "$out" --on >/dev/null 2>&1 || true
-}
-
+# NOTE: we used to cycle the connector (wlr-randr --output X --off then --on)
+# when wlopm reported it stuck "off", to wake the physical HDMI signal. That
+# tears down and re-creates the wl_output global, which wayvnc (RPi Connect's
+# screen capture backend) treats as the monitor disappearing for good
+# ("Selected output HDMI-A-1 went away" / "No fallback outputs left.
+# Exiting"), killing the remote view. Just re-assert DPMS power instead.
 disable_blanking() {
   if [ "$SERVER" = "wayland" ]; then
     has wlopm && wlopm --on '*' >/dev/null 2>&1 || true
-    if has wlopm && wlopm 2>/dev/null | grep -q ' off$'; then
-      cycle_wayland_output
-      has wlopm && wlopm --on '*' >/dev/null 2>&1 || true
-    fi
   else
     if has xset; then xset s off 2>/dev/null; xset s noblank 2>/dev/null; xset -dpms 2>/dev/null; fi
   fi
