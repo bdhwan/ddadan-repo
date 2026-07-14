@@ -58,6 +58,7 @@ export interface ScreenLayoutItem {
   componentId?: number | null;
   text?: string;
   fontSize?: number;
+  fontUnit?: 'px' | 'vh';
   color?: string;
   background?: string;
   opacity?: number;
@@ -98,6 +99,7 @@ export interface PlayerScreenItem {
   url?: string;
   text?: string;
   fontSize?: number;
+  fontUnit?: 'px' | 'vh';
   color?: string;
   background?: string;
   opacity?: number;

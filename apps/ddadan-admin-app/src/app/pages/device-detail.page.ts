@@ -312,7 +312,8 @@ export class DeviceDetailPage implements OnInit {
   }
 
   previewFontSize(item: ScreenLayoutItem, scr: ScreenView): number {
-    const base = item.fontSize ?? 36;
+    const stored = item.fontSize ?? 36;
+    const base = item.fontUnit === 'vh' ? (stored * scr.height) / 100 : stored;
     const ratio = this.scale > 0 ? 1 / this.scale : 1;
     return Math.max(8, Math.round(base * ratio));
   }

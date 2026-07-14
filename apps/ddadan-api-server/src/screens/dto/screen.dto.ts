@@ -36,6 +36,10 @@ export class ScreenLayoutItemDto {
   fontSize?: number;
 
   @IsOptional()
+  @IsIn(['px', 'vh'])
+  fontUnit?: 'px' | 'vh';
+
+  @IsOptional()
   @IsString()
   color?: string;
 

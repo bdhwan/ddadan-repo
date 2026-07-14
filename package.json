@@ -15,6 +15,8 @@
     "build:admin": "npm run build --workspace ddadan-admin-app",
     "build:client": "npm run build --workspace ddadan-client-app",
     "build:pi": "npm run build --workspace ddadan-service-pi",
+    "build:android": "cd apps/ddadan-android-app && ./gradlew assembleDebug",
+    "run:android": "cd apps/ddadan-android-app && ./gradlew assembleDebug && android run --apks=app/build/outputs/apk/debug/app-debug.apk --activity=com.ddadan.player.MainActivity --debug",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down"
   }

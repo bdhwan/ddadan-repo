@@ -8,6 +8,7 @@ interface ScreenItem {
   url?: string;
   text?: string;
   fontSize?: number;
+  fontUnit?: 'px' | 'vh';
   color?: string;
   background?: string;
   opacity?: number;
@@ -147,6 +148,11 @@ export class App implements OnInit, OnDestroy {
 
   protected textAlign(item: ScreenItem): string {
     return item.textAlign ?? (this.isMenuLine(item) ? 'left' : 'center');
+  }
+
+  protected fontCss(item: ScreenItem): string | null {
+    if (item.fontSize == null) return null;
+    return `${item.fontSize}${item.fontUnit ?? 'px'}`;
   }
 
   protected absoluteUrl(item: ScreenItem): string | null {
