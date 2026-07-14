@@ -21,3 +21,6 @@ out-tsc/
 
 # UX build scratch (downloaded/edited images, screenshots, scripts)
 .ux-build/
+
+# Session debug screenshots
+artifacts/
