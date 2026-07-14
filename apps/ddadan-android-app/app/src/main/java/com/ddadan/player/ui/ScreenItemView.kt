@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,11 +17,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -31,12 +34,37 @@ import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.ddadan.player.data.ScreenItem
 import com.ddadan.player.util.absoluteUrl
-import com.ddadan.player.util.resolveFontSizeSp
+import com.ddadan.player.util.resolveFontSizeDp
+
+/**
+ * Board text is sized in Dp (see [resolveFontSizeDp]) and converted here with the local
+ * density, so the rendered pixel size is exactly what the layout reserved for it. Going
+ * through `Density.toSp` also divides out the user's font-scale setting, which a signage
+ * board must ignore — it has a fixed box to fit into.
+ */
+@Composable
+private fun fontSizeOf(item: ScreenItem, stageHeightDp: Float, designHeight: Int): TextUnit {
+  val dp = resolveFontSizeDp(item, stageHeightDp, designHeight)
+  return with(LocalDensity.current) { dp.dp.toSp() }
+}
+
+/** The web player insets box text by 12px of design space; scale it like everything else. */
+private fun textInset(stageHeightDp: Float, designHeight: Int): Dp =
+  (12f * stageHeightDp / designHeight.coerceAtLeast(1)).dp
+
+/**
+ * Only the horizontal inset is applied. `Modifier.padding` is a hard constraint in Compose —
+ * a vertical inset shrinks the box the line box must fit in, and the text is then clipped.
+ * The web gets away with `padding: 12px` because its line box is free to overflow into the
+ * padding (the item, not the text, is what has `overflow: hidden`), so a board authored to
+ * fit its box on the web must not lose height to padding here.
+ */
 
 @Composable
 fun ScreenItemContent(
   item: ScreenItem,
-  stageHeightPx: Float,
+  stageHeightDp: Float,
+  designHeight: Int,
   apiBase: String,
   modifier: Modifier = Modifier,
 ) {
@@ -73,27 +101,34 @@ fun ScreenItemContent(
       }
       else -> {
         if (isMenuLine) {
-          MenuLineText(item = item, stageHeightPx = stageHeightPx)
+          MenuLineText(item = item, stageHeightDp = stageHeightDp, designHeight = designHeight)
         } else {
-          Text(
-            text = item.text.orEmpty(),
-            color = parseColorOrNull(item.color) ?: Color.White,
-            fontSize = resolveFontSizeSp(item, stageHeightPx).sp,
-            fontWeight =
-              item.fontWeight?.toInt()?.let { weight ->
-                when {
-                  weight >= 700 -> FontWeight.Bold
-                  weight >= 600 -> FontWeight.SemiBold
-                  weight >= 500 -> FontWeight.Medium
-                  else -> FontWeight.Normal
-                }
-              } ?: FontWeight.Normal,
-            textAlign = textAlign,
-            lineHeight =
-              item.lineHeight?.let { (it * resolveFontSizeSp(item, stageHeightPx)).sp }
-                ?: resolveFontSizeSp(item, stageHeightPx).sp,
-            modifier = Modifier.fillMaxSize().padding(12.dp),
-          )
+          val fontSize = fontSizeOf(item, stageHeightDp, designHeight)
+          Box(
+            modifier = Modifier.fillMaxSize().padding(horizontal = textInset(stageHeightDp, designHeight)),
+            contentAlignment = Alignment.Center,
+          ) {
+            Text(
+              text = item.text.orEmpty(),
+              color = parseColorOrNull(item.color) ?: Color.White,
+              fontSize = fontSize,
+              fontWeight =
+                item.fontWeight?.toInt()?.let { weight ->
+                  when {
+                    weight >= 700 -> FontWeight.Bold
+                    weight >= 600 -> FontWeight.SemiBold
+                    weight >= 500 -> FontWeight.Medium
+                    else -> FontWeight.Normal
+                  }
+                } ?: FontWeight.Normal,
+              textAlign = textAlign,
+              // Unspecified = the font's natural line height. Forcing it to fontSize (a 1.0
+              // ratio) leaves no room for ascenders or descenders, which sheared the bottom
+              // off every Hangul jongseong.
+              lineHeight = item.lineHeight?.let { fontSize * it.toFloat() } ?: TextUnit.Unspecified,
+              modifier = Modifier.fillMaxWidth(),
+            )
+          }
         }
       }
     }
@@ -101,11 +136,11 @@ fun ScreenItemContent(
 }
 
 @Composable
-private fun MenuLineText(item: ScreenItem, stageHeightPx: Float) {
-  val fontSize = resolveFontSizeSp(item, stageHeightPx).sp
+private fun MenuLineText(item: ScreenItem, stageHeightDp: Float, designHeight: Int) {
+  val fontSize = fontSizeOf(item, stageHeightDp, designHeight)
   val color = parseColorOrNull(item.color) ?: Color.White
   Row(
-    modifier = Modifier.fillMaxSize().padding(12.dp),
+    modifier = Modifier.fillMaxSize().padding(horizontal = textInset(stageHeightDp, designHeight)),
     verticalAlignment = Alignment.Bottom,
   ) {
     Text(
