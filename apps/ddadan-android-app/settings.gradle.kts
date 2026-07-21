@@ -31,3 +31,5 @@ plugins {
 
 rootProject.name = "DDADAN Player"
 include(":app")
+include(":core")
+include(":watchdog")

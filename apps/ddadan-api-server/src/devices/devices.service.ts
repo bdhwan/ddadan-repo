@@ -11,7 +11,12 @@ import { AppConfig } from '../config/configuration';
 import { Monitor } from '../monitors/monitor.entity';
 import { StoresService } from '../stores/stores.service';
 import { Device, DeviceStatus } from './device.entity';
-import { HeartbeatDto, MonitorReportDto, RegisterDeviceDto } from './dto/device.dto';
+import {
+  HeartbeatDto,
+  MonitorReportDto,
+  RegisterDeviceDto,
+  TelemetryDto,
+} from './dto/device.dto';
 
 @Injectable()
 export class DevicesService {
@@ -131,6 +136,26 @@ export class DevicesService {
       await this.syncMonitors(device.id, dto.monitors);
     }
 
+    return { ok: true, deviceId: device.id };
+  }
+
+  /** 워치독의 자원 텔레메트리 수신 — heartbeat 겸용(lastSeenAt 갱신 → online 표시). */
+  async telemetry(hardwareId: string, dto: TelemetryDto) {
+    const device = await this.devices.findOne({
+      where: { hardwareId, deletedAt: IsNull() },
+    });
+    if (!device) throw new NotFoundException('Device not registered');
+
+    device.status = 'online';
+    device.lastSeenAt = new Date();
+    if (dto.appVersion !== undefined) device.appVersion = dto.appVersion;
+    if (dto.cpuPercent !== undefined) device.lastCpuPercent = dto.cpuPercent;
+    if (dto.ramUsedMb !== undefined) device.lastRamUsedMb = dto.ramUsedMb;
+    if (dto.ramTotalMb !== undefined) device.lastRamTotalMb = dto.ramTotalMb;
+    if (dto.diskUsedPercent !== undefined) {
+      device.lastDiskUsedPercent = dto.diskUsedPercent;
+    }
+    await this.devices.save(device);
     return { ok: true, deviceId: device.id };
   }
 
@@ -262,6 +287,10 @@ export class DevicesService {
       status: liveStatus,
       lastSeenAt: device.lastSeenAt,
       appVersion: device.appVersion,
+      cpuPercent: device.lastCpuPercent,
+      ramUsedMb: device.lastRamUsedMb,
+      ramTotalMb: device.lastRamTotalMb,
+      diskUsedPercent: device.lastDiskUsedPercent,
       offlineAfterSeconds: ttl,
       monitors,
     };

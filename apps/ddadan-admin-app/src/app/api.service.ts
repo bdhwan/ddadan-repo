@@ -51,6 +51,13 @@ export interface AssetView {
   createdAt: string;
 }
 
+export interface ScreenshotView {
+  id: number;
+  url: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
 export interface ScreenLayoutItem {
   id: string;
   kind: 'image' | 'video' | 'text';
@@ -196,6 +203,11 @@ export class ApiService {
   }
   unregisterDevice(id: number): Observable<void> {
     return this.http.delete<void>(`${this.base}/devices/${id}`);
+  }
+  listDeviceScreenshots(id: number, limit = 10): Observable<ScreenshotView[]> {
+    return this.http.get<ScreenshotView[]>(
+      `${this.base}/devices/${id}/screenshots?limit=${limit}`,
+    );
   }
 
   // Monitors

@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,9 +17,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -32,6 +37,21 @@ import coil3.request.crossfade
 import com.ddadan.player.data.ScreenItem
 import com.ddadan.player.util.absoluteUrl
 import com.ddadan.player.util.resolveFontSizeSp
+
+/**
+ * 한글 등 세로 폭이 큰 글자의 상/하단이 라인 박스에서 잘리지 않도록 하는 텍스트 스타일.
+ * - includeFontPadding = true: 폰트 권장 여백(ascent/descent)을 확보
+ * - LineHeightStyle(trim = None): 명시적 lineHeight가 있어도 첫/마지막 줄의 leading을 유지
+ */
+private val NoClipTextStyle =
+  TextStyle(
+    lineHeightStyle =
+      LineHeightStyle(
+        alignment = LineHeightStyle.Alignment.Center,
+        trim = LineHeightStyle.Trim.None,
+      ),
+    platformStyle = PlatformTextStyle(includeFontPadding = true),
+  )
 
 @Composable
 fun ScreenItemContent(
@@ -75,25 +95,33 @@ fun ScreenItemContent(
         if (isMenuLine) {
           MenuLineText(item = item, stageHeightPx = stageHeightPx)
         } else {
-          Text(
-            text = item.text.orEmpty(),
-            color = parseColorOrNull(item.color) ?: Color.White,
-            fontSize = resolveFontSizeSp(item, stageHeightPx).sp,
-            fontWeight =
-              item.fontWeight?.toInt()?.let { weight ->
-                when {
-                  weight >= 700 -> FontWeight.Bold
-                  weight >= 600 -> FontWeight.SemiBold
-                  weight >= 500 -> FontWeight.Medium
-                  else -> FontWeight.Normal
-                }
-              } ?: FontWeight.Normal,
-            textAlign = textAlign,
-            lineHeight =
-              item.lineHeight?.let { (it * resolveFontSizeSp(item, stageHeightPx)).sp }
-                ?: resolveFontSizeSp(item, stageHeightPx).sp,
-            modifier = Modifier.fillMaxSize().padding(12.dp),
-          )
+          // 텍스트는 자연 높이로 두고 박스 안에서 세로 중앙 정렬한다.
+          // (박스 높이에 억지로 맞추면 짧은 박스에서 글자 상/하단이 잘림)
+          Box(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center,
+          ) {
+            Text(
+              text = item.text.orEmpty(),
+              color = parseColorOrNull(item.color) ?: Color.White,
+              fontSize = resolveFontSizeSp(item, stageHeightPx).sp,
+              fontWeight =
+                item.fontWeight?.toInt()?.let { weight ->
+                  when {
+                    weight >= 700 -> FontWeight.Bold
+                    weight >= 600 -> FontWeight.SemiBold
+                    weight >= 500 -> FontWeight.Medium
+                    else -> FontWeight.Normal
+                  }
+                } ?: FontWeight.Normal,
+              textAlign = textAlign,
+              lineHeight =
+                item.lineHeight?.let { (it * resolveFontSizeSp(item, stageHeightPx)).sp }
+                  ?: TextUnit.Unspecified,
+              style = NoClipTextStyle,
+              modifier = Modifier.fillMaxWidth(),
+            )
+          }
         }
       }
     }
@@ -114,6 +142,7 @@ private fun MenuLineText(item: ScreenItem, stageHeightPx: Float) {
       fontSize = fontSize,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
+      style = NoClipTextStyle,
     )
     Box(
       modifier =
@@ -136,6 +165,7 @@ private fun MenuLineText(item: ScreenItem, stageHeightPx: Float) {
       color = color,
       fontSize = fontSize,
       maxLines = 1,
+      style = NoClipTextStyle,
     )
   }
 }

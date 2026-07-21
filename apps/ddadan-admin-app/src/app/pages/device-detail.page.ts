@@ -1,7 +1,7 @@
 import { Component, ElementRef, computed, inject, OnInit, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, ScreenView } from '../api.service';
+import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, ScreenshotView, ScreenView } from '../api.service';
 import {
   MonitorRotationPanelComponent,
   RotForm,
@@ -98,10 +98,51 @@ import { isMenuLine, textAlignStyle } from '../screen-utils';
           }
         </div>
       </div>
+
+      <div class="panel">
+        <h2 class="shots-title">최근 스크린샷</h2>
+        @if (screenshots().length === 0) {
+          <p class="muted">아직 업로드된 스크린샷이 없습니다. (플레이어가 30초마다 현재 화면을 업로드합니다)</p>
+        } @else {
+          <div class="shots">
+            @for (s of screenshots(); track s.id) {
+              <figure class="shot">
+                <img [src]="shotUrl(s.url)" alt="screenshot" loading="lazy" />
+                <figcaption>{{ s.createdAt }}</figcaption>
+              </figure>
+            }
+          </div>
+        }
+      </div>
     }
   `,
   styles: [
     `
+      .shots-title { margin: 0 0 10px; font-size: 15px; }
+      .shots {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 12px;
+      }
+      .shot {
+        margin: 0;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #0c0f1a;
+      }
+      .shot img {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        object-fit: cover;
+        display: block;
+      }
+      .shot figcaption {
+        font-size: 11px;
+        color: var(--muted, #8a93a6);
+        padding: 6px 8px;
+        word-break: break-all;
+      }
       .row {
         display: flex;
         justify-content: space-between;
@@ -219,6 +260,7 @@ export class DeviceDetailPage implements OnInit {
   readonly device = signal<DeviceView | null>(null);
   readonly screens = signal<ScreenView[]>([]);
   readonly assets = signal<AssetView[]>([]);
+  readonly screenshots = signal<ScreenshotView[]>([]);
   readonly rotForms = signal<Record<number, RotForm>>({});
   private readonly assetMap = computed(() => {
     const map = new Map<number, AssetView>();
@@ -244,10 +286,15 @@ export class DeviceDetailPage implements OnInit {
     });
     this.api.listScreens().subscribe((s) => this.screens.set(s));
     this.api.listAssets().subscribe((a) => this.assets.set(a));
+    this.api.listDeviceScreenshots(id).subscribe((s) => this.screenshots.set(s));
   }
 
   previewUrl(d: DeviceView): string {
     return `${window.location.origin}/preview/${encodeURIComponent(d.hardwareId)}`;
+  }
+
+  shotUrl(url: string): string {
+    return this.api.absoluteAssetUrl(url);
   }
 
   sortedItems(scr: ScreenView): ScreenLayoutItem[] {

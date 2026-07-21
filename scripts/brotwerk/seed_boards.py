@@ -87,7 +87,8 @@ def panel_layout(side, title_en, title_ko, items, per_col, top, line_h, size, fo
         it.append(txt(won(m["price"]), x + col_w - 150, y, 150, line_h - 14, 6, size, PRICE, 700, "right"))
         it.append(box(x, y + line_h - 10, col_w, 1, 6, ROWL))
 
-    it.append(txt(footer, menu_l, 996, menu_w, 36, 6, 21, FOOT, 400, "left"))
+    if footer:
+        it.append(txt(footer, menu_l, 996, menu_w, 36, 6, 21, FOOT, 400, "left"))
     return {"width": W, "height": H, "layout": {"items": it}}
 
 
@@ -124,11 +125,11 @@ def main():
     menu = json.load(open(os.path.join(os.path.dirname(__file__), "menu.json")))
     print("BAKERY panel (photo left):")
     seed_panel(args.api, "left", "BAKERY", "베이커리", menu["bread"], 8, 248, 78, 30,
-               "매장에서 갓 구워낸 빵 · 매일 오전 11시 출고",
+               "",
                args.bakery_imgs, args.bakery_monitor, args.interval_ms, args.fade_ms)
     print("BEVERAGE panel (photo right):")
     seed_panel(args.api, "right", "BEVERAGE", "음료", menu["beverage"], 6, 286, 96, 32,
-               "핸드드립 커피 · 생과일 주스는 매일 신선하게",
+               "",
                args.beverage_imgs, args.beverage_monitor, args.interval_ms, args.fade_ms)
     print("done.")
 

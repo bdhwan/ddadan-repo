@@ -15,6 +15,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ddadan.player.data.AppUpdater
 import com.ddadan.player.data.PlayerRepository
 import com.ddadan.player.prefs.PlayerPreferences
 import com.ddadan.player.ui.PlayerScreen
@@ -34,7 +35,8 @@ class MainActivity : ComponentActivity() {
 
     val preferences = PlayerPreferences(applicationContext)
     val repository = PlayerRepository(preferences)
-    val factory = PlayerViewModelFactory(repository, preferences)
+    val updater = AppUpdater(applicationContext, repository)
+    val factory = PlayerViewModelFactory(repository, preferences, updater)
 
     val deviceId = intent.getStringExtra(EXTRA_DEVICE_ID)
     val slot = intent.getIntExtra(EXTRA_SLOT, -1).takeIf { it >= 0 }

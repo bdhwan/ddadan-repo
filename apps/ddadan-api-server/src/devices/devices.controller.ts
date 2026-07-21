@@ -15,6 +15,7 @@ import {
   CheckDeviceDto,
   HeartbeatDto,
   RegisterDeviceDto,
+  TelemetryDto,
   UpdateDeviceDto,
 } from './dto/device.dto';
 
@@ -33,6 +34,14 @@ export class DevicesController {
   @Post('devices/heartbeat')
   heartbeat(@Body() dto: HeartbeatDto) {
     return this.devices.heartbeat(dto);
+  }
+
+  @Post('devices/:hardwareId/telemetry')
+  telemetry(
+    @Param('hardwareId') hardwareId: string,
+    @Body() dto: TelemetryDto,
+  ) {
+    return this.devices.telemetry(hardwareId, dto);
   }
 
   @Post('devices')

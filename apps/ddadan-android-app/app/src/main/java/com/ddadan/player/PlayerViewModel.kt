@@ -3,8 +3,10 @@ package com.ddadan.player
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ddadan.player.BuildConfig
+import com.ddadan.player.data.AppUpdater
 import com.ddadan.player.data.PlayerRepository
 import com.ddadan.player.data.ScreenResponse
+import com.ddadan.player.data.ServerLocator
 import com.ddadan.player.data.SlidePayload
 import com.ddadan.player.prefs.PlayerPreferences
 import com.ddadan.player.util.buildRotationKey
@@ -16,6 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 
 data class PlayerUiState(
   val screen: ScreenResponse? = null,
@@ -34,29 +37,43 @@ data class PlayerUiState(
   val editingSettings: Boolean = false,
   val draftApiBase: String = "",
   val draftSlot: String = "0",
+  // 서버 자동 탐색 상태
+  val discovering: Boolean = false,
+  val scanCurrentIp: String? = null,
+  val scanDone: Int = 0,
+  val scanTotal: Int = 0,
+  val retryCountdownSec: Int = 0,
 )
 
 class PlayerViewModel(
   private val repository: PlayerRepository,
   private val preferences: PlayerPreferences,
+  private val updater: AppUpdater? = null,
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(PlayerUiState())
   val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
+  private val locator = ServerLocator()
+
   private var pollJob: Job? = null
   private var rotationJob: Job? = null
+  private var updateJob: Job? = null
   private var lastRotationKey = ""
+
+  /** 사용자가 수동으로 API 주소를 지정한 상태인지. true면 자동 탐색을 하지 않는다. */
+  private var overridePresent = false
 
   fun start() {
     if (pollJob?.isActive == true) return
+    startUpdateLoop()
     viewModelScope.launch {
       preferences.config.collect { config ->
-        val apiBase = config.apiBaseOverride ?: BuildConfig.API_BASE
+        overridePresent = config.apiBaseOverride != null
         _uiState.update {
           it.copy(
             hardwareId = config.deviceId,
             slot = config.slot,
-            apiBase = apiBase,
+            apiBase = config.effectiveApiBase,
           )
         }
         restartPolling()
@@ -70,28 +87,97 @@ class PlayerViewModel(
     }
   }
 
+  /** 주기적으로 서버의 최신 APK를 확인해 필요 시 자동 업데이트한다. */
+  private fun startUpdateLoop() {
+    val up = updater ?: return
+    if (updateJob?.isActive == true) return
+    updateJob =
+      viewModelScope.launch {
+        while (isActive) {
+          try {
+            up.checkAndUpdate()
+          } catch (e: Exception) {
+            android.util.Log.w("PlayerViewModel", "update loop error: ${e.message}")
+          }
+          delay(UPDATE_CHECK_INTERVAL_MS)
+        }
+      }
+  }
+
   private fun restartPolling() {
     pollJob?.cancel()
     pollJob =
       viewModelScope.launch {
         while (isActive) {
-          fetchOnce()
-          delay(BuildConfig.POLL_INTERVAL_MS)
+          val ok = fetchOnce()
+          if (ok || overridePresent) {
+            // 정상 응답이거나 수동 지정 모드면 평소대로 폴링만 반복.
+            delay(BuildConfig.POLL_INTERVAL_MS)
+          } else {
+            // 자동 모드에서 응답이 없으면 서버를 찾을 때까지 탐색한 뒤 폴링 재개.
+            runDiscoveryUntilFound()
+          }
         }
       }
   }
 
-  private suspend fun fetchOnce() {
+  /** @return 화면 응답을 정상적으로 받았으면 true. */
+  private suspend fun fetchOnce(): Boolean {
     val state = _uiState.value
     val hwid = state.hardwareId
-    if (hwid.isBlank()) return
-    try {
+    if (hwid.isBlank()) return false
+    return try {
       val response = repository.fetchScreen(hwid, state.slot)
       applyResponse(response)
+      true
     } catch (e: Exception) {
       android.util.Log.w("PlayerViewModel", "player fetch failed: ${e.message}")
+      false
     } finally {
       _uiState.update { it.copy(isLoading = false) }
+    }
+  }
+
+  /**
+   * 로컬 네트워크를 스캔해 서버를 찾을 때까지 반복한다.
+   * 한 바퀴 다 돌아도 못 찾으면 3분 카운트다운 후 재시도. 찾으면 주소를 저장하고 반환.
+   */
+  private suspend fun runDiscoveryUntilFound() {
+    _uiState.update {
+      it.copy(discovering = true, scanCurrentIp = null, scanDone = 0, scanTotal = 0, retryCountdownSec = 0)
+    }
+    try {
+      while (coroutineContext.isActive) {
+        _uiState.update { it.copy(scanCurrentIp = null, scanDone = 0, scanTotal = 0, retryCountdownSec = 0) }
+
+        val found =
+          locator.scanOnce { progress ->
+            _uiState.update {
+              it.copy(
+                scanCurrentIp = progress.currentIp,
+                scanDone = progress.done,
+                scanTotal = progress.total,
+              )
+            }
+          }
+
+        if (found != null) {
+          preferences.setDiscoveredApiBase(found)
+          _uiState.update {
+            it.copy(discovering = false, scanCurrentIp = null, apiBase = found)
+          }
+          return
+        }
+
+        // 못 찾음 → 3분 대기(카운트다운) 후 다시 스캔.
+        for (sec in RETRY_DELAY_SEC downTo 1) {
+          if (!coroutineContext.isActive) return
+          _uiState.update { it.copy(retryCountdownSec = sec, scanCurrentIp = null) }
+          delay(1000)
+        }
+      }
+    } finally {
+      _uiState.update { it.copy(discovering = false, retryCountdownSec = 0) }
     }
   }
 
@@ -230,6 +316,15 @@ class PlayerViewModel(
   override fun onCleared() {
     pollJob?.cancel()
     rotationJob?.cancel()
+    updateJob?.cancel()
     super.onCleared()
+  }
+
+  companion object {
+    /** 서버를 못 찾았을 때 다음 스캔까지 대기 시간(초). */
+    private const val RETRY_DELAY_SEC = 180
+
+    /** APK 업데이트 확인 주기(ms). */
+    private const val UPDATE_CHECK_INTERVAL_MS = 10 * 60_000L
   }
 }

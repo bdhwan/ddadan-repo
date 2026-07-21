@@ -9,12 +9,23 @@ android {
   compileSdk = 36
   defaultConfig {
     applicationId = "com.ddadan.player"
-    minSdk = 24
+    minSdk = 22
     targetSdk = 36
-    versionCode = 1
+    versionCode = 14
     versionName = "1.0"
     buildConfigField("String", "API_BASE", "\"http://10.0.2.2:7800/api\"")
     buildConfigField("long", "POLL_INTERVAL_MS", "5000L")
+  }
+
+  signingConfigs {
+    // 사내 사이니지 앱: OTA 서명 일관성을 위해 debug 키스토어로 release도 서명한다.
+    // (이미 배포된 debug-서명 앱을 pm install -r로 갱신하려면 같은 키여야 함)
+    create("release") {
+      storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+      storePassword = "android"
+      keyAlias = "androiddebugkey"
+      keyPassword = "android"
+    }
   }
 
   buildTypes {
@@ -22,7 +33,9 @@ android {
       buildConfigField("String", "API_BASE", "\"http://10.0.2.2:7800/api\"")
     }
     release {
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
+      signingConfig = signingConfigs.getByName("release")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       val apiBase = (project.findProperty("DDADAN_API_BASE") as String?) ?: "http://127.0.0.1:7800/api"
       buildConfigField("String", "API_BASE", "\"$apiBase\"")
@@ -51,6 +64,8 @@ kotlin {
 }
 
 dependencies {
+  implementation(project(":core"))
+
   val composeBom = platform(libs.androidx.compose.bom)
   implementation(composeBom)
   androidTestImplementation(composeBom)

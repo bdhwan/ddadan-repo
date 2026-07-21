@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Length,
@@ -83,4 +84,27 @@ export class HeartbeatDto {
   @ValidateNested({ each: true })
   @Type(() => MonitorReportDto)
   monitors?: MonitorReportDto[];
+}
+
+export class TelemetryDto {
+  @IsOptional()
+  @IsString()
+  @Length(0, 64)
+  appVersion?: string;
+
+  @IsOptional()
+  @IsNumber()
+  cpuPercent?: number;
+
+  @IsOptional()
+  @IsInt()
+  ramUsedMb?: number;
+
+  @IsOptional()
+  @IsInt()
+  ramTotalMb?: number;
+
+  @IsOptional()
+  @IsNumber()
+  diskUsedPercent?: number;
 }

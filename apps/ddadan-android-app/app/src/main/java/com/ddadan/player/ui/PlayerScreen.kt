@@ -3,8 +3,12 @@ package com.ddadan.player.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -12,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -95,6 +100,16 @@ fun PlayerScreen(
       }
     }
 
+    if (state.discovering) {
+      DiscoveryOverlay(
+        scanCurrentIp = state.scanCurrentIp,
+        scanDone = state.scanDone,
+        scanTotal = state.scanTotal,
+        retryCountdownSec = state.retryCountdownSec,
+        modifier = Modifier.fillMaxSize(),
+      )
+    }
+
     DeviceIdOverlay(
       visible = needsRegister,
       hardwareId = state.hardwareId,
@@ -134,6 +149,60 @@ fun PlayerScreen(
       onClick = viewModel::openSettingsEditor,
       modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
     )
+  }
+}
+
+@Composable
+private fun DiscoveryOverlay(
+  scanCurrentIp: String?,
+  scanDone: Int,
+  scanTotal: Int,
+  retryCountdownSec: Int,
+  modifier: Modifier = Modifier,
+) {
+  Box(
+    modifier = modifier.background(Color(0xF2050505)),
+    contentAlignment = Alignment.Center,
+  ) {
+    Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center,
+    ) {
+      Text(
+        text = "서버를 찾는 중",
+        color = Color.White.copy(alpha = 0.9f),
+        fontSize = 28.sp,
+      )
+      Spacer(modifier = Modifier.height(20.dp))
+      if (retryCountdownSec > 0) {
+        Text(
+          text = "이 네트워크에서 서버를 찾지 못했습니다",
+          color = Color.White.copy(alpha = 0.6f),
+          fontSize = 18.sp,
+          textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+          text = "${retryCountdownSec}초 후 다시 탐색합니다",
+          color = Color(0xFFFFC107),
+          fontSize = 22.sp,
+        )
+      } else {
+        Text(
+          text = scanCurrentIp ?: "네트워크 스캔 준비 중...",
+          color = Color.White.copy(alpha = 0.85f),
+          fontSize = 24.sp,
+        )
+        if (scanTotal > 0) {
+          Spacer(modifier = Modifier.height(8.dp))
+          Text(
+            text = "$scanDone / $scanTotal",
+            color = Color.White.copy(alpha = 0.5f),
+            fontSize = 16.sp,
+          )
+        }
+      }
+    }
   }
 }
 
