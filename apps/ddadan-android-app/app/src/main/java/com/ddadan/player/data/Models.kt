@@ -41,21 +41,6 @@ data class RotationConfig(
 )
 
 @Serializable
-data class UploadAck(
-  val ok: Boolean = false,
-  val id: Int = 0,
-)
-
-@Serializable
-data class ApkInfo(
-  val versionCode: Int = 0,
-  val versionName: String? = null,
-  val applicationId: String? = null,
-  val url: String? = null,
-  val sizeBytes: Long = 0,
-)
-
-@Serializable
 data class ScreenResponse(
   val registered: Boolean,
   val deviceName: String? = null,

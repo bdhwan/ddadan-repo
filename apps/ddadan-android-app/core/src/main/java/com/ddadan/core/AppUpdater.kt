@@ -41,6 +41,9 @@ class AppUpdater(
     val relUrl = latest.url ?: return
     Log.i(TAG, "updating $applicationId → vc ${latest.versionCode}")
 
+    // 이전 사이클에서 프로세스가 죽어 사후 rm이 안 됐을 수 있는 스테이징 잔여를 시작 시 청소.
+    RootShell.run("rm -f /data/local/tmp/ddadan-${applicationId}.apk")
+
     val apk = File(context.cacheDir, "update-${applicationId}.apk")
     val ok =
       try {
@@ -50,8 +53,7 @@ class AppUpdater(
       }
     if (!ok) return
 
-    val selfPackage = applicationId == context.packageName
-    withContext(Dispatchers.IO) { install(apk, applicationId, selfPackage) }
+    withContext(Dispatchers.IO) { install(apk, applicationId) }
   }
 
   private fun currentVersionCode(applicationId: String): Int =
@@ -71,38 +73,20 @@ class AppUpdater(
     return dest.length() > 0
   }
 
-  private fun install(apk: File, applicationId: String, selfPackage: Boolean) {
+  /**
+   * 포그라운드 su로 설치. 대상 앱(플레이어/워치독)은 설치로 죽지만, **상대 앱이 상호 감시로 재실행**한다
+   * (워치독→플레이어, 플레이어→워치독). 포그라운드 설치는 앱이 죽어도 system_server가 끝까지 완료하므로
+   * 확실하다(취약한 detached 재실행/재부팅 불필요). 설치 후 캐시·스테이징 APK 삭제(저장공간 부족).
+   */
+  private fun install(apk: File, applicationId: String) {
     val staged = "/data/local/tmp/ddadan-${applicationId}.apk"
-    if (selfPackage) {
-      // 자기 자신: setsid 분리 스크립트로 설치+재실행+APK삭제.
-      val activity = "$applicationId/.MainActivity"
-      val script =
-        buildString {
-          append("chmod 644 $staged\n")
-          append("setprop dalvik.vm.dex2oat-filter interpret-only\n")
-          append("pm install -r $staged\n")
-          append("rm -f $staged\n")
-          append("sleep 6\n")
-          append("am start -n $activity\n")
-        }
-      val scriptFile = File(apk.parentFile, "ota-${applicationId}.sh")
-      scriptFile.writeText(script)
-      RootShell.run(
-        "cp '${apk.absolutePath}' $staged; cp '${scriptFile.absolutePath}' " +
-          "/data/local/tmp/ota-${applicationId}.sh; chmod 644 $staged; " +
-          "chmod 755 /data/local/tmp/ota-${applicationId}.sh; " +
-          "setsid sh /data/local/tmp/ota-${applicationId}.sh </dev/null >/dev/null 2>&1",
-      )
-    } else {
-      // 다른 앱: 단순 설치(대상은 워치독이 재실행). 설치 후 스테이징 APK 삭제.
-      RootShell.run(
-        "cp '${apk.absolutePath}' $staged; chmod 644 $staged; " +
-          "setprop dalvik.vm.dex2oat-filter interpret-only; " +
-          "pm install -r $staged; rm -f $staged",
-      )
-    }
-    // 다운로드 캐시 APK 삭제(자기 자신도 설치는 스테이징본으로 진행되므로 캐시는 지워도 됨).
+    // 1) 스테이징(앱 살아있음) 후 캐시 APK 즉시 삭제.
+    RootShell.run("cp '${apk.absolutePath}' $staged; chmod 644 $staged")
     apk.delete()
+    // 2) 설치(설치가 이 프로세스를 죽일 수 있어 사후 rm은 best-effort; 잔여는 다음 사이클 시작 시 청소).
+    RootShell.run(
+      "setprop dalvik.vm.dex2oat-filter interpret-only; pm install -r $staged; rm -f $staged",
+    )
   }
 
   companion object {

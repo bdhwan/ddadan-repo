@@ -3,10 +3,9 @@ package com.ddadan.player
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ddadan.player.BuildConfig
-import com.ddadan.player.data.AppUpdater
+import com.ddadan.core.ServerLocator
 import com.ddadan.player.data.PlayerRepository
 import com.ddadan.player.data.ScreenResponse
-import com.ddadan.player.data.ServerLocator
 import com.ddadan.player.data.SlidePayload
 import com.ddadan.player.prefs.PlayerPreferences
 import com.ddadan.player.util.buildRotationKey
@@ -48,7 +47,6 @@ data class PlayerUiState(
 class PlayerViewModel(
   private val repository: PlayerRepository,
   private val preferences: PlayerPreferences,
-  private val updater: AppUpdater? = null,
 ) : ViewModel() {
   private val _uiState = MutableStateFlow(PlayerUiState())
   val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -57,7 +55,6 @@ class PlayerViewModel(
 
   private var pollJob: Job? = null
   private var rotationJob: Job? = null
-  private var updateJob: Job? = null
   private var lastRotationKey = ""
 
   /** 사용자가 수동으로 API 주소를 지정한 상태인지. true면 자동 탐색을 하지 않는다. */
@@ -65,7 +62,6 @@ class PlayerViewModel(
 
   fun start() {
     if (pollJob?.isActive == true) return
-    startUpdateLoop()
     viewModelScope.launch {
       preferences.config.collect { config ->
         overridePresent = config.apiBaseOverride != null
@@ -85,23 +81,6 @@ class PlayerViewModel(
     viewModelScope.launch {
       preferences.seedFromIntent(deviceId, slot, apiBase)
     }
-  }
-
-  /** 주기적으로 서버의 최신 APK를 확인해 필요 시 자동 업데이트한다. */
-  private fun startUpdateLoop() {
-    val up = updater ?: return
-    if (updateJob?.isActive == true) return
-    updateJob =
-      viewModelScope.launch {
-        while (isActive) {
-          try {
-            up.checkAndUpdate()
-          } catch (e: Exception) {
-            android.util.Log.w("PlayerViewModel", "update loop error: ${e.message}")
-          }
-          delay(UPDATE_CHECK_INTERVAL_MS)
-        }
-      }
   }
 
   private fun restartPolling() {
@@ -316,15 +295,11 @@ class PlayerViewModel(
   override fun onCleared() {
     pollJob?.cancel()
     rotationJob?.cancel()
-    updateJob?.cancel()
     super.onCleared()
   }
 
   companion object {
     /** 서버를 못 찾았을 때 다음 스캔까지 대기 시간(초). */
     private const val RETRY_DELAY_SEC = 180
-
-    /** APK 업데이트 확인 주기(ms). */
-    private const val UPDATE_CHECK_INTERVAL_MS = 10 * 60_000L
   }
 }
