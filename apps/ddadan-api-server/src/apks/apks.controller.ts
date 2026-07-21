@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -36,12 +37,12 @@ export class ApksController {
 
   /** 최신 APK. 없으면 versionCode 0(=업데이트 없음)을 돌려준다. */
   @Get('latest')
-  async latest() {
+  async latest(@Query('applicationId') applicationId?: string) {
     return (
-      (await this.apks.latest()) ?? {
+      (await this.apks.latest(applicationId)) ?? {
         versionCode: 0,
         versionName: null,
-        applicationId: null,
+        applicationId: applicationId ?? null,
         url: null,
         sizeBytes: 0,
       }

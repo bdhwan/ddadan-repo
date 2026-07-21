@@ -41,8 +41,9 @@ export class ApksService {
     return this.toView(saved);
   }
 
-  async latest() {
+  async latest(applicationId?: string) {
     const rows = await this.apks.find({
+      where: applicationId ? { applicationId } : {},
       order: { versionCode: 'DESC', id: 'DESC' },
       take: 1,
     });

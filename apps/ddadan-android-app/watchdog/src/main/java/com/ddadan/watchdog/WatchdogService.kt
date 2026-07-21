@@ -10,8 +10,11 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import com.ddadan.core.AppUpdater
 import com.ddadan.core.CoreConfig
 import com.ddadan.core.CoreRepository
+import com.ddadan.core.DeviceCommandDto
+import com.ddadan.core.RootShell
 import com.ddadan.core.ScreenCapture
 import com.ddadan.core.ServerLocator
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +38,7 @@ class WatchdogService : Service() {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private lateinit var config: CoreConfig
   private lateinit var repository: CoreRepository
+  private lateinit var updater: AppUpdater
   private val discovering = AtomicBoolean(false)
   private var loopsStarted = false
 
@@ -42,6 +46,7 @@ class WatchdogService : Service() {
     super.onCreate()
     config = CoreConfig(applicationContext)
     repository = CoreRepository(config)
+    updater = AppUpdater(applicationContext, repository)
   }
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -51,8 +56,74 @@ class WatchdogService : Service() {
       scope.launch { watchdogLoop() }
       scope.launch { telemetryLoop() }
       scope.launch { captureLoop() }
+      scope.launch { commandLoop() }
+      scope.launch { otaLoop() }
     }
     return START_STICKY
+  }
+
+  // ── 원격 명령 폴링/실행 ───────────────────────────────────────────
+  private suspend fun commandLoop() {
+    while (scope.isActive) {
+      delay(COMMAND_INTERVAL_MS)
+      val hwid = config.hardwareId()
+      val commands =
+        try {
+          repository.getPendingCommands(hwid)
+        } catch (e: Exception) {
+          emptyList()
+        }
+      for (cmd in commands) {
+        val (status, result) = executeCommand(cmd)
+        try {
+          repository.ackCommand(hwid, cmd.id, status, result)
+        } catch (e: Exception) {
+          Log.w(TAG, "ack failed: ${e.message}")
+        }
+      }
+    }
+  }
+
+  private suspend fun executeCommand(cmd: DeviceCommandDto): Pair<String, String?> =
+    try {
+      when (cmd.type) {
+        "reboot" -> ok(RootShell.run("reboot"))
+        "screenOff" -> ok(RootShell.run("input keyevent 223")) // KEYCODE_SLEEP
+        "screenOn" -> ok(RootShell.run("input keyevent 224")) // KEYCODE_WAKEUP
+        "shell" -> {
+          val out = RootShell.capture(cmd.payload.orEmpty())
+          if (out != null) "done" to out.take(4000) else "failed" to null
+        }
+        "updateApp" -> {
+          val target = cmd.payload?.takeIf { it.isNotBlank() }
+          if (target != null) {
+            updater.updateApp(target)
+          } else {
+            updater.updateApp(PLAYER_PACKAGE)
+            updater.updateApp(packageName)
+          }
+          "done" to null
+        }
+        else -> "failed" to "unknown type ${cmd.type}"
+      }
+    } catch (e: Exception) {
+      "failed" to (e.message ?: "error")
+    }
+
+  private fun ok(success: Boolean): Pair<String, String?> =
+    if (success) "done" to null else "failed" to null
+
+  // ── 주기적 OTA(플레이어 + 워치독 둘 다) ────────────────────────────
+  private suspend fun otaLoop() {
+    while (scope.isActive) {
+      delay(OTA_INTERVAL_MS)
+      try {
+        updater.updateApp(PLAYER_PACKAGE)
+        updater.updateApp(packageName)
+      } catch (e: Exception) {
+        Log.w(TAG, "ota loop error: ${e.message}")
+      }
+    }
   }
 
   // ── 플레이어 감시/재실행 (1~2초 주기) ──────────────────────────────
@@ -176,6 +247,8 @@ class WatchdogService : Service() {
     private const val WATCHDOG_INTERVAL_MS = 2_000L
     private const val TELEMETRY_INTERVAL_MS = 20_000L
     private const val CAPTURE_INTERVAL_MS = 30_000L
+    private const val COMMAND_INTERVAL_MS = 10_000L
+    private const val OTA_INTERVAL_MS = 10 * 60_000L
 
     fun start(context: Context) {
       val intent = Intent(context, WatchdogService::class.java)

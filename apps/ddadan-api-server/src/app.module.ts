@@ -5,6 +5,7 @@ import { ServeStaticModule } from '@nestjs/serve-static';
 import { AccountModule } from './account/account.module';
 import { ApksModule } from './apks/apks.module';
 import { AssetsModule } from './assets/assets.module';
+import { CommandsModule } from './commands/commands.module';
 import { loadConfig, AppConfig } from './config/configuration';
 import { DatabaseModule } from './database/database.module';
 import { DevicesModule } from './devices/devices.module';
@@ -41,6 +42,7 @@ import { HealthController } from './health/health.controller';
     ScreensModule,
     ScreenshotsModule,
     ApksModule,
+    CommandsModule,
     PlayerModule,
     HeartbeatModule,
     PoliciesModule,

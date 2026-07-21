@@ -35,8 +35,22 @@ export interface DeviceView {
   status: 'unregistered' | 'online' | 'offline';
   lastSeenAt: string | null;
   appVersion: string | null;
+  cpuPercent?: number | null;
+  ramUsedMb?: number | null;
+  ramTotalMb?: number | null;
+  diskUsedPercent?: number | null;
   monitors: MonitorView[];
   offlineAfterSeconds: number;
+}
+
+export interface CommandView {
+  id: number;
+  type: 'reboot' | 'screenOn' | 'screenOff' | 'updateApp' | 'shell';
+  payload: string | null;
+  status: 'pending' | 'done' | 'failed';
+  result: string | null;
+  createdAt: string;
+  ackedAt: string | null;
 }
 
 export interface AssetView {
@@ -207,6 +221,21 @@ export class ApiService {
   listDeviceScreenshots(id: number, limit = 10): Observable<ScreenshotView[]> {
     return this.http.get<ScreenshotView[]>(
       `${this.base}/devices/${id}/screenshots?limit=${limit}`,
+    );
+  }
+  sendCommand(
+    id: number,
+    type: CommandView['type'],
+    payload?: string,
+  ): Observable<CommandView> {
+    return this.http.post<CommandView>(`${this.base}/devices/${id}/commands`, {
+      type,
+      payload,
+    });
+  }
+  listCommands(id: number, limit = 20): Observable<CommandView[]> {
+    return this.http.get<CommandView[]>(
+      `${this.base}/devices/${id}/commands?limit=${limit}`,
     );
   }
 

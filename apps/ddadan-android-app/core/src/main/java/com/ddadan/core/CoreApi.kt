@@ -27,4 +27,16 @@ interface CoreApi {
     @Path("hardwareId") hardwareId: String,
     @Body body: TelemetryBody,
   ): UploadAck
+
+  @GET("devices/{hardwareId}/commands/pending")
+  suspend fun getPendingCommands(
+    @Path("hardwareId") hardwareId: String,
+  ): List<DeviceCommandDto>
+
+  @POST("devices/{hardwareId}/commands/{cmdId}/ack")
+  suspend fun ackCommand(
+    @Path("hardwareId") hardwareId: String,
+    @Path("cmdId") cmdId: Int,
+    @Body body: AckBody,
+  ): UploadAck
 }

@@ -1,7 +1,7 @@
 import { Component, ElementRef, computed, inject, OnInit, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { ApiService, AssetView, DeviceView, MonitorView, ScreenLayoutItem, ScreenshotView, ScreenView } from '../api.service';
+import { ApiService, AssetView, CommandView, DeviceView, MonitorView, ScreenLayoutItem, ScreenshotView, ScreenView } from '../api.service';
 import {
   MonitorRotationPanelComponent,
   RotForm,
@@ -25,6 +25,38 @@ import { isMenuLine, textAlignStyle } from '../screen-utils';
             <span class="muted">상태: {{ d.status }} · 마지막 접속 {{ d.lastSeenAt ?? '-' }}</span>
           </div>
         </div>
+
+        <div class="telemetry">
+          <span class="tbadge" [class.on]="d.status === 'online'">{{ d.status }}</span>
+          @if (d.appVersion) { <span class="tchip">v{{ d.appVersion }}</span> }
+          @if (d.cpuPercent != null) { <span class="tchip">CPU {{ d.cpuPercent }}%</span> }
+          @if (d.ramUsedMb != null) { <span class="tchip">RAM {{ d.ramUsedMb }}/{{ d.ramTotalMb }}MB</span> }
+          @if (d.diskUsedPercent != null) { <span class="tchip">디스크 {{ d.diskUsedPercent }}%</span> }
+        </div>
+
+        <div class="cmd-row">
+          <button (click)="send('reboot')">재부팅</button>
+          <button (click)="send('screenOff')">화면끄기</button>
+          <button (click)="send('screenOn')">화면켜기</button>
+          <button (click)="send('updateApp')">앱 업데이트</button>
+          <input class="shell" [(ngModel)]="shellInput" placeholder="root shell 명령" />
+          <button (click)="sendShell()">실행</button>
+        </div>
+
+        @if (commands().length) {
+          <table class="cmd-history">
+            <tr><th>명령</th><th>상태</th><th>결과</th><th>예약시각</th></tr>
+            @for (c of commands(); track c.id) {
+              <tr>
+                <td>{{ c.type }}{{ c.payload ? ' (' + c.payload + ')' : '' }}</td>
+                <td [class.done]="c.status === 'done'" [class.failed]="c.status === 'failed'">{{ c.status }}</td>
+                <td class="result">{{ c.result }}</td>
+                <td class="muted">{{ c.createdAt }}</td>
+              </tr>
+            }
+          </table>
+        }
+
         <p class="muted">캔버스에서 모니터를 드래그해 위치를 지정하세요. 각 모니터 하단에서 화면·로테이션을 설정합니다.</p>
         <div #canvas class="canvas" (mouseup)="endDrag()" (mousemove)="onDrag($event)">
           @for (m of d.monitors; track m.id) {
@@ -118,6 +150,18 @@ import { isMenuLine, textAlignStyle } from '../screen-utils';
   `,
   styles: [
     `
+      .telemetry { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 10px; }
+      .tbadge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #6b7280; color: #fff; }
+      .tbadge.on { background: #22a06b; }
+      .tchip { font-size: 12px; color: var(--muted, #8a93a6); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; }
+      .cmd-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+      .cmd-row button { padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+      .cmd-row .shell { flex: 1 1 200px; min-width: 160px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; }
+      .cmd-history { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 12px; }
+      .cmd-history th, .cmd-history td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+      .cmd-history td.done { color: #22a06b; }
+      .cmd-history td.failed { color: #e0552f; }
+      .cmd-history td.result { font-family: monospace; white-space: pre-wrap; word-break: break-all; max-width: 320px; }
       .shots-title { margin: 0 0 10px; font-size: 15px; }
       .shots {
         display: grid;
@@ -261,6 +305,8 @@ export class DeviceDetailPage implements OnInit {
   readonly screens = signal<ScreenView[]>([]);
   readonly assets = signal<AssetView[]>([]);
   readonly screenshots = signal<ScreenshotView[]>([]);
+  readonly commands = signal<CommandView[]>([]);
+  shellInput = '';
   readonly rotForms = signal<Record<number, RotForm>>({});
   private readonly assetMap = computed(() => {
     const map = new Map<number, AssetView>();
@@ -287,6 +333,7 @@ export class DeviceDetailPage implements OnInit {
     this.api.listScreens().subscribe((s) => this.screens.set(s));
     this.api.listAssets().subscribe((a) => this.assets.set(a));
     this.api.listDeviceScreenshots(id).subscribe((s) => this.screenshots.set(s));
+    this.refreshCommands(id);
   }
 
   previewUrl(d: DeviceView): string {
@@ -295,6 +342,27 @@ export class DeviceDetailPage implements OnInit {
 
   shotUrl(url: string): string {
     return this.api.absoluteAssetUrl(url);
+  }
+
+  private deviceId(): number {
+    return this.device()?.id ?? Number(this.route.snapshot.paramMap.get('id'));
+  }
+
+  private refreshCommands(id = this.deviceId()) {
+    this.api.listCommands(id).subscribe((c) => this.commands.set(c));
+  }
+
+  send(type: CommandView['type'], payload?: string) {
+    this.api.sendCommand(this.deviceId(), type, payload).subscribe(() => {
+      setTimeout(() => this.refreshCommands(), 300);
+    });
+  }
+
+  sendShell() {
+    const cmd = this.shellInput.trim();
+    if (!cmd) return;
+    this.send('shell', cmd);
+    this.shellInput = '';
   }
 
   sortedItems(scr: ScreenView): ScreenLayoutItem[] {

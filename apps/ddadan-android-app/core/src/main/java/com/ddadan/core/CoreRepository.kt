@@ -31,6 +31,13 @@ class CoreRepository(private val config: CoreConfig) {
   suspend fun getLatestApk(applicationId: String? = null): ApkInfo =
     createApi(effectiveApiBase()).getLatestApk(applicationId)
 
+  suspend fun getPendingCommands(hardwareId: String): List<DeviceCommandDto> =
+    createApi(effectiveApiBase()).getPendingCommands(hardwareId)
+
+  suspend fun ackCommand(hardwareId: String, cmdId: Int, status: String, result: String?) {
+    createApi(effectiveApiBase()).ackCommand(hardwareId, cmdId, AckBody(status, result))
+  }
+
   private fun createApi(apiBase: String): CoreApi {
     val normalized = if (apiBase.endsWith("/")) apiBase else "$apiBase/"
     val client =
