@@ -4,6 +4,13 @@ plugins {
   alias(libs.plugins.kotlin.serialization)
 }
 
+// Server the app talks to. Set in gradle.properties, overridable per build with
+// -PDDADAN_API_BASE=... . Debug reads it too: a debug build is the only one that
+// installs without a signing config, so it is what goes on a real device, and
+// hardcoding the emulator loopback there left no way to point one at a server.
+val ddadanApiBase = (project.findProperty("DDADAN_API_BASE") as String?)
+  ?: "http://10.0.2.2:7800/api"
+
 android {
   namespace = "com.ddadan.player"
   compileSdk = 36
@@ -13,7 +20,7 @@ android {
     targetSdk = 36
     versionCode = 14
     versionName = "1.0"
-    buildConfigField("String", "API_BASE", "\"http://10.0.2.2:7800/api\"")
+    buildConfigField("String", "API_BASE", "\"$ddadanApiBase\"")
     buildConfigField("long", "POLL_INTERVAL_MS", "5000L")
   }
 
@@ -30,15 +37,14 @@ android {
 
   buildTypes {
     debug {
-      buildConfigField("String", "API_BASE", "\"http://10.0.2.2:7800/api\"")
+      buildConfigField("String", "API_BASE", "\"$ddadanApiBase\"")
     }
     release {
       isMinifyEnabled = true
       isShrinkResources = true
       signingConfig = signingConfigs.getByName("release")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      val apiBase = (project.findProperty("DDADAN_API_BASE") as String?) ?: "http://127.0.0.1:7800/api"
-      buildConfigField("String", "API_BASE", "\"$apiBase\"")
+      buildConfigField("String", "API_BASE", "\"$ddadanApiBase\"")
     }
   }
   compileOptions {

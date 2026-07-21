@@ -26,7 +26,9 @@ fun ScreenStage(
         .fillMaxSize()
         .background(parseColorOrNull(background) ?: Color(0xFF0C0F1A)),
   ) {
-    val stageHeightPx = constraints.maxHeight.toFloat()
+    // Dp, to match the boxes below. Passing constraints.maxHeight here instead — which is
+    // pixels — is what made text render density-times too large and clip out of its box.
+    val stageHeightDp = maxHeight.value
     items.forEach { item ->
       val left = maxWidth * (item.x / designWidth).toFloat()
       val top = maxHeight * (item.y / designHeight).toFloat()
@@ -42,7 +44,8 @@ fun ScreenStage(
       ) {
         ScreenItemContent(
           item = item,
-          stageHeightPx = stageHeightPx,
+          stageHeightDp = stageHeightDp,
+          designHeight = designHeight,
           apiBase = apiBase,
         )
       }

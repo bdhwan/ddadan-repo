@@ -6,35 +6,57 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class FontSizeTest {
+  private fun textItem(fontSize: Double, fontUnit: String? = null) =
+    ScreenItem(
+      id = "t",
+      kind = "text",
+      fontSize = fontSize,
+      fontUnit = fontUnit,
+      x = 0.0,
+      y = 0.0,
+      width = 100.0,
+      height = 40.0,
+    )
+
   @Test
-  fun resolveFontSizeSp_returnsVhBasedSize() {
-    val item =
-      ScreenItem(
-        id = "t1",
-        kind = "text",
-        fontSize = 3.7037037037,
-        fontUnit = "vh",
-        x = 0.0,
-        y = 0.0,
-        width = 100.0,
-        height = 40.0,
-      )
-    assertEquals(40f, resolveFontSizeSp(item, stageHeightPx = 1080f), 0.01f)
+  fun vh_isPercentOfStageHeight() {
+    assertEquals(
+      40f,
+      resolveFontSizeDp(textItem(3.7037037037, "vh"), stageHeightDp = 1080f, designHeight = 1080),
+      0.01f,
+    )
   }
 
   @Test
-  fun resolveFontSizeSp_returnsPxForLegacyData() {
-    val item =
-      ScreenItem(
-        id = "t2",
-        kind = "text",
-        fontSize = 40.0,
-        x = 0.0,
-        y = 0.0,
-        width = 100.0,
-        height = 40.0,
-      )
-    assertEquals(40f, resolveFontSizeSp(item, stageHeightPx = 1080f))
+  fun px_isInDesignSpace_soItScalesWithTheStage() {
+    // A 40px font on a 1080-tall board: unchanged when the stage happens to be 1080 Dp…
+    assertEquals(
+      40f,
+      resolveFontSizeDp(textItem(40.0), stageHeightDp = 1080f, designHeight = 1080),
+      0.01f,
+    )
+    // …and scaled by the same factor as the item boxes when it is not. Returning a raw 40
+    // here is what overflowed every text box on an 800 Dp tall tablet.
+    assertEquals(
+      29.63f,
+      resolveFontSizeDp(textItem(40.0), stageHeightDp = 800f, designHeight = 1080),
+      0.01f,
+    )
+  }
+
+  @Test
+  fun px_keepsTheAuthoredFontToBoxRatio() {
+    // The real boards: a 60px caption inside an 80px box. It must stay at 0.75 of its box
+    // on any stage, or it clips.
+    val fontDp = resolveFontSizeDp(textItem(60.0), stageHeightDp = 800f, designHeight = 1080)
+    val boxDp = 800f * (80f / 1080f)
+    assertEquals(0.75f, fontDp / boxDp, 0.001f)
+  }
+
+  @Test
+  fun missingFontSize_fallsBackToADefault() {
+    val item = ScreenItem(id = "t", kind = "text", x = 0.0, y = 0.0, width = 10.0, height = 10.0)
+    assertEquals(16f, resolveFontSizeDp(item, stageHeightDp = 800f, designHeight = 1080), 0.01f)
   }
 }
 
