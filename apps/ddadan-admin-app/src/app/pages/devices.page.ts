@@ -1,13 +1,22 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { ApiService, DeviceView, MonitorView, ScreenView } from '../api.service';
+import { ApiService, ApkInfo, DeviceView, MonitorView, ScreenView } from '../api.service';
 
 @Component({
   standalone: true,
   imports: [FormsModule, RouterLink],
   template: `
     <h1>디바이스</h1>
+    <div class="panel latest-apk">
+      <span class="la-label">최신 APK (서버 OTA 페이로드)</span>
+      @if (latestApk(); as a) {
+        <span class="la-ver">{{ a.versionName ?? '—' }} ({{ a.versionCode }})</span>
+        <span class="la-app">{{ a.applicationId }}</span>
+      } @else {
+        <span class="la-ver muted">업로드된 APK 없음</span>
+      }
+    </div>
     <div class="panel quick-previews">
       <div class="quick-title">화면 미리보기</div>
       <div class="quick-links">
@@ -36,6 +45,8 @@ import { ApiService, DeviceView, MonitorView, ScreenView } from '../api.service'
             <th>이름</th>
             <th>하드웨어 ID</th>
             <th>상태</th>
+            <th>앱 버전</th>
+            <th>마지막 온라인</th>
             <th>화면 할당</th>
             <th>미리보기</th>
             <th></th>
@@ -52,6 +63,10 @@ import { ApiService, DeviceView, MonitorView, ScreenView } from '../api.service'
                 <span [class.online]="d.status === 'online'" [class.offline]="d.status !== 'online'">
                   {{ d.status }}
                 </span>
+              </td>
+              <td><code>{{ d.appVersion ?? '—' }}</code></td>
+              <td class="lastseen-col">
+                <span [title]="d.lastSeenAt ?? ''">{{ lastSeen(d) }}</span>
               </td>
               <td class="assign-col">
                 @for (m of d.monitors; track m.id) {
@@ -70,7 +85,7 @@ import { ApiService, DeviceView, MonitorView, ScreenView } from '../api.service'
               <td><button class="secondary" (click)="unregister(d.id)">등록 해제</button></td>
             </tr>
           } @empty {
-            <tr><td colspan="6" class="muted">등록된 디바이스가 없습니다.</td></tr>
+            <tr><td colspan="8" class="muted">등록된 디바이스가 없습니다.</td></tr>
           }
         </tbody>
       </table>
@@ -78,6 +93,28 @@ import { ApiService, DeviceView, MonitorView, ScreenView } from '../api.service'
   `,
   styles: [
     `
+      .latest-apk {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+        padding: 12px 16px;
+      }
+      .latest-apk .la-label {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .latest-apk .la-ver {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--accent);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .latest-apk .la-app {
+        font-size: 12px;
+        color: var(--muted);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
       .toolbar {
         display: flex;
         flex-wrap: wrap;
@@ -94,6 +131,11 @@ import { ApiService, DeviceView, MonitorView, ScreenView } from '../api.service'
       .assign-col {
         vertical-align: top;
         min-width: 200px;
+      }
+      .lastseen-col {
+        font-size: 12px;
+        white-space: nowrap;
+        color: var(--muted);
       }
       .slot-summary {
         display: flex;
@@ -162,6 +204,7 @@ export class DevicesPage implements OnInit {
   readonly quickPreviewIds = ['display-1', 'display-2', 'display-3'];
   readonly devices = signal<DeviceView[]>([]);
   readonly screens = signal<ScreenView[]>([]);
+  readonly latestApk = signal<ApkInfo | null>(null);
   readonly registerStoreId = signal<number | null>(null);
   hardwareId = '';
   alias = '';
@@ -176,6 +219,10 @@ export class DevicesPage implements OnInit {
   refresh() {
     this.api.listAllDevices().subscribe((d) => this.devices.set(d));
     this.api.listScreens().subscribe((s) => this.screens.set(s));
+    this.api.latestApk('com.ddadan.player').subscribe({
+      next: (a) => this.latestApk.set(a && a.versionCode > 0 ? a : null),
+      error: () => this.latestApk.set(null),
+    });
   }
 
   previewPath(hardwareId: string): string {
@@ -184,6 +231,20 @@ export class DevicesPage implements OnInit {
 
   previewUrl(hardwareId: string): string {
     return `${window.location.origin}${this.previewPath(hardwareId)}`;
+  }
+
+  lastSeen(d: DeviceView): string {
+    if (!d.lastSeenAt) return '기록 없음';
+    const t = new Date(d.lastSeenAt);
+    const diffSec = Math.floor((Date.now() - t.getTime()) / 1000);
+    let rel: string;
+    if (diffSec < 60) rel = '방금';
+    else if (diffSec < 3600) rel = `${Math.floor(diffSec / 60)}분 전`;
+    else if (diffSec < 86400) rel = `${Math.floor(diffSec / 3600)}시간 전`;
+    else rel = `${Math.floor(diffSec / 86400)}일 전`;
+    const p = (n: number) => String(n).padStart(2, '0');
+    const abs = `${p(t.getMonth() + 1)}-${p(t.getDate())} ${p(t.getHours())}:${p(t.getMinutes())}`;
+    return `${abs} (${rel})`;
   }
 
   assignmentSummary(m: MonitorView): string {

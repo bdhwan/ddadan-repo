@@ -185,8 +185,8 @@ export class PlayerController {
           color: '#ffffff',
           fontSize: 48,
           text: info.registered
-            ? `DDADAN\n${info.deviceName ?? info.hardwareId} · slot ${info.slot}\n화면이 아직 할당되지 않았습니다`
-            : `DDADAN 등록이 필요합니다\n등록 코드: ${info.hardwareId}`,
+            ? `브로트베르크\n${info.deviceName ?? info.hardwareId} · slot ${info.slot}\n화면이 아직 할당되지 않았습니다`
+            : `브로트베르크 등록이 필요합니다\n등록 코드: ${info.hardwareId}`,
         },
       ],
       isFallback: true,

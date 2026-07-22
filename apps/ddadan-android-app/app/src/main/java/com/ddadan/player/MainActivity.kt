@@ -1,10 +1,15 @@
 package com.ddadan.player
 
 import android.app.ActivityManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import com.ddadan.core.OtaBroadcast
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -28,10 +33,36 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+  private val otaAutoClear = Handler(Looper.getMainLooper())
+  private val otaClearRunnable = Runnable { OtaProgress.update(null) }
+
+  /** 워치독의 OTA 진행률 브로드캐스트 수신 → 좌상단 오버레이 상태 갱신. */
+  private val otaReceiver =
+    object : BroadcastReceiver() {
+      override fun onReceive(context: Context, intent: Intent) {
+        val phase = intent.getStringExtra(OtaBroadcast.EXTRA_PHASE) ?: return
+        otaAutoClear.removeCallbacks(otaClearRunnable)
+        if (phase == OtaBroadcast.PHASE_DONE) {
+          OtaProgress.update(null)
+        } else {
+          OtaProgress.update(
+            OtaStatus(
+              app = intent.getStringExtra(OtaBroadcast.EXTRA_APP).orEmpty(),
+              phase = phase,
+              percent = intent.getIntExtra(OtaBroadcast.EXTRA_PERCENT, -1),
+            ),
+          )
+          // 안전장치: 15초간 갱신 없으면 자동 숨김(설치 중 프로세스 종료 등).
+          otaAutoClear.postDelayed(otaClearRunnable, 15_000)
+        }
+      }
+    }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    registerReceiver(otaReceiver, IntentFilter(OtaBroadcast.ACTION))
     startWatchdogKeeper()
     enableEdgeToEdge()
     WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -60,6 +91,15 @@ class MainActivity : ComponentActivity() {
         }
       }
     }
+  }
+
+  override fun onDestroy() {
+    otaAutoClear.removeCallbacks(otaClearRunnable)
+    try {
+      unregisterReceiver(otaReceiver)
+    } catch (_: Exception) {
+    }
+    super.onDestroy()
   }
 
   /**

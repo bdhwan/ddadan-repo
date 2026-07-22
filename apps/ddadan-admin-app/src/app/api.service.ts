@@ -26,6 +26,15 @@ export interface MonitorView {
   rotationFadeMs?: number;
 }
 
+export interface ApkInfo {
+  versionCode: number;
+  versionName: string | null;
+  applicationId: string | null;
+  url?: string | null;
+  sizeBytes?: number | null;
+  createdAt?: string | null;
+}
+
 export interface DeviceView {
   id: number;
   hardwareId: string;
@@ -205,6 +214,12 @@ export class ApiService {
   // Devices
   listAllDevices(): Observable<DeviceView[]> {
     return this.http.get<DeviceView[]>(`${this.base}/devices`);
+  }
+  /** 서버에 올라온 최신 APK(플레이어 OTA 페이로드). */
+  latestApk(applicationId: string): Observable<ApkInfo> {
+    return this.http.get<ApkInfo>(`${this.base}/apks/latest`, {
+      params: { applicationId },
+    });
   }
   listDevices(storeId: number): Observable<DeviceView[]> {
     return this.http.get<DeviceView[]>(`${this.base}/stores/${storeId}/devices`);

@@ -1,6 +1,7 @@
 package com.ddadan.core
 
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
@@ -44,16 +45,37 @@ class AppUpdater(
     // 이전 사이클에서 프로세스가 죽어 사후 rm이 안 됐을 수 있는 스테이징 잔여를 시작 시 청소.
     RootShell.run("rm -f /data/local/tmp/ddadan-${applicationId}.apk")
 
+    emitProgress(applicationId, OtaBroadcast.PHASE_DOWNLOADING, 0)
     val apk = File(context.cacheDir, "update-${applicationId}.apk")
     val ok =
       try {
-        withContext(Dispatchers.IO) { download(repository.apiOrigin() + relUrl, apk) }
+        withContext(Dispatchers.IO) { download(repository.apiOrigin() + relUrl, apk, applicationId) }
       } catch (e: Exception) {
         Log.w(TAG, "download failed: ${e.message}"); false
       }
-    if (!ok) return
+    if (!ok) {
+      emitProgress(applicationId, OtaBroadcast.PHASE_DONE, -1)
+      return
+    }
 
+    emitProgress(applicationId, OtaBroadcast.PHASE_INSTALLING, 100)
     withContext(Dispatchers.IO) { install(apk, applicationId) }
+    // 플레이어 자기 갱신 시엔 이 시점에 프로세스가 죽어 도달 못 할 수 있음(재실행 시 오버레이 사라짐).
+    emitProgress(applicationId, OtaBroadcast.PHASE_DONE, -1)
+  }
+
+  /** 진행률을 플레이어로 브로드캐스트(좌상단 오버레이 표시용). 실패는 무시. */
+  private fun emitProgress(app: String, phase: String, percent: Int) {
+    try {
+      context.sendBroadcast(
+        Intent(OtaBroadcast.ACTION)
+          .setPackage(OtaBroadcast.PLAYER_PACKAGE)
+          .putExtra(OtaBroadcast.EXTRA_APP, app)
+          .putExtra(OtaBroadcast.EXTRA_PHASE, phase)
+          .putExtra(OtaBroadcast.EXTRA_PERCENT, percent),
+      )
+    } catch (_: Exception) {
+    }
   }
 
   private fun currentVersionCode(applicationId: String): Int =
@@ -64,11 +86,30 @@ class AppUpdater(
       0 // 미설치면 0 → 항상 설치
     }
 
-  private fun download(url: String, dest: File): Boolean {
+  private fun download(url: String, dest: File, applicationId: String): Boolean {
     client.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
       if (!resp.isSuccessful) return false
       val body = resp.body ?: return false
-      dest.outputStream().use { out -> body.byteStream().copyTo(out) }
+      val total = body.contentLength()
+      dest.outputStream().use { out ->
+        val input = body.byteStream()
+        val buf = ByteArray(64 * 1024)
+        var copied = 0L
+        var lastPct = -1
+        while (true) {
+          val n = input.read(buf)
+          if (n < 0) break
+          out.write(buf, 0, n)
+          copied += n
+          if (total > 0) {
+            val pct = (copied * 100 / total).toInt()
+            if (pct != lastPct) {
+              lastPct = pct
+              emitProgress(applicationId, OtaBroadcast.PHASE_DOWNLOADING, pct)
+            }
+          }
+        }
+      }
     }
     return dest.length() > 0
   }

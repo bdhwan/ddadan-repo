@@ -6,13 +6,22 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import com.ddadan.player.util.gatherNetDiag
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,7 +36,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.ddadan.core.OtaBroadcast
 import com.ddadan.player.BuildConfig
+import com.ddadan.player.OtaProgress
+import com.ddadan.player.OtaStatus
 import com.ddadan.player.PlayerUiState
 import com.ddadan.player.PlayerViewModel
 import com.ddadan.player.PlayerViewModelFactory
@@ -92,7 +104,7 @@ fun PlayerScreen(
       }
       state.isLoading -> {
         Text(
-          text = "DDADAN 플레이어 연결 중...",
+          text = "브로트베르크 연결 중...",
           color = Color.White.copy(alpha = 0.7f),
           fontSize = 24.sp,
           modifier = Modifier.align(Alignment.Center),
@@ -106,6 +118,8 @@ fun PlayerScreen(
         scanDone = state.scanDone,
         scanTotal = state.scanTotal,
         retryCountdownSec = state.retryCountdownSec,
+        hardwareId = state.hardwareId,
+        apiBase = state.apiBase,
         modifier = Modifier.fillMaxSize(),
       )
     }
@@ -145,6 +159,39 @@ fun PlayerScreen(
       }
     }
 
+    // OTA 진행 중 좌상단 작은 오버레이.
+    val ota by OtaProgress.status.collectAsStateWithLifecycle()
+    ota?.let {
+      OtaOverlay(
+        status = it,
+        modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+      )
+    }
+  }
+}
+
+/** OTA 진행 중 좌상단에 작게 표시하는 오버레이. */
+@Composable
+private fun OtaOverlay(status: OtaStatus, modifier: Modifier = Modifier) {
+  val label =
+    when (status.phase) {
+      OtaBroadcast.PHASE_INSTALLING -> "APK 설치 중…"
+      else -> if (status.percent >= 0) "APK 업데이트 중  ${status.percent}%" else "APK 업데이트 중…"
+    }
+  Row(
+    modifier =
+      modifier
+        .clip(RoundedCornerShape(8.dp))
+        .background(Color(0xE6141A24))
+        .padding(horizontal = 12.dp, vertical = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(
+      text = label,
+      color = Color(0xFFFFC107),
+      fontSize = 14.sp,
+      fontWeight = FontWeight.SemiBold,
+    )
   }
 }
 
@@ -154,8 +201,19 @@ private fun DiscoveryOverlay(
   scanDone: Int,
   scanTotal: Int,
   retryCountdownSec: Int,
+  hardwareId: String,
+  apiBase: String,
   modifier: Modifier = Modifier,
 ) {
+  val context = LocalContext.current
+  // 네트워크 상태는 바뀔 수 있으니 3초마다 갱신.
+  val diag by produceState(initialValue = gatherNetDiag(context), context) {
+    while (true) {
+      value = gatherNetDiag(context)
+      delay(3000)
+    }
+  }
+
   Box(
     modifier = modifier.background(Color(0xF2050505)),
     contentAlignment = Alignment.Center,
@@ -169,7 +227,7 @@ private fun DiscoveryOverlay(
         color = Color.White.copy(alpha = 0.9f),
         fontSize = 28.sp,
       )
-      Spacer(modifier = Modifier.height(20.dp))
+      Spacer(modifier = Modifier.height(16.dp))
       if (retryCountdownSec > 0) {
         Text(
           text = "이 네트워크에서 서버를 찾지 못했습니다",
@@ -177,7 +235,7 @@ private fun DiscoveryOverlay(
           fontSize = 18.sp,
           textAlign = TextAlign.Center,
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
           text = "${retryCountdownSec}초 후 다시 탐색합니다",
           color = Color(0xFFFFC107),
@@ -190,7 +248,7 @@ private fun DiscoveryOverlay(
           fontSize = 24.sp,
         )
         if (scanTotal > 0) {
-          Spacer(modifier = Modifier.height(8.dp))
+          Spacer(modifier = Modifier.height(6.dp))
           Text(
             text = "$scanDone / $scanTotal",
             color = Color.White.copy(alpha = 0.5f),
@@ -198,7 +256,61 @@ private fun DiscoveryOverlay(
           )
         }
       }
+
+      Spacer(modifier = Modifier.height(24.dp))
+
+      // ── 진단 정보 패널 ── 서버에 못 붙는 원인 파악용.
+      val noNetwork = diag.ips.isEmpty()
+      Column(
+        modifier =
+          Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0x14FFFFFF))
+            .padding(horizontal = 24.dp, vertical = 18.dp),
+        horizontalAlignment = Alignment.Start,
+      ) {
+        Text(
+          text = "기기 진단 정보",
+          color = Color.White.copy(alpha = 0.5f),
+          fontSize = 14.sp,
+          fontWeight = FontWeight.Bold,
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        DiagRow("기기 ID", hardwareId)
+        DiagRow(
+          label = "IP 주소",
+          value = if (noNetwork) "없음 — 네트워크 미연결" else diag.ips.joinToString("   "),
+          valueColor = if (noNetwork) Color(0xFFFF5252) else Color.White,
+        )
+        DiagRow(
+          label = "WiFi",
+          value = listOfNotNull(diag.ssid, diag.wifiState).joinToString(" · "),
+          valueColor = if (diag.wifiState == "연결됨") Color.White else Color(0xFFFFC107),
+        )
+        DiagRow("게이트웨이", diag.gateway ?: "없음")
+        DiagRow("스캔 대상", diag.subnet?.let { "$it (2~254)" } ?: "—")
+        DiagRow("서버 주소(대상)", apiBase)
+        DiagRow("앱 버전", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+      }
     }
+  }
+}
+
+@Composable
+private fun DiagRow(label: String, value: String, valueColor: Color = Color.White) {
+  Row(modifier = Modifier.padding(vertical = 3.dp)) {
+    Text(
+      text = label,
+      color = Color.White.copy(alpha = 0.45f),
+      fontSize = 16.sp,
+      modifier = Modifier.width(150.dp),
+    )
+    Text(
+      text = value,
+      color = valueColor.copy(alpha = if (valueColor == Color.White) 0.9f else 1f),
+      fontSize = 16.sp,
+      fontFamily = FontFamily.Monospace,
+    )
   }
 }
 

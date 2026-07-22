@@ -12,22 +12,26 @@
           "text": "BEST",
           "variant": "best"
         }
-      ]
+      ],
+      "group": "bread"
     },
     {
       "name": "크림치즈빵",
       "price": 3800,
-      "en": "Cream Cheese Bun"
+      "en": "Cream Cheese Bun",
+      "group": "bread"
     },
     {
       "name": "식빵",
       "price": 6000,
-      "en": "White Loaf"
+      "en": "White Loaf",
+      "group": "bread"
     },
     {
       "name": "쌀식빵",
       "price": 7000,
-      "en": "Rice Loaf"
+      "en": "Rice Loaf",
+      "group": "bread"
     },
     {
       "name": "통밀식빵",
@@ -38,52 +42,62 @@
           "text": "추천",
           "variant": "rec"
         }
-      ]
+      ],
+      "group": "bread"
     },
     {
       "name": "바게트",
       "price": 5000,
-      "en": "Baguette"
+      "en": "Baguette",
+      "group": "bread"
     },
     {
       "name": "소보로",
       "price": 3000,
-      "en": "Soboro Bun"
+      "en": "Soboro Bun",
+      "group": "bread"
     },
     {
       "name": "소세지빵",
       "price": 3600,
-      "en": "Sausage Bread"
+      "en": "Sausage Bread",
+      "group": "bread"
     },
     {
       "name": "고구마팥빵",
       "price": 3600,
-      "en": "Sweet Potato Red Bean"
+      "en": "Sweet Potato Red Bean",
+      "group": "sweet"
     },
     {
       "name": "단호박팥빵",
       "price": 3600,
-      "en": "Pumpkin Red Bean"
+      "en": "Pumpkin Red Bean",
+      "group": "sweet"
     },
     {
       "name": "러스크",
       "price": 4800,
-      "en": "Rusk"
+      "en": "Rusk",
+      "group": "sweet"
     },
     {
       "name": "사과잼빵",
       "price": 3800,
-      "en": "Apple Jam Bun"
+      "en": "Apple Jam Bun",
+      "group": "sweet"
     },
     {
       "name": "마말레이드",
       "price": 3800,
-      "en": "Marmalade"
+      "en": "Marmalade",
+      "group": "sweet"
     },
     {
       "name": "소금빵 샌드위치",
       "price": 8000,
-      "en": "Salt Bread Sandwich"
+      "en": "Salt Bread Sandwich",
+      "group": "sandwich"
     },
     {
       "name": "바게트 샌드위치",
@@ -94,12 +108,14 @@
           "text": "추천",
           "variant": "rec"
         }
-      ]
+      ],
+      "group": "sandwich"
     },
     {
       "name": "추억의 사라다빵",
       "price": 5800,
-      "en": "Classic Salad Bun"
+      "en": "Classic Salad Bun",
+      "group": "sandwich"
     }
   ],
   "beverage": [

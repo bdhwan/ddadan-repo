@@ -21,13 +21,30 @@ object Telemetry {
     val diskUsedPercent = if (total > 0) (total - free) * 100.0 / total else null
 
     return TelemetryBody(
-      appVersion = BuildConfig.VERSION_NAME,
+      // 관제에는 사이니지 앱(플레이어)의 설치 버전을 보고한다(워치독 자신 버전이 아니라).
+      appVersion = playerVersion(context),
       cpuPercent = readCpuPercent(),
       ramUsedMb = ramUsedMb,
       ramTotalMb = ramTotalMb,
       diskUsedPercent = diskUsedPercent?.let { Math.round(it * 10) / 10.0 },
     )
   }
+
+  /** 설치된 플레이어의 버전 "1.6 (22)". 미설치면 "미설치". */
+  private fun playerVersion(context: Context): String =
+    try {
+      val pi = context.packageManager.getPackageInfo("com.ddadan.player", 0)
+      @Suppress("DEPRECATION")
+      val code = pi.longVersionCodeCompat()
+      "${pi.versionName} ($code)"
+    } catch (_: Exception) {
+      "미설치"
+    }
+
+  @Suppress("DEPRECATION")
+  private fun android.content.pm.PackageInfo.longVersionCodeCompat(): Long =
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) longVersionCode
+    else versionCode.toLong()
 
   /** /proc/stat 두 번 샘플링해 전체 CPU 사용률(%) 계산. 실패 시 null. */
   private fun readCpuPercent(): Double? =

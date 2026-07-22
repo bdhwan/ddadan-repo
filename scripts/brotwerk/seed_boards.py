@@ -104,6 +104,13 @@ BEV = {
     "tea": ("티 · 주스", "TEA · JUICE", "#2f9e6e", "rgba(47,158,110,0.30)", "rgba(47,158,110,0.16)"),
 }
 
+# 베이커리 그룹: (한글, 영문, 헤더색, 안내박스 틴트, 그룹카드 틴트) — 웜톤
+BAKERY = {
+    "bread": ("빵 · 베이커리", "BREAD", "#b5731f", "rgba(181,115,31,0.30)", "rgba(181,115,31,0.15)"),
+    "sweet": ("단과자 · 잼", "PASTRY · JAM", "#c0392b", "rgba(192,57,43,0.28)", "rgba(192,57,43,0.13)"),
+    "sandwich": ("샌드위치", "SANDWICH", "#4a8c5f", "rgba(74,140,95,0.30)", "rgba(74,140,95,0.15)"),
+}
+
 
 def _kprice(p):
     """가격을 천 단위 소수 표기로: 4000->'4.0', 3500->'3.5'. 문자열이면 +extra로 처리."""
@@ -196,6 +203,61 @@ def beverage_layout(title_en, title_ko, groups, addons, img_asset, img_w=481):
     # 우열: 콜드브루 카드 + 티·주스 카드
     y2 = place_card("coldbrew", xs[1], top, row_h)
     place_card("tea", xs[1], y2 + gap, row_h)
+
+    return {"width": W, "height": H, "layout": {"items": it}}
+
+
+def bakery_layout(groups, note_text, img_asset, img_w=481):
+    """리치 베이커리 보드: 색상 그룹 카드(빵/단과자·잼/샌드위치) + 안내박스 (사진 좌측, 큰 폰트).
+    음료 보드와 동일한 카드 스타일. 가격은 천 단위 소수 표기."""
+    groups = {
+        k: [{**m, "price": _kprice(m["price"]),
+             **({"extra": _kextra(m["extra"])} if m.get("extra") else {})} for m in v]
+        for k, v in groups.items()
+    }
+    it = [box(0, 0, W, H, 0, BG)]
+    it.append(img(img_asset, 0, 0, img_w, H, 1))          # 사진 좌측
+
+    menu_l = img_w + 36
+    menu_r = W - 28
+    menu_w = menu_r - menu_l
+    col_gap = 40
+    col_w = (menu_w - col_gap) // 2
+    xs = [menu_l, menu_l + col_w + col_gap]
+
+    item_size = 34
+    row_h = 80
+    hdr_size = 38
+    hdr_h = 48
+    px = 32
+    pad_top = 32
+    pad_bot = 30
+    hdr_gap = 20
+    gap = 30
+    top = 28
+
+    def place_card(key, x, y, rh):
+        ko, en, color, ntint, ctint = BAKERY[key]
+        rows = groups[key]
+        right = "EXTRA SIZE" if sum(1 for m in rows if m.get("extra")) >= 2 else None
+        ch = pad_top + hdr_h + hdr_gap + len(rows) * rh + pad_bot
+        it.append(card(x, y, col_w, ch, 4, ctint, 24))
+        it.append(card(x + 24, y + pad_top + 2, 9, hdr_h - 10, 6, color, 5))
+        it.append(groupheader(ko, en, right, x + 48, y + pad_top, col_w - 72, hdr_h, 6, hdr_size, color))
+        it.append(box(x + px, y + pad_top + hdr_h + 4, col_w - 2 * px, 2, 6, "rgba(33,57,95,0.12)"))
+        iy = y + pad_top + hdr_h + hdr_gap
+        for m in rows:
+            it.append(menuline(m, x + px, iy, col_w - 2 * px, rh, 6, item_size))
+            it.append(box(x + px, iy + rh - 8, col_w - 2 * px, 1, 6, ROWL))
+            iy += rh
+        return y + ch
+
+    # 좌열(메뉴): 빵 카드 + 안내박스 / 우열: 단과자 카드 + 샌드위치 카드
+    y1 = place_card("bread", xs[0], top, row_h)
+    it.append(note(note_text, BAKERY["bread"][3], BAKERY["bread"][2],
+                   xs[0], y1 + gap, col_w, 72, 6, int(item_size * 0.8)))
+    y2 = place_card("sweet", xs[1], top, row_h)
+    place_card("sandwich", xs[1], y2 + gap, row_h)
 
     return {"width": W, "height": H, "layout": {"items": it}}
 
