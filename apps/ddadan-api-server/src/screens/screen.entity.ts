@@ -17,14 +17,28 @@ export interface ScreenLayoutItem {
   fontWeight?: number;
   textAlign?: 'left' | 'center' | 'right';
   lineHeight?: number;
-  /** 'menuLine' renders label + dot leader + price (textSecondary). */
-  textVariant?: 'plain' | 'menuLine';
+  /**
+   * 'menuLine' renders label + dot leader + price (textSecondary).
+   * 'groupHeader' renders a category header (한글 title + textEn + right-aligned textSecondary).
+   * 'note' renders a tinted rounded callout box with a leading check + text.
+   */
+  textVariant?: 'plain' | 'menuLine' | 'groupHeader' | 'note';
   textSecondary?: string;
+  /** 영문 병기(한글명 옆 작은 회색 텍스트). */
+  textEn?: string;
+  /** 이중 가격의 보조가("+1.0" 등) — textSecondary(기본가) 뒤에 강조 표시. */
+  priceExtra?: string;
+  /** menuLine 가격 색(미지정 시 아이템 색 상속). */
+  priceColor?: string;
+  /** 인라인 뱃지(BEST/추천/ICED Only/DECAF 등). */
+  badges?: { text: string; variant?: 'best' | 'rec' | 'info' | 'warn' }[];
   x: number;
   y: number;
   width: number;
   height: number;
   zIndex?: number;
+  /** 배경 모서리 둥글기(px) — 그룹 카드/패널/안내박스. */
+  radius?: number;
   durationMs?: number;
 }
 

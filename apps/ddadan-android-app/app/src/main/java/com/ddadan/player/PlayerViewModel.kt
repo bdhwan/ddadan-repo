@@ -173,11 +173,13 @@ class PlayerViewModel(
       if (key != lastRotationKey) {
         lastRotationKey = key
         rotationJob?.cancel()
+        // 페이드 사이에는 오버레이(idx1)가 베이스(idx0)와 같은 슬라이드를 가리킨다 →
+        // 오버레이가 숨김 상태에서 잠깐 보여도 베이스와 동일해 튕김/잔상이 없다.
         _uiState.update {
           it.copy(
             rotationSlides = slides,
             rotIdx0 = 0,
-            rotIdx1 = 1,
+            rotIdx1 = 0,
             rotOp0 = 1f,
             rotOp1 = 0f,
             rotTransition = false,
@@ -197,21 +199,18 @@ class PlayerViewModel(
     rotationJob =
       viewModelScope.launch {
         delay(intervalMs)
-        _uiState.update {
-          it.copy(rotTransition = true, rotOp0 = 0f, rotOp1 = 1f)
-        }
-        delay(fadeMs)
         val slides = _uiState.value.rotationSlides ?: return@launch
         val n = slides.size
-        val nextTop = (_uiState.value.rotIdx1 + 1) % n
+        val nextIdx = (_uiState.value.rotIdx0 + 1) % n
+        // 오버레이(idx1)를 다음 슬라이드로 지정하고 0→1로 페이드 인(베이스는 계속 불투명).
         _uiState.update {
-          it.copy(
-            rotIdx0 = it.rotIdx1,
-            rotIdx1 = nextTop,
-            rotTransition = false,
-            rotOp0 = 1f,
-            rotOp1 = 0f,
-          )
+          it.copy(rotIdx1 = nextIdx, rotTransition = true, rotOp0 = 0f, rotOp1 = 1f)
+        }
+        delay(fadeMs)
+        // 페이드 완료: 베이스를 다음 슬라이드로 승격. 오버레이는 그대로 다음 슬라이드를 가리킨
+        // 채 숨긴다(베이스와 동일 → 오버레이 alpha가 늦게 스냅돼도 튕김 없음).
+        _uiState.update {
+          it.copy(rotIdx0 = nextIdx, rotTransition = false, rotOp0 = 1f, rotOp1 = 0f)
         }
         scheduleRotationStep(intervalMs, fadeMs)
       }

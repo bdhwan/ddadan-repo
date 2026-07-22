@@ -1,0 +1,4 @@
+# 안드로이드 셋톱박스(Krizer RK3229, Android 5.1)의 System WebView가 Chromium 72라,
+# esbuild가 옵셔널체이닝(?.)·nullish(??)·클래스필드 등 신문법을 Ch72 호환으로 다운레벨하도록
+# 타깃을 명시한다. 이 SPA는 박스 WebView + 데스크톱 브라우저 디스플레이 양쪽에서 돈다.
+Chrome >= 72

@@ -24,3 +24,4 @@ out-tsc/
 
 # Session debug screenshots
 artifacts/
+__pycache__/

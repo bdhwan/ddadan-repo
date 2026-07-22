@@ -1,51 +1,87 @@
+<!-- 단일 아이템 렌더러 — 로테이션 앞/뒤 레이어와 단일 화면에서 공통 사용 -->
+<ng-template #itemView let-item="item" let-w="w" let-h="h">
+  <div
+    class="item"
+    [class.item-note]="isNote(item)"
+    [style.left.%]="(item.x / w) * 100"
+    [style.top.%]="(item.y / h) * 100"
+    [style.width.%]="(item.width / w) * 100"
+    [style.height.%]="(item.height / h) * 100"
+    [style.z-index]="item.zIndex ?? 1"
+    [style.background]="item.background ?? null"
+    [style.color]="item.color ?? null"
+    [style.font-size]="fontCss(item)"
+    [style.font-weight]="item.fontWeight ?? null"
+    [style.text-align]="textAlign(item)"
+    [style.line-height]="item.lineHeight ?? null"
+    [style.opacity]="item.opacity ?? null"
+    [style.border-radius.px]="item.radius ?? null"
+  >
+    @switch (item.kind) {
+      @case ('image') {
+        <img [src]="absoluteUrl(item) ?? ''" alt="" />
+      }
+      @case ('video') {
+        <video [src]="absoluteUrl(item) ?? ''" autoplay muted loop playsinline></video>
+      }
+      @default {
+        @if (isNote(item)) {
+          <div class="text note">
+            <span class="note-check">✓</span>
+            <span class="note-text">{{ item.text }}</span>
+          </div>
+        } @else if (isGroupHeader(item)) {
+          <div class="text group-header">
+            <span class="gh-ko">{{ item.text }}</span>
+            @if (item.textEn) {
+              <span class="gh-en">{{ item.textEn }}</span>
+            }
+            <span class="gh-rule"></span>
+            @if (item.textSecondary) {
+              <span class="gh-right">{{ item.textSecondary }}</span>
+            }
+          </div>
+        } @else if (isMenuLine(item)) {
+          <div class="text menu-line">
+            @for (b of prefixBadges(item); track $index) {
+              <span class="badge" [class]="'badge-' + (b.variant ?? 'best')">{{ b.text }}</span>
+            }
+            <span class="label">
+              <span class="label-ko">{{ item.text }}</span>
+              @if (item.textEn) {
+                <span class="label-en">{{ item.textEn }}</span>
+              }
+            </span>
+            @for (b of suffixBadges(item); track $index) {
+              <span class="tag" [class]="'tag-' + (b.variant ?? 'info')">{{ b.text }}</span>
+            }
+            <span class="dots"></span>
+            <span class="price" [style.color]="item.priceColor ?? null">{{ item.textSecondary }}</span>
+            @if (item.priceExtra) {
+              <span class="price-extra">{{ item.priceExtra }}</span>
+            }
+          </div>
+        } @else {
+          <div class="text">{{ item.text }}</div>
+        }
+      }
+    }
+  </div>
+</ng-template>
+
 @if (useRotation()) {
-  <div class="stage rot-stage" [style.aspect-ratio]="aspectRot()">
+  <div class="stage rot-stage" [class.fill]="fillMode()" [style.aspect-ratio]="fillMode() ? null : aspectRot()">
     <div
       class="rot-layer layer-back"
       [style.opacity]="rotOp0()"
       [style.transition]="rotTransition()"
     >
       @if (slideAt(0); as sl) {
-        <div
-          class="slide-fill"
-          [style.background]="sl.background ?? '#0c0f1a'"
-        >
+        <div class="slide-fill" [style.background]="sl.background ?? '#0c0f1a'">
           @for (item of sl.items; track item.id) {
-            <div
-              class="item"
-              [style.left.%]="(item.x / sl.width) * 100"
-              [style.top.%]="(item.y / sl.height) * 100"
-              [style.width.%]="(item.width / sl.width) * 100"
-              [style.height.%]="(item.height / sl.height) * 100"
-              [style.z-index]="item.zIndex ?? 1"
-              [style.background]="item.background ?? null"
-              [style.color]="item.color ?? null"
-              [style.font-size]="fontCss(item)"
-              [style.font-weight]="item.fontWeight ?? null"
-              [style.text-align]="textAlign(item)"
-              [style.line-height]="item.lineHeight ?? null"
-              [style.opacity]="item.opacity ?? null"
-            >
-              @switch (item.kind) {
-                @case ('image') {
-                  <img [src]="absoluteUrl(item) ?? ''" alt="" />
-                }
-                @case ('video') {
-                  <video [src]="absoluteUrl(item) ?? ''" autoplay muted loop playsinline></video>
-                }
-                @default {
-                  @if (isMenuLine(item)) {
-                    <div class="text menu-line">
-                      <span class="label">{{ item.text }}</span>
-                      <span class="dots"></span>
-                      <span class="price">{{ item.textSecondary }}</span>
-                    </div>
-                  } @else {
-                    <div class="text">{{ item.text }}</div>
-                  }
-                }
-              }
-            </div>
+            <ng-container
+              *ngTemplateOutlet="itemView; context: { item: item, w: sl.width, h: sl.height }"
+            ></ng-container>
           }
         </div>
       }
@@ -56,89 +92,22 @@
       [style.transition]="rotTransition()"
     >
       @if (slideAt(1); as sl) {
-        <div
-          class="slide-fill"
-          [style.background]="sl.background ?? '#0c0f1a'"
-        >
+        <div class="slide-fill" [style.background]="sl.background ?? '#0c0f1a'">
           @for (item of sl.items; track item.id) {
-            <div
-              class="item"
-              [style.left.%]="(item.x / sl.width) * 100"
-              [style.top.%]="(item.y / sl.height) * 100"
-              [style.width.%]="(item.width / sl.width) * 100"
-              [style.height.%]="(item.height / sl.height) * 100"
-              [style.z-index]="item.zIndex ?? 1"
-              [style.background]="item.background ?? null"
-              [style.color]="item.color ?? null"
-              [style.font-size]="fontCss(item)"
-              [style.font-weight]="item.fontWeight ?? null"
-              [style.text-align]="textAlign(item)"
-              [style.line-height]="item.lineHeight ?? null"
-              [style.opacity]="item.opacity ?? null"
-            >
-              @switch (item.kind) {
-                @case ('image') {
-                  <img [src]="absoluteUrl(item) ?? ''" alt="" />
-                }
-                @case ('video') {
-                  <video [src]="absoluteUrl(item) ?? ''" autoplay muted loop playsinline></video>
-                }
-                @default {
-                  @if (isMenuLine(item)) {
-                    <div class="text menu-line">
-                      <span class="label">{{ item.text }}</span>
-                      <span class="dots"></span>
-                      <span class="price">{{ item.textSecondary }}</span>
-                    </div>
-                  } @else {
-                    <div class="text">{{ item.text }}</div>
-                  }
-                }
-              }
-            </div>
+            <ng-container
+              *ngTemplateOutlet="itemView; context: { item: item, w: sl.width, h: sl.height }"
+            ></ng-container>
           }
         </div>
       }
     </div>
   </div>
 } @else if (screen(); as s) {
-  <div class="stage" [style.background]="s.background ?? '#0c0f1a'" [style.aspect-ratio]="aspect()">
+  <div class="stage" [class.fill]="fillMode()" [style.background]="s.background ?? '#0c0f1a'" [style.aspect-ratio]="fillMode() ? null : aspect()">
     @for (item of s.items; track item.id) {
-      <div
-        class="item"
-        [style.left.%]="(item.x / s.width) * 100"
-        [style.top.%]="(item.y / s.height) * 100"
-        [style.width.%]="(item.width / s.width) * 100"
-        [style.height.%]="(item.height / s.height) * 100"
-        [style.z-index]="item.zIndex ?? 1"
-        [style.background]="item.background ?? null"
-        [style.color]="item.color ?? null"
-        [style.font-size]="fontCss(item)"
-        [style.font-weight]="item.fontWeight ?? null"
-        [style.text-align]="textAlign(item)"
-        [style.line-height]="item.lineHeight ?? null"
-        [style.opacity]="item.opacity ?? null"
-      >
-        @switch (item.kind) {
-          @case ('image') {
-            <img [src]="absoluteUrl(item)" alt="" />
-          }
-          @case ('video') {
-            <video [src]="absoluteUrl(item)" autoplay muted loop playsinline></video>
-          }
-          @default {
-            @if (isMenuLine(item)) {
-              <div class="text menu-line">
-                <span class="label">{{ item.text }}</span>
-                <span class="dots"></span>
-                <span class="price">{{ item.textSecondary }}</span>
-              </div>
-            } @else {
-              <div class="text">{{ item.text }}</div>
-            }
-          }
-        }
-      </div>
+      <ng-container
+        *ngTemplateOutlet="itemView; context: { item: item, w: s.width, h: s.height }"
+      ></ng-container>
     }
   </div>
 } @else {

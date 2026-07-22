@@ -3,35 +3,302 @@
   "tagline": "BAKERY · COFFEE",
   "source": "매가시티빵집(브로트베르크) 사장님 제공 메뉴 — 쿠팡잇츠 기준",
   "bread": [
-    { "name": "소금빵", "price": 2800 },
-    { "name": "크림치즈빵", "price": 3800 },
-    { "name": "식빵", "price": 6000 },
-    { "name": "쌀식빵", "price": 7000 },
-    { "name": "통밀식빵", "price": 7000 },
-    { "name": "바게트", "price": 5000 },
-    { "name": "소보로", "price": 3000 },
-    { "name": "소세지빵", "price": 3600 },
-    { "name": "고구마팥빵", "price": 3600 },
-    { "name": "단호박팥빵", "price": 3600 },
-    { "name": "러스크", "price": 4800 },
-    { "name": "사과잼빵", "price": 3800 },
-    { "name": "마말레이드", "price": 3800 },
-    { "name": "소금빵 샌드위치", "price": 8000 },
-    { "name": "바게트 샌드위치", "price": 9800 },
-    { "name": "추억의 사라다빵", "price": 5800 }
+    {
+      "name": "소금빵",
+      "price": 2800,
+      "en": "Salt Bread",
+      "badges": [
+        {
+          "text": "BEST",
+          "variant": "best"
+        }
+      ]
+    },
+    {
+      "name": "크림치즈빵",
+      "price": 3800,
+      "en": "Cream Cheese Bun"
+    },
+    {
+      "name": "식빵",
+      "price": 6000,
+      "en": "White Loaf"
+    },
+    {
+      "name": "쌀식빵",
+      "price": 7000,
+      "en": "Rice Loaf"
+    },
+    {
+      "name": "통밀식빵",
+      "price": 7000,
+      "en": "Whole Wheat Loaf",
+      "badges": [
+        {
+          "text": "추천",
+          "variant": "rec"
+        }
+      ]
+    },
+    {
+      "name": "바게트",
+      "price": 5000,
+      "en": "Baguette"
+    },
+    {
+      "name": "소보로",
+      "price": 3000,
+      "en": "Soboro Bun"
+    },
+    {
+      "name": "소세지빵",
+      "price": 3600,
+      "en": "Sausage Bread"
+    },
+    {
+      "name": "고구마팥빵",
+      "price": 3600,
+      "en": "Sweet Potato Red Bean"
+    },
+    {
+      "name": "단호박팥빵",
+      "price": 3600,
+      "en": "Pumpkin Red Bean"
+    },
+    {
+      "name": "러스크",
+      "price": 4800,
+      "en": "Rusk"
+    },
+    {
+      "name": "사과잼빵",
+      "price": 3800,
+      "en": "Apple Jam Bun"
+    },
+    {
+      "name": "마말레이드",
+      "price": 3800,
+      "en": "Marmalade"
+    },
+    {
+      "name": "소금빵 샌드위치",
+      "price": 8000,
+      "en": "Salt Bread Sandwich"
+    },
+    {
+      "name": "바게트 샌드위치",
+      "price": 9800,
+      "en": "Baguette Sandwich",
+      "badges": [
+        {
+          "text": "추천",
+          "variant": "rec"
+        }
+      ]
+    },
+    {
+      "name": "추억의 사라다빵",
+      "price": 5800,
+      "en": "Classic Salad Bun"
+    }
   ],
   "beverage": [
-    { "name": "아메리카노", "price": 3200 },
-    { "name": "아이스 아메리카노", "price": 3000 },
-    { "name": "카페라떼", "price": 4000 },
-    { "name": "고구마라떼", "price": 4000 },
-    { "name": "흑임자라떼", "price": 4000 },
-    { "name": "디카페인 커피", "price": 4000 },
-    { "name": "허브차", "price": 3500 },
-    { "name": "페퍼민트", "price": 3500 },
-    { "name": "생강차", "price": 4500 },
-    { "name": "자몽에이드", "price": 5500 },
-    { "name": "유자에이드", "price": 5500 },
-    { "name": "생과일주스", "price": 7000 }
+    {
+      "name": "아메리카노",
+      "price": 3200,
+      "en": "Americano",
+      "group": "espresso",
+      "extra": "+1,000"
+    },
+    {
+      "name": "아이스 아메리카노",
+      "price": 3000,
+      "en": "Iced Americano",
+      "group": "espresso",
+      "badges": [
+        {
+          "text": "BEST",
+          "variant": "best"
+        }
+      ]
+    },
+    {
+      "name": "카페라떼",
+      "price": 4000,
+      "en": "Café Latte",
+      "group": "espresso",
+      "extra": "+1,000"
+    },
+    {
+      "name": "카푸치노",
+      "price": 4200,
+      "en": "Cappuccino",
+      "group": "espresso"
+    },
+    {
+      "name": "바닐라라떼",
+      "price": 4500,
+      "en": "Vanilla Latte",
+      "group": "espresso",
+      "extra": "+1,000"
+    },
+    {
+      "name": "카페모카",
+      "price": 4500,
+      "en": "Café Mocha",
+      "group": "espresso",
+      "extra": "+1,000"
+    },
+    {
+      "name": "디카페인 커피",
+      "price": 4000,
+      "en": "Decaf Coffee",
+      "group": "espresso",
+      "badges": [
+        {
+          "text": "DECAF",
+          "variant": "warn"
+        }
+      ]
+    },
+    {
+      "name": "콜드브루",
+      "price": 3900,
+      "en": "Cold Brew",
+      "group": "coldbrew",
+      "badges": [
+        {
+          "text": "BEST",
+          "variant": "best"
+        },
+        {
+          "text": "ICED Only",
+          "variant": "info"
+        }
+      ],
+      "extra": "+1,000"
+    },
+    {
+      "name": "흑당 콜드브루",
+      "price": 4200,
+      "en": "Black Sugar Cold Brew",
+      "group": "coldbrew",
+      "badges": [
+        {
+          "text": "ICED Only",
+          "variant": "info"
+        }
+      ]
+    },
+    {
+      "name": "자몽에이드",
+      "price": 5500,
+      "en": "Grapefruit Ade",
+      "group": "coldbrew",
+      "badges": [
+        {
+          "text": "ICED Only",
+          "variant": "info"
+        }
+      ]
+    },
+    {
+      "name": "유자에이드",
+      "price": 5500,
+      "en": "Citron Ade",
+      "group": "coldbrew",
+      "badges": [
+        {
+          "text": "ICED Only",
+          "variant": "info"
+        }
+      ]
+    },
+    {
+      "name": "청귤에이드",
+      "price": 5500,
+      "en": "Green Tangerine Ade",
+      "group": "coldbrew",
+      "badges": [
+        {
+          "text": "추천",
+          "variant": "rec"
+        },
+        {
+          "text": "ICED Only",
+          "variant": "info"
+        }
+      ]
+    },
+    {
+      "name": "허브차",
+      "price": 3500,
+      "en": "Herb Tea",
+      "group": "tea"
+    },
+    {
+      "name": "페퍼민트",
+      "price": 3500,
+      "en": "Peppermint",
+      "group": "tea"
+    },
+    {
+      "name": "생강차",
+      "price": 4500,
+      "en": "Ginger Tea",
+      "group": "tea"
+    },
+    {
+      "name": "흑임자라떼",
+      "price": 4000,
+      "en": "Black Sesame Latte",
+      "group": "tea",
+      "badges": [
+        {
+          "text": "추천",
+          "variant": "rec"
+        }
+      ]
+    },
+    {
+      "name": "고구마라떼",
+      "price": 4000,
+      "en": "Sweet Potato Latte",
+      "group": "tea"
+    },
+    {
+      "name": "생과일주스",
+      "price": 7000,
+      "en": "Fresh Juice",
+      "group": "tea",
+      "badges": [
+        {
+          "text": "추천",
+          "variant": "rec"
+        }
+      ]
+    }
+  ],
+  "beverage_addons": [
+    {
+      "name": "샷 추가",
+      "en": "Extra Shot",
+      "price": "+500"
+    },
+    {
+      "name": "시럽",
+      "en": "Syrup",
+      "price": "+300"
+    },
+    {
+      "name": "휘핑크림",
+      "en": "Whipped Cream",
+      "price": "+500"
+    },
+    {
+      "name": "두유 변경",
+      "en": "Soy Milk",
+      "price": "+500"
+    }
   ]
 }

@@ -145,10 +145,6 @@ fun PlayerScreen(
       }
     }
 
-    SettingsHintBadge(
-      onClick = viewModel::openSettingsEditor,
-      modifier = Modifier.align(Alignment.TopStart).padding(16.dp),
-    )
   }
 }
 
@@ -204,21 +200,6 @@ private fun DiscoveryOverlay(
       }
     }
   }
-}
-
-@Composable
-private fun SettingsHintBadge(onClick: () -> Unit, modifier: Modifier = Modifier) {
-  Text(
-    text = "설정 (Menu)",
-    color = Color.White.copy(alpha = 0.35f),
-    fontSize = 12.sp,
-    modifier =
-      modifier
-        .clickable(onClick = onClick)
-        .focusable()
-        .background(Color(0x66141824))
-        .padding(horizontal = 10.dp, vertical = 6.dp),
-  )
 }
 
 private val PlayerUiState.useRotation: Boolean

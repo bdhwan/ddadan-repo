@@ -1,12 +1,20 @@
 :host {
   display: block;
   width: 100%;
+  /* vh 먼저(구형 WebView Chromium 72 등 dvh 미지원 대비), 지원 시 dvh로 정교화 */
+  height: 100vh;
   height: 100dvh;
   background: #050505;
   color: #fff;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple SD Gothic Neo',
     'Malgun Gothic', sans-serif;
+}
+
+/* 풀스크린 키오스크 모드 — 스테이지가 뷰포트를 꽉 채운다(aspect-ratio 미사용). */
+.stage.fill {
+  width: 100%;
+  height: 100%;
 }
 
 .stage {
@@ -60,27 +68,173 @@
 
 .item .text.menu-line {
   align-items: baseline;
-  gap: 12px;
+  gap: 0.34em;
 }
 
 .item .menu-line .label {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4em;
+  overflow: hidden;
+}
+
+/* 한글명은 웬만하면 온전히(약하게만 수축) */
+.item .menu-line .label-ko {
   flex: 0 1 auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* 영문 병기 — 한글명보다 작고 옅게. 공간이 부족하면 영문이 먼저 줄어든다(shrink 100). */
+.item .menu-line .label-en {
+  flex: 0 100 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.52em;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  opacity: 0.5;
+  text-transform: none;
+}
+
 .item .menu-line .dots {
   flex: 1 1 auto;
+  align-self: flex-end;
   border-bottom: 2px dotted currentColor;
-  opacity: 0.45;
-  min-width: 24px;
-  margin-bottom: 0.25em;
+  opacity: 0.28;
+  min-width: 20px;
+  margin-bottom: 0.28em;
 }
 
 .item .menu-line .price {
   flex: 0 0 auto;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 이중 가격의 보조가("+1.0") — 기본가 뒤 작게, 초록 강조 */
+.item .menu-line .price-extra {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 0.62em;
+  font-weight: 700;
+  color: #2f9e6e;
+  margin-left: 0.15em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 원형 뱃지(BEST/추천) — 라벨 앞 */
+.item .menu-line .badge {
+  flex: 0 0 auto;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 1.5em;
+  min-width: 1.5em;
+  padding: 0 0.42em;
+  border-radius: 999px;
+  font-size: 0.44em;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  color: #fff;
+}
+
+.item .menu-line .badge-best {
+  background: #2f6fd0;
+}
+.item .menu-line .badge-rec {
+  background: #2f9e6e;
+}
+
+/* 인라인 태그(ICED Only/DECAF) — 라벨 뒤 */
+.item .menu-line .tag {
+  flex: 0 0 auto;
+  align-self: center;
+  white-space: nowrap;
+  font-size: 0.5em;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.item .menu-line .tag-info {
+  color: #8a8f98;
+  font-style: italic;
+  font-weight: 600;
+}
+.item .menu-line .tag-warn {
+  color: #1f7a4d;
+  background: rgba(47, 158, 110, 0.14);
+  border-radius: 6px;
+  padding: 0.28em 0.5em;
+}
+
+/* 안내 콜백 박스 — 연한 틴트(item.background) 라운드 박스 + 체크 + 문구 */
+.item.item-note {
+  border-radius: 10px;
+}
+.item .text.note {
+  align-items: center;
+  gap: 0.5em;
+  padding: 0 0.8em;
+  font-weight: 600;
+}
+.item .note .note-check {
+  flex: 0 0 auto;
+  font-weight: 800;
+  opacity: 0.9;
+}
+.item .note .note-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 카테고리 그룹 헤더 — 한글 title + 영문 + 룰 라인 + 우측 라벨(EXTRA SIZE 등) */
+.item .text.group-header {
+  align-items: baseline;
+  gap: 0.5em;
+  font-weight: 800;
+}
+
+.item .group-header .gh-ko {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.item .group-header .gh-en {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 0.6em;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0.85;
+}
+
+.item .group-header .gh-rule {
+  flex: 1 1 auto;
+  align-self: center;
+  height: 2px;
+  background: currentColor;
+  opacity: 0.35;
+  min-width: 16px;
+}
+
+.item .group-header .gh-right {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 0.5em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
 }
 
 .loading {
