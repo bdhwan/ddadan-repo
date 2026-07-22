@@ -30,6 +30,9 @@ export class Device extends BaseEntity {
   @Column({ type: 'varchar', length: 64, nullable: true })
   appVersion!: string | null;
 
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  watchdogVersion!: string | null;
+
   // 최신 자원 텔레메트리 스냅샷(워치독이 주기 전송).
   @Column({ type: 'float', nullable: true })
   lastCpuPercent!: number | null;

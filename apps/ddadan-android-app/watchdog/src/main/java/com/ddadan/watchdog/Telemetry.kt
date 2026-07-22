@@ -21,8 +21,9 @@ object Telemetry {
     val diskUsedPercent = if (total > 0) (total - free) * 100.0 / total else null
 
     return TelemetryBody(
-      // 관제에는 사이니지 앱(플레이어)의 설치 버전을 보고한다(워치독 자신 버전이 아니라).
+      // 플레이어(사이니지 앱)와 워치독 버전을 분리해 보고.
       appVersion = playerVersion(context),
+      watchdogVersion = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
       cpuPercent = readCpuPercent(),
       ramUsedMb = ramUsedMb,
       ramTotalMb = ramTotalMb,

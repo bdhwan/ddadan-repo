@@ -35,7 +35,10 @@ data class AckBody(
 /** 디바이스 자원 텔레메트리(heartbeat 겸용). */
 @Serializable
 data class TelemetryBody(
+  /** 사이니지 플레이어(com.ddadan.player) 설치 버전. */
   val appVersion: String? = null,
+  /** 워치독(com.ddadan.watchdog) 자신의 버전. */
+  val watchdogVersion: String? = null,
   val cpuPercent: Double? = null,
   val ramUsedMb: Long? = null,
   val ramTotalMb: Long? = null,

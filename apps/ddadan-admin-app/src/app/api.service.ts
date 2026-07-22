@@ -44,6 +44,7 @@ export interface DeviceView {
   status: 'unregistered' | 'online' | 'offline';
   lastSeenAt: string | null;
   appVersion: string | null;
+  watchdogVersion?: string | null;
   cpuPercent?: number | null;
   ramUsedMb?: number | null;
   ramTotalMb?: number | null;

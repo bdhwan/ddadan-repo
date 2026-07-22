@@ -93,6 +93,11 @@ export class TelemetryDto {
   appVersion?: string;
 
   @IsOptional()
+  @IsString()
+  @Length(0, 64)
+  watchdogVersion?: string;
+
+  @IsOptional()
   @IsNumber()
   cpuPercent?: number;
 

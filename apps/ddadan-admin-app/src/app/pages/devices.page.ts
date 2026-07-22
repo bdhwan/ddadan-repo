@@ -16,6 +16,16 @@ import { ApiService, ApkInfo, DeviceView, MonitorView, ScreenView } from '../api
       } @else {
         <span class="la-ver muted">업로드된 APK 없음</span>
       }
+      <button
+        class="update-all"
+        (click)="updateAll()"
+        [disabled]="updatingAll() || devices().length === 0"
+      >
+        {{ updatingAll() ? '업데이트 지시 중…' : '안드로이드 전체 업데이트' }}
+      </button>
+      @if (updateResult()) {
+        <span class="la-result">{{ updateResult() }}</span>
+      }
     </div>
     <div class="panel quick-previews">
       <div class="quick-title">화면 미리보기</div>
@@ -45,7 +55,7 @@ import { ApiService, ApkInfo, DeviceView, MonitorView, ScreenView } from '../api
             <th>이름</th>
             <th>하드웨어 ID</th>
             <th>상태</th>
-            <th>앱 버전</th>
+            <th>버전 (플레이어/워치독)</th>
             <th>마지막 온라인</th>
             <th>화면 할당</th>
             <th>미리보기</th>
@@ -64,7 +74,10 @@ import { ApiService, ApkInfo, DeviceView, MonitorView, ScreenView } from '../api
                   {{ d.status }}
                 </span>
               </td>
-              <td><code>{{ d.appVersion ?? '—' }}</code></td>
+              <td class="ver-cell">
+                <div><span class="vc-label">플레이어</span><code>{{ d.appVersion ?? '—' }}</code></div>
+                <div><span class="vc-label">워치독</span><code>{{ d.watchdogVersion ?? '—' }}</code></div>
+              </td>
               <td class="lastseen-col">
                 <span [title]="d.lastSeenAt ?? ''">{{ lastSeen(d) }}</span>
               </td>
@@ -114,6 +127,22 @@ import { ApiService, ApkInfo, DeviceView, MonitorView, ScreenView } from '../api
         font-size: 12px;
         color: var(--muted);
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .latest-apk .update-all {
+        margin-left: auto;
+      }
+      .latest-apk .la-result {
+        flex-basis: 100%;
+        font-size: 12px;
+        color: #1f9d4f;
+      }
+      .ver-cell {
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .ver-cell .vc-label {
+        color: var(--muted);
+        margin-right: 4px;
       }
       .toolbar {
         display: flex;
@@ -205,6 +234,8 @@ export class DevicesPage implements OnInit {
   readonly devices = signal<DeviceView[]>([]);
   readonly screens = signal<ScreenView[]>([]);
   readonly latestApk = signal<ApkInfo | null>(null);
+  readonly updatingAll = signal(false);
+  readonly updateResult = signal('');
   readonly registerStoreId = signal<number | null>(null);
   hardwareId = '';
   alias = '';
@@ -231,6 +262,36 @@ export class DevicesPage implements OnInit {
 
   previewUrl(hardwareId: string): string {
     return `${window.location.origin}${this.previewPath(hardwareId)}`;
+  }
+
+  updateAll() {
+    const devs = this.devices();
+    if (!devs.length) return;
+    if (!confirm(`전체 ${devs.length}대에 앱 업데이트(OTA)를 지시할까요?`)) return;
+    this.updatingAll.set(true);
+    this.updateResult.set('');
+    let ok = 0;
+    let fail = 0;
+    const check = () => {
+      if (ok + fail >= devs.length) {
+        this.updatingAll.set(false);
+        this.updateResult.set(
+          `지시 완료 — 성공 ${ok} / 실패 ${fail}. 각 박스가 곧 OTA를 수행합니다.`,
+        );
+      }
+    };
+    for (const d of devs) {
+      this.api.sendCommand(d.id, 'updateApp').subscribe({
+        next: () => {
+          ok++;
+          check();
+        },
+        error: () => {
+          fail++;
+          check();
+        },
+      });
+    }
   }
 
   lastSeen(d: DeviceView): string {

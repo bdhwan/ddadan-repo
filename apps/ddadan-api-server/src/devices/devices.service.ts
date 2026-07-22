@@ -149,6 +149,9 @@ export class DevicesService {
     device.status = 'online';
     device.lastSeenAt = new Date();
     if (dto.appVersion !== undefined) device.appVersion = dto.appVersion;
+    if (dto.watchdogVersion !== undefined) {
+      device.watchdogVersion = dto.watchdogVersion;
+    }
     if (dto.cpuPercent !== undefined) device.lastCpuPercent = dto.cpuPercent;
     if (dto.ramUsedMb !== undefined) device.lastRamUsedMb = dto.ramUsedMb;
     if (dto.ramTotalMb !== undefined) device.lastRamTotalMb = dto.ramTotalMb;
@@ -287,6 +290,7 @@ export class DevicesService {
       status: liveStatus,
       lastSeenAt: device.lastSeenAt,
       appVersion: device.appVersion,
+      watchdogVersion: device.watchdogVersion,
       cpuPercent: device.lastCpuPercent,
       ramUsedMb: device.lastRamUsedMb,
       ramTotalMb: device.lastRamTotalMb,
