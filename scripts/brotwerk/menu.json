@@ -105,16 +105,10 @@
   "beverage": [
     {
       "name": "아메리카노",
-      "price": 3200,
+      "price": 3000,
       "en": "Americano",
       "group": "espresso",
-      "extra": "+1,000"
-    },
-    {
-      "name": "아이스 아메리카노",
-      "price": 3000,
-      "en": "Iced Americano",
-      "group": "espresso",
+      "extra": "+1,000",
       "badges": [
         {
           "text": "BEST",
@@ -153,6 +147,18 @@
       "name": "디카페인 커피",
       "price": 4000,
       "en": "Decaf Coffee",
+      "group": "espresso",
+      "badges": [
+        {
+          "text": "DECAF",
+          "variant": "warn"
+        }
+      ]
+    },
+    {
+      "name": "디카페인 카페라떼",
+      "price": 4500,
+      "en": "Decaf Café Latte",
       "group": "espresso",
       "badges": [
         {
@@ -293,11 +299,6 @@
     {
       "name": "휘핑크림",
       "en": "Whipped Cream",
-      "price": "+500"
-    },
-    {
-      "name": "두유 변경",
-      "en": "Soy Milk",
       "price": "+500"
     }
   ]

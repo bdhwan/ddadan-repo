@@ -105,35 +105,62 @@ BEV = {
 }
 
 
-def beverage_layout(title_en, title_ko, groups, addons, img_asset, img_w=420):
-    """리치 음료 보드: 색상 그룹 카드 3개 + 안내박스 + 추가 카드 (사진 우측, 큰 폰트)."""
+def _kprice(p):
+    """가격을 천 단위 소수 표기로: 4000->'4.0', 3500->'3.5'. 문자열이면 +extra로 처리."""
+    if isinstance(p, (int, float)):
+        return f"{p / 1000:.1f}"
+    return _kextra(p)
+
+
+def _kextra(e):
+    """'+1,000'->'+1.0', '+500'->'+0.5'."""
+    if not e:
+        return e
+    num = int(str(e).replace("+", "").replace(",", "").strip())
+    return f"+{num / 1000:.1f}"
+
+
+def beverage_layout(title_en, title_ko, groups, addons, img_asset, img_w=481):
+    """리치 음료 보드: 색상 그룹 카드 3개 + 안내박스 + 추가 카드 (사진 우측, 큰 폰트).
+
+    가격은 천 단위 소수 표기(4,000->4.0, +1,000->+1.0)로 짧게 표시해 공간을 절약한다.
+    """
+    # 가격/보조가를 천 단위 소수 문자열로 변환(원본 메뉴 데이터는 그대로).
+    groups = {
+        k: [{**m, "price": _kprice(m["price"]),
+             **({"extra": _kextra(m["extra"])} if m.get("extra") else {})} for m in v]
+        for k, v in groups.items()
+    }
+    addons = [{**a, "price": _kextra(a["price"])} for a in addons]
+
     it = [box(0, 0, W, H, 0, BG)]
     img_x = W - img_w
     it.append(img(img_asset, img_x, 0, img_w, H, 1))
 
-    menu_l = 80
-    menu_r = img_x - 50
+    menu_l = 28
+    menu_r = img_x - 32
     menu_w = menu_r - menu_l
-    col_gap = 44
+    col_gap = 40
     col_w = (menu_w - col_gap) // 2
     xs = [menu_l, menu_l + col_w + col_gap]
 
     # 보드 타이틀(BEVERAGE/음료) 없음 — 그 공간까지 그룹 카드로 사용.
-    item_size = 32
-    row_h = 64
-    hdr_size = 36
+    item_size = 34
+    row_h = 66
+    hdr_size = 38
     hdr_h = 48
     px = 32           # 카드 내부 좌우 여백
     pad_top = 32      # 카드 상단 여백
     pad_bot = 30      # 카드 하단 여백
     hdr_gap = 20      # 헤더 밑줄~첫 항목 간격
     gap = 30          # 카드 사이 간격
-    top = 56
+    top = 28
 
     def place_card(key, x, y, rh):
         ko, en, color, ntint, ctint = BEV[key]
         rows = groups[key]
-        right = "EXTRA SIZE" if any(m.get("extra") for m in rows) else None
+        # 그룹의 다수(2개 이상)가 사이즈업일 때만 헤더에 EXTRA SIZE 라벨(좁은 카드 충돌 방지).
+        right = "EXTRA SIZE" if sum(1 for m in rows if m.get("extra")) >= 2 else None
         ch = pad_top + hdr_h + hdr_gap + len(rows) * rh + pad_bot
         it.append(card(x, y, col_w, ch, 4, ctint, 24))
         it.append(card(x + 24, y + pad_top + 2, 9, hdr_h - 10, 6, color, 5))   # 컬러 액센트 바
@@ -148,7 +175,7 @@ def beverage_layout(title_en, title_ko, groups, addons, img_asset, img_w=420):
 
     # 좌열: 에스프레소 카드 + 안내박스 + 추가 카드(하단 정렬)
     y1 = place_card("espresso", xs[0], top, row_h)
-    it.append(note("모든 커피는 원두 2종 중 선택 가능합니다", BEV["espresso"][3],
+    it.append(note("모든 커피는 최상급 원두를 사용합니다", BEV["espresso"][3],
                    BEV["espresso"][2], xs[0], y1 + gap, col_w, 72, 6, int(item_size * 0.8)))
     # 추가 카드 — 하단에 붙여 세로 여백 채움
     nrows = (len(addons) + 1) // 2

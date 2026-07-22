@@ -189,7 +189,7 @@ private fun MenuLineText(item: ScreenItem, stageHeightDp: Float, designHeight: I
       Text(
         text = en,
         color = color.copy(alpha = 0.5f),
-        fontSize = fontSize * 0.52f,
+        fontSize = fontSize * 0.46f,
         fontWeight = FontWeight.SemiBold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
