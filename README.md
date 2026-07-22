@@ -1,78 +1,89 @@
 # ddadan-repo
 
-소상공인용 디지털 사이니지 SaaS + 하드웨어 서비스. NestJS API + Angular 어드민/플레이어 + Raspberry Pi 로컬 서비스로 구성된 모노레포.
+소상공인용 디지털 사이니지 시스템. NestJS API + Angular 어드민/플레이어 + **Android 셋톱박스 네이티브 플레이어**로 구성된 모노레포.
+
+> 🏬 실제 운영(박스 프로비저닝·메뉴 구성·OTA·배포·진단)은 **[docs/signage-guide.md](docs/signage-guide.md)** 에 절차 위주로 정리되어 있다. 이 README는 개요·구성·API 레퍼런스.
 
 ## 구성
 
-- `apps/ddadan-api-server`
-  - NestJS API 서버
-  - MySQL(TypeORM) + Redis + BullMQ + Firebase Admin SDK
-  - 매장/디바이스/모니터/에셋/화면/하트비트/약관/회원탈퇴 도메인
-  - 정적 에셋 서빙 (`/static/assets/*`)
-- `apps/ddadan-admin-app`
-  - 매장/디바이스 관리, 모니터 드래그드롭 배치, PPT식 화면 편집기
-  - Firebase Web SDK 이메일/구글 로그인
-  - Angular 21 (port 4200)
-- `apps/ddadan-client-app`
-  - 라즈베리파이 풀스크린 플레이어
-  - `?deviceId=<hardwareId>` 쿼리로 본인 화면 layout JSON을 폴링
-  - Angular 21 (port 4300 권장)
-- `services/ddadan-service-pi`
-  - 하드웨어 ID 자동 인식 (machine-id / eth0 mac)
-  - 미등록 시 어드민 `/register?deviceId=...` 자동 진입
-  - 등록 시 플레이어 URL을 Chromium kiosk 모드로 실행
-  - 주기 하트비트 + 모니터 해상도 자동 보고
+- `apps/ddadan-api-server` — NestJS API 서버
+  - **SQLite(better-sqlite3, TypeORM)**, `DB_SYNCHRONIZE=true`(마이그레이션 없음)
+  - 매장/디바이스/모니터/에셋/화면 + **APK(OTA)/원격명령/텔레메트리/스크린샷** 도메인
+  - 정적 에셋 서빙 (`/static/assets/*`), 전역 prefix `/api`, 기본 포트 `7800`
+- `apps/ddadan-admin-app` — 관제 UI (Angular)
+  - 매장/디바이스 관리, 화면 편집기, **디바이스 버전 관제(플레이어/워치독)·마지막 온라인·최신 APK·전체 OTA 버튼**
+  - 원격명령(재부팅/화면on·off/앱업데이트/shell), 스크린샷 갤러리, 자원 텔레메트리
+  - 기본 포트 `4200`
+- `apps/ddadan-android-app` — **Android 셋톱박스 사이니지 플레이어 (핵심)**
+  - `:app`(플레이어) — Jetpack Compose **네이티브 렌더**로 메뉴 보드를 그림. 서버 layout JSON 폴링, 서버 미도달 시 LAN 자동 탐색.
+  - `:watchdog` — 별도 패키지. 플레이어 상호 감시·재실행, **OTA(자가/플레이어 갱신)**, 텔레메트리, 원격명령 실행.
+  - `:core` — 공용(ServerLocator/RootShell/AppUpdater/DTO/설정).
+  - Android 5.1(minSdk 22)·RK3229 박스 대상. root(`su`) 사용. (박스 WebView가 라이브 SPA를 못 그려 네이티브 렌더 채택 — guide 1절 참고)
+- `apps/ddadan-client-app` — 브라우저 디스플레이용 HTML 렌더러 (Angular)
+  - 박스와 **동일 `ScreenItem` 스키마**를 HTML/CSS로 렌더. `?deviceId=<hardwareId>`로 본인 화면 폴링. 기본 포트 `7300`.
+- `services/ddadan-service-pi` — 라즈베리파이 로컬 서비스(하드웨어 ID 인식 + Chromium kiosk).
+- `scripts/brotwerk/` — 메뉴 보드 시드(`seed_boards.py`, `menu.json`). 색상 그룹 카드 레이아웃 생성.
 
-## 빠른 시작
+## 렌더러 스키마 (박스·브라우저 공유)
+
+`ScreenItem`(`kind`: image/video/text). 텍스트 `textVariant`:
+- `menuLine` — `[뱃지] 한글 영문 ····· 가격 (+보조가)`. `textEn`/`priceExtra`/`priceColor`/`badges[]`.
+- `groupHeader` — 카테고리 헤더(한글+영문+룰라인+우측라벨).
+- `note` — 라운드 틴트 안내박스(✓ + 문구).
+- `radius` — 배경 모서리 둥글기(그룹 카드/패널). 색은 hex 및 `rgba()`/`rgb()` 지원.
+
+네이티브 렌더러 `apps/ddadan-android-app/app/.../ui/ScreenItemView.kt`·`ScreenStage.kt`, 웹 렌더러 `apps/ddadan-client-app/src/app/app.{ts,html,scss}` — **두 곳을 함께 수정**.
+
+## 배포 (display-4)
+
+서버는 `ssh display-4`의 `~/ddadan-repo`에서 `docker compose`로 구동(api `:7800`, admin `:4200`, player `:7300`). DB/에셋은 named volume로 유지.
 
 ```bash
-# 1) 인프라(MySQL, Redis) 기동
-npm run infra:up
-
-# 2) 의존성 설치
-npm install
-
-# 3) Firebase 서비스 계정 JSON을 apps/ddadan-api-server/firebase/service-account.json 에 배치
-#    (예시는 service-account.example.json 참고)
-cp apps/ddadan-api-server/.env.example apps/ddadan-api-server/.env
-cp services/ddadan-service-pi/.env.example services/ddadan-service-pi/.env
-
-# 4) 각 워크스페이스 개발 서버
-npm run dev:api      # NestJS, http://localhost:7800/api
-npm run dev:admin    # Angular 어드민, http://localhost:4200
-npm run dev:client   # Angular 플레이어 (다른 포트로 실행 권장)
-npm run dev:pi       # Pi 서비스 (DDADAN_LAUNCH_KIOSK=0 으로 dry-run 가능)
+# 소스 변경 후 배포
+rsync -az apps/ddadan-api-server/src/ display-4:~/ddadan-repo/apps/ddadan-api-server/src/
+rsync -az apps/ddadan-admin-app/src/  display-4:~/ddadan-repo/apps/ddadan-admin-app/src/
+ssh display-4 "cd ~/ddadan-repo && docker compose up -d --build api admin"
 ```
+접속: LAN `http://192.168.150.222:4200`, Tailscale `http://100.96.152.109:4200`.
 
-> 프론트의 Firebase Web SDK 키는 `apps/ddadan-admin-app/src/environment.ts`에 입력해야 한다.
+## Android 앱 빌드 / OTA
+
+```bash
+cd apps/ddadan-android-app
+./gradlew :app:assembleRelease :watchdog:assembleRelease   # R8 minify + debug 서명
+# OTA: 버전 올린 APK를 서버에 업로드 → 박스 워치독이 자가 갱신(설치 후 APK 자동삭제)
+curl -X POST http://192.168.150.222:7800/api/apks/upload \
+  -F file=@app/build/outputs/apk/release/app-release.apk \
+  -F versionCode=NN -F versionName=X.Y -F applicationId=com.ddadan.player
+```
+상세 절차(프로비저닝·부팅자동실행·설치 트러블슈팅)는 [docs/signage-guide.md](docs/signage-guide.md).
+
+## 로컬 개발
+
+```bash
+npm install
+npm run dev:api      # NestJS, http://localhost:7800/api  (SQLite 자동 생성)
+npm run dev:admin    # 어드민, http://localhost:4200
+npm run dev:client   # 브라우저 플레이어
+```
 
 ## 주요 API
 
-| Method | Path | 설명 |
-|---|---|---|
-| `POST /api/devices/check` | public | Pi가 부팅 시 등록 여부 확인 |
-| `POST /api/devices/heartbeat` | public | Pi 주기 하트비트 + 해상도 보고 |
-| `POST /api/devices` | auth | 어드민에서 매장에 디바이스 등록 |
-| `GET /api/stores/:storeId/devices` | auth | 매장별 디바이스 목록 |
-| `PATCH /api/monitors/:id/position` | auth | 모니터 드래그드롭 위치 갱신 |
-| `PATCH /api/monitors/:id/screen` | auth | 모니터에 화면 할당 |
-| `POST /api/assets/upload` | auth | 이미지/영상 업로드 (multer disk) |
-| `POST /api/assets/text` | auth | 텍스트 에셋 |
-| `GET/POST/PATCH /api/screens` | auth | 화면 CRUD (PPT식 layout JSON) |
-| `POST /api/screen-components` | auth | 재사용 컴포넌트 저장 |
-| `GET /api/player/:hardwareId/screen?slot=0` | public | 플레이어가 풀스크린에 그릴 layout |
-| `GET /api/policies/current` | public | 약관/개인정보 최신 버전 |
-| `POST /api/policies/accept` | auth | 가입 시 약관 동의 기록 |
-| `DELETE /api/account` | auth | 회원 탈퇴 (전 데이터 soft delete + Firebase auth user 삭제) |
+| Method / Path | 설명 |
+|---|---|
+| `POST /api/devices/check` | 박스 등록 여부 확인 |
+| `POST /api/devices` | 디바이스 등록(하드웨어 시리얼=hardwareId) |
+| `POST /api/devices/:hardwareId/telemetry` | 워치독 자원/버전 텔레메트리(heartbeat 겸용) |
+| `GET /api/player/:hardwareId/screen?slot=0` | 플레이어가 그릴 layout JSON |
+| `GET/POST/PATCH /api/screens` | 화면 CRUD (layout JSON) |
+| `PATCH /api/monitors/:id/rotation` | 모니터 로테이션 편성(screenIds/interval/fade) |
+| `POST /api/apks/upload` · `GET /api/apks/latest?applicationId=` | OTA APK 업로드/최신 조회 |
+| `POST /api/devices/:id/commands` | 원격명령 큐잉(reboot/screenOn·Off/updateApp/shell) |
+| `GET /api/devices/:hardwareId/commands/pending` · `POST .../ack` | 박스 폴링/완료 보고 |
+| `POST /api/devices/:hardwareId/screenshots` · `GET` | 스크린샷 업로드/최근 10장 |
+| `POST /api/assets/upload` · `text` | 에셋 업로드 |
 
 ## 데이터 모델 요약
 
-`users → stores → devices → monitors`. 각 모니터에 `current_screen_id`로 `screens`를 연결.
-`screens.layout`은 PPT 슬라이드처럼 절대 위치 + 크기 + 종류(image/video/text)를 가진 아이템 리스트.
-`screen_components`는 사용자가 만든 재사용 가능한 그룹/단일 컴포넌트.
-
-## 회원 탈퇴 정책
-
-- 탈퇴 시 `users / stores / devices / monitors / assets / screens / screen_components` 모두 soft delete
-- Firebase Auth 사용자도 함께 삭제
-- 동일 이메일로 즉시 재가입 가능 (새 firebase_uid 발급으로 자연스러운 새 user row 생성)
+`users → stores → devices → monitors`. 각 모니터는 `rotationScreenIds`(로테이션) 또는 `currentScreenId`로 `screens`를 연결.
+`screens.layout`은 절대 위치·크기·종류(image/video/text)를 가진 `ScreenItem` 리스트(JSON 컬럼). 디바이스는 하드웨어 시리얼로 식별, 앱버전/워치독버전/마지막온라인/자원 스냅샷을 보관.

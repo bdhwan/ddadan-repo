@@ -173,8 +173,11 @@ curl -s -X POST "$API/apks/upload" \
 # 4) 즉시 적용하려면 특정 박스에 updateApp 명령 큐잉(워치독 commandLoop ~10s가 처리):
 curl -s -X POST "$API/devices/{DEVICE_ID}/commands" -H "Content-Type: application/json" -d '{"type":"updateApp"}'
 ```
-- admin `http://.../devices` 상단에 **최신 APK 버전**, 각 행에 **설치된 버전**(`appVersion`, 워치독이 플레이어 버전을 보고)과 **마지막 온라인** 표시.
+- admin `http://.../devices`:
+  - 상단에 **서버 최신 APK 버전**(OTA 페이로드) + **"안드로이드 전체 업데이트" 버튼**(전체 디바이스에 `updateApp` 명령 큐잉).
+  - 각 행에 **설치 버전을 플레이어/워치독 분리 표시**(워치독 텔레메트리가 `appVersion`=플레이어, `watchdogVersion`=워치독 자신을 각각 보고) + **마지막 온라인**.
 - 개발 중 즉시 반영은 `adb install -r`(위 프로비저닝 참고, force-stop 후). **OTA 경로 자체를 검증**하려면 버전 올려 업로드 후 워치독이 받아가는지 확인.
+- 현재 버전(참고): 플레이어 `1.6 (22)`, 워치독 `7.0 (7)`. OTA는 플레이어·워치독 각각의 `apks/latest?applicationId=`로 독립 갱신.
 
 ### 5.3 주의
 - 큰 Compose dex → `INSTALL_FAILED_DEXOPT`(dex2oat SIGSEGV). 완화: `setprop dalvik.vm.dex2oat-filter interpret-only`. 근본 해결: R8 minify(이미 적용, ~2.5MB).
@@ -211,7 +214,7 @@ ssh display-4 "cd ~/ddadan-repo && docker compose up -d --build api admin"   # �
 - `ScreenItem` 스키마 확장: `textEn`/`priceExtra`/`priceColor`/`badges[]`/`radius`, `textVariant`에 `groupHeader`·`note`.
 - 네이티브 렌더러(`ScreenItemView.kt`/`ScreenStage.kt`): 뱃지·영문병기·이중가격·그룹헤더·안내박스·라운드카드, **`parseColorOrNull` rgba 지원**, 크로스페이드 튕김 수정.
 - 시드 재작성: 색상 그룹 카드 + 천단위 표기 + `beverage_layout`/`bakery_layout`.
-- OTA 진행 오버레이(좌상단), 워치독 텔레메트리가 플레이어 버전 보고.
-- admin `/devices`: 설치 버전 + 마지막 온라인 + 상단 최신 APK.
+- OTA 진행 오버레이(좌상단), 워치독 텔레메트리가 플레이어/워치독 버전 분리 보고.
+- admin `/devices`: 플레이어/워치독 버전 분리 + 마지막 온라인 + 상단 최신 APK + 전체 OTA 버튼.
 - 브랜딩: 화면 표시 "DDADAN" → "브로트베르크".
 - 부팅 자동실행(스톡 런처 비활성화).
