@@ -179,7 +179,17 @@ curl -s -X POST "$API/devices/{DEVICE_ID}/commands" -H "Content-Type: applicatio
 - 개발 중 즉시 반영은 `adb install -r`(위 프로비저닝 참고, force-stop 후). **OTA 경로 자체를 검증**하려면 버전 올려 업로드 후 워치독이 받아가는지 확인.
 - 현재 버전(참고): 플레이어 `1.6 (22)`, 워치독 `7.0 (7)`. OTA는 플레이어·워치독 각각의 `apks/latest?applicationId=`로 독립 갱신.
 
-### 5.3 주의
+### 5.3 서명 키 (⚠ OTA 생명줄)
+릴리스 APK도 **안드로이드 디버그 키스토어**로 서명한다 — 이미 배포된 앱을 `pm install -r`로 갱신하려면 **서명 키가 반드시 같아야** 하기 때문(`app/build.gradle.kts`의 `signingConfigs.release`).
+```
+키스토어: ~/.android/debug.keystore   alias: androiddebugkey   비번: android / android
+현재 서명 지문 SHA-256: 7623a8459165d59e8c2686a2cdf0245271a08b9f0b2c6c85b2d251302877ac6b
+```
+- **다른 머신에서 빌드하면 키가 달라져 OTA가 거부된다.** 반드시 같은 `debug.keystore`를 쓸 것(필요 시 이 파일을 복사해 사용). 파일 분실 시 박스 전체 수동 재설치 필요.
+- OTA가 안 먹으면 먼저 서명부터 확인: `apksigner verify --print-certs <apk>` 결과를 위 지문과 대조.
+- 디버그 키는 공개 기본 키라 출처 보증이 안 되고 Play 배포도 불가 — 사내 폐쇄망 전용이라는 전제로 유지 중.
+
+### 5.4 주의
 - 큰 Compose dex → `INSTALL_FAILED_DEXOPT`(dex2oat SIGSEGV). 완화: `setprop dalvik.vm.dex2oat-filter interpret-only`. 근본 해결: R8 minify(이미 적용, ~2.5MB).
 - 저장공간 부족(`No space left`) → R8 minify로 해결됨. OTA 후 APK 삭제 필수.
 
