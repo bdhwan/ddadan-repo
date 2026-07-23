@@ -177,7 +177,8 @@ curl -s -X POST "$API/devices/{DEVICE_ID}/commands" -H "Content-Type: applicatio
   - 상단에 **서버 최신 APK 버전**(OTA 페이로드) + **"안드로이드 전체 업데이트" 버튼**(전체 디바이스에 `updateApp` 명령 큐잉).
   - 각 행에 **설치 버전을 플레이어/워치독 분리 표시**(워치독 텔레메트리가 `appVersion`=플레이어, `watchdogVersion`=워치독 자신을 각각 보고) + **마지막 온라인**.
 - 개발 중 즉시 반영은 `adb install -r`(위 프로비저닝 참고, force-stop 후). **OTA 경로 자체를 검증**하려면 버전 올려 업로드 후 워치독이 받아가는지 확인.
-- 현재 버전(참고): 플레이어 `1.6 (22)`, 워치독 `7.0 (7)`. OTA는 플레이어·워치독 각각의 `apks/latest?applicationId=`로 독립 갱신.
+- 현재 버전(참고): 플레이어 `1.7 (23)`, 워치독 `8.0 (8)`. OTA는 플레이어·워치독 각각의 `apks/latest?applicationId=`로 독립 갱신.
+- 워치독 주기(참고): 플레이어 감시 `2s` · 원격명령 폴링 `10s` · 텔레메트리(하트비트) `120s` · OTA 확인 `10분`. 서버 오프라인 판정은 `360s`(하트비트의 3배).
 
 ### 5.3 서명 키 (⚠ OTA 생명줄)
 릴리스 APK도 **안드로이드 디버그 키스토어**로 서명한다 — 이미 배포된 앱을 `pm install -r`로 갱신하려면 **서명 키가 반드시 같아야** 하기 때문(`app/build.gradle.kts`의 `signingConfigs.release`).
@@ -212,19 +213,34 @@ ssh display-4 "cd ~/ddadan-repo && docker compose up -d --build api admin"   # �
 
 ## 7. 진단 / 트러블슈팅
 
-- **서버 탐색 화면**: 서버 미도달 시 표시. **기기 진단 정보**(기기 ID, IP 주소[없으면 미연결 빨강], WiFi 상태/SSID, 게이트웨이, 스캔 대상 서브넷, 서버 주소, 앱 버전)를 함께 보여줌 → 원인 즉시 파악. (`PlayerScreen.DiscoveryOverlay` + `util/NetworkDiag.kt`)
-- **서버 다운 시 동작**: 앱은 안 꺼짐, 다운로드된 정보는 메모리 유지. 단 **자동탐색 모드에선 탐색 오버레이가 메뉴를 덮음**(수동지정 모드는 마지막 메뉴 유지). 서버 복구 시 재개.
-- **부팅 직후 재연결 지연**: 부팅 시 WiFi가 늦게 붙으면 첫 탐색 실패 후 최대 ~3분 대기 후 재탐색. (개선 여지: 실패 시 저장 주소를 짧은 간격으로 재시도.)
+- **서버 탐색 화면(전체)**: **보여줄 콘텐츠가 아직 없을 때만**(첫 부팅 등) 전체 화면으로 표시. **기기 진단 정보**(기기 ID, IP 주소[없으면 "없음 — 네트워크 미연결" 빨강], WiFi 상태/SSID, 게이트웨이, 스캔 대상 서브넷, 서버 주소, 앱 버전)를 함께 보여줌 → 원인 즉시 파악. (`PlayerScreen.DiscoveryOverlay` + `util/NetworkDiag.kt`)
+- **서버 다운 시 동작**: 앱은 안 꺼지고 **마지막 메뉴가 화면에 그대로 유지**된다. 덮지 않고 **좌상단에 작은 "서버 재연결 중" 배지**만 표시(`ReconnectingBadge`). 서버 복구 시 조용히 재개.
+  - 폴링 실패가 **연속 10회(`MAX_CONSECUTIVE_FAILURES`)** 쌓여야 LAN 전체 스캔으로 넘어간다(짧은 블립엔 스캔 안 함).
+  - 스캔에도 못 찾으면 **30초(`RETRY_DELAY_SEC`) 후 재탐색**(과거 3분에서 단축).
+- **부팅 시**: 네트워크가 붙을 때까지 대기(`awaitingNetwork`, "네트워크 연결 대기 중...")하고, **캐시된 보드를 먼저 표시**한 뒤 서버와 동기화한다.
+- **스크린샷**: 주기 촬영이 아니라 **온디맨드** — admin에서 `screenshot` 원격명령을 보내면 그때 캡처·업로드(서버는 기기당 최근 10장 유지).
 - **`adb install` "Success" 없이 조용히 실패**: 앱 실행 중 `pm install -r` 간섭. `am force-stop` 후 재설치.
 - **adb 기기 안 잡힘**: `adb kill-server && adb start-server`, 박스 "Connect to PC"/USB디버깅 확인.
 
 ---
 
-## 8. 이번 세션에서 만든 것 (요약 변경점)
+## 8. 구현 이력 (요약)
+
+**렌더링/메뉴**
 - `ScreenItem` 스키마 확장: `textEn`/`priceExtra`/`priceColor`/`badges[]`/`radius`, `textVariant`에 `groupHeader`·`note`.
 - 네이티브 렌더러(`ScreenItemView.kt`/`ScreenStage.kt`): 뱃지·영문병기·이중가격·그룹헤더·안내박스·라운드카드, **`parseColorOrNull` rgba 지원**, 크로스페이드 튕김 수정.
 - 시드 재작성: 색상 그룹 카드 + 천단위 표기 + `beverage_layout`/`bakery_layout`.
+- 브랜딩: 화면 표시 "DDADAN" → "브로트베르크".
+
+**운영/관제**
 - OTA 진행 오버레이(좌상단), 워치독 텔레메트리가 플레이어/워치독 버전 분리 보고.
 - admin `/devices`: 플레이어/워치독 버전 분리 + 마지막 온라인 + 상단 최신 APK + 전체 OTA 버튼.
-- 브랜딩: 화면 표시 "DDADAN" → "브로트베르크".
 - 부팅 자동실행(스톡 런처 비활성화).
+
+**연결 안정화 (이후 반영)**
+- 서버 끊겨도 **보드 유지 + 좌상단 재연결 배지**(전체 탐색 화면은 콘텐츠 없을 때만).
+- 폴링 **연속 10회 실패** 후에만 LAN 스캔, 재탐색 대기 **3분 → 30초**.
+- 부팅 시 **네트워크 대기 + 캐시 보드 우선 표시**.
+- 스크린샷 **주기 → 온디맨드**(`screenshot` 명령), 하트비트 `120s`/오프라인 판정 `360s`.
+
+> 원격에서 **메뉴를 API로 편집**하는 방법(LLM 에이전트용)은 별도 문서 **[agent-api-guide.md](agent-api-guide.md)** 참고.
