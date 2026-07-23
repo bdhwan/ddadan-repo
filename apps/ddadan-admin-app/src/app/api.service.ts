@@ -55,7 +55,7 @@ export interface DeviceView {
 
 export interface CommandView {
   id: number;
-  type: 'reboot' | 'screenOn' | 'screenOff' | 'updateApp' | 'shell';
+  type: 'reboot' | 'screenOn' | 'screenOff' | 'updateApp' | 'shell' | 'screenshot';
   payload: string | null;
   status: 'pending' | 'done' | 'failed';
   result: string | null;

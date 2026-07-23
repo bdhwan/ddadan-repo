@@ -7,7 +7,8 @@ export type CommandType =
   | 'screenOn'
   | 'screenOff'
   | 'updateApp'
-  | 'shell';
+  | 'shell'
+  | 'screenshot';
 
 export type CommandStatus = 'pending' | 'done' | 'failed';
 

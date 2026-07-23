@@ -7,6 +7,7 @@ const TYPES: CommandType[] = [
   'screenOff',
   'updateApp',
   'shell',
+  'screenshot',
 ];
 
 export class CreateCommandDto {

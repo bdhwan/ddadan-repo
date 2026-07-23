@@ -132,9 +132,12 @@ import { isMenuLine, textAlignStyle } from '../screen-utils';
       </div>
 
       <div class="panel">
-        <h2 class="shots-title">최근 스크린샷</h2>
+        <div class="shots-head">
+          <h2 class="shots-title">최근 스크린샷</h2>
+          <button (click)="send('screenshot')">지금 캡처 요청</button>
+        </div>
         @if (screenshots().length === 0) {
-          <p class="muted">아직 업로드된 스크린샷이 없습니다. (플레이어가 30초마다 현재 화면을 업로드합니다)</p>
+          <p class="muted">아직 업로드된 스크린샷이 없습니다. "지금 캡처 요청"을 누르면 박스가 현재 화면을 캡처해 올립니다.</p>
         } @else {
           <div class="shots">
             @for (s of screenshots(); track s.id) {
@@ -163,6 +166,9 @@ import { isMenuLine, textAlignStyle } from '../screen-utils';
       .cmd-history td.failed { color: #e0552f; }
       .cmd-history td.result { font-family: monospace; white-space: pre-wrap; word-break: break-all; max-width: 320px; }
       .shots-title { margin: 0 0 10px; font-size: 15px; }
+      .shots-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+      .shots-head .shots-title { margin: 0; }
+      .shots-head button { padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
       .shots {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
