@@ -119,7 +119,7 @@ class PlayerViewModel(
 
   /**
    * 로컬 네트워크를 스캔해 서버를 찾을 때까지 반복한다.
-   * 한 바퀴 다 돌아도 못 찾으면 3분 카운트다운 후 재시도. 찾으면 주소를 저장하고 반환.
+   * 한 바퀴 다 돌아도 못 찾으면 30초 카운트다운 후 재시도. 찾으면 주소를 저장하고 반환.
    */
   private suspend fun runDiscoveryUntilFound() {
     _uiState.update {
@@ -148,7 +148,7 @@ class PlayerViewModel(
           return
         }
 
-        // 못 찾음 → 3분 대기(카운트다운) 후 다시 스캔.
+        // 못 찾음 → 30초 대기(카운트다운) 후 다시 스캔.
         for (sec in RETRY_DELAY_SEC downTo 1) {
           if (!coroutineContext.isActive) return
           _uiState.update { it.copy(retryCountdownSec = sec, scanCurrentIp = null) }
@@ -299,6 +299,6 @@ class PlayerViewModel(
 
   companion object {
     /** 서버를 못 찾았을 때 다음 스캔까지 대기 시간(초). */
-    private const val RETRY_DELAY_SEC = 180
+    private const val RETRY_DELAY_SEC = 30
   }
 }
