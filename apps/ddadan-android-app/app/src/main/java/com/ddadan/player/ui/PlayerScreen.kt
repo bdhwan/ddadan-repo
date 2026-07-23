@@ -113,15 +113,25 @@ fun PlayerScreen(
     }
 
     if (state.discovering) {
-      DiscoveryOverlay(
-        scanCurrentIp = state.scanCurrentIp,
-        scanDone = state.scanDone,
-        scanTotal = state.scanTotal,
-        retryCountdownSec = state.retryCountdownSec,
-        hardwareId = state.hardwareId,
-        apiBase = state.apiBase,
-        modifier = Modifier.fillMaxSize(),
-      )
+      if (state.screen != null) {
+        // 이미 보여줄 콘텐츠가 있으면 화면을 덮지 않는다. 서버가 잠깐 끊긴 것뿐일 수
+        // 있으니 마지막 메뉴를 계속 띄운 채, 좌상단에 작게 재연결 상태만 표시한다.
+        ReconnectingBadge(
+          retryCountdownSec = state.retryCountdownSec,
+          modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
+        )
+      } else {
+        // 보여줄 콘텐츠가 없으면(첫 부팅 등) 기존 전체 탐색 화면.
+        DiscoveryOverlay(
+          scanCurrentIp = state.scanCurrentIp,
+          scanDone = state.scanDone,
+          scanTotal = state.scanTotal,
+          retryCountdownSec = state.retryCountdownSec,
+          hardwareId = state.hardwareId,
+          apiBase = state.apiBase,
+          modifier = Modifier.fillMaxSize(),
+        )
+      }
     }
 
     DeviceIdOverlay(
@@ -167,6 +177,32 @@ fun PlayerScreen(
         modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
       )
     }
+  }
+}
+
+/**
+ * 콘텐츠가 이미 떠 있는 상태에서 서버 연결이 잠깐 끊겼을 때, 화면을 덮지 않고
+ * 좌상단에 작게 재연결 상태만 보여준다. 마지막 메뉴는 그대로 유지된다.
+ */
+@Composable
+private fun ReconnectingBadge(retryCountdownSec: Int, modifier: Modifier = Modifier) {
+  val label =
+    if (retryCountdownSec > 0) "서버 재연결 중 · ${retryCountdownSec}초 후 재시도"
+    else "서버 재연결 중…"
+  Row(
+    modifier =
+      modifier
+        .clip(RoundedCornerShape(8.dp))
+        .background(Color(0xE6141A24))
+        .padding(horizontal = 12.dp, vertical = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(
+      text = label,
+      color = Color(0xFFFFC107),
+      fontSize = 14.sp,
+      fontWeight = FontWeight.SemiBold,
+    )
   }
 }
 
