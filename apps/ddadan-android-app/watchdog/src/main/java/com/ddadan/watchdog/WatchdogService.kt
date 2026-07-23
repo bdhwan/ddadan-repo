@@ -55,7 +55,6 @@ class WatchdogService : Service() {
       loopsStarted = true
       scope.launch { watchdogLoop() }
       scope.launch { telemetryLoop() }
-      scope.launch { captureLoop() }
       scope.launch { commandLoop() }
       scope.launch { otaLoop() }
     }
@@ -64,6 +63,7 @@ class WatchdogService : Service() {
 
   // ── 원격 명령 폴링/실행 ───────────────────────────────────────────
   private suspend fun commandLoop() {
+    awaitNetwork()
     while (scope.isActive) {
       delay(COMMAND_INTERVAL_MS)
       val hwid = config.hardwareId()
@@ -90,6 +90,7 @@ class WatchdogService : Service() {
         "reboot" -> ok(RootShell.run("reboot"))
         "screenOff" -> ok(RootShell.run("input keyevent 223")) // KEYCODE_SLEEP
         "screenOn" -> ok(RootShell.run("input keyevent 224")) // KEYCODE_WAKEUP
+        "screenshot" -> captureAndUpload()
         "shell" -> {
           val out = RootShell.capture(cmd.payload.orEmpty())
           if (out != null) "done" to out.take(4000) else "failed" to null
@@ -115,6 +116,7 @@ class WatchdogService : Service() {
 
   // ── 주기적 OTA(플레이어 + 워치독 둘 다) ────────────────────────────
   private suspend fun otaLoop() {
+    awaitNetwork()
     while (scope.isActive) {
       delay(OTA_INTERVAL_MS)
       try {
@@ -160,8 +162,26 @@ class WatchdogService : Service() {
     }
   }
 
+  /** 네트워크(IPv4 할당)가 준비될 때까지 대기. 부팅 직후 Wi-Fi 전 헛된 서버 접속을 막는다. */
+  private suspend fun awaitNetwork() {
+    while (scope.isActive && !hasIpv4()) delay(1000)
+  }
+
+  private fun hasIpv4(): Boolean =
+    try {
+      java.net.NetworkInterface.getNetworkInterfaces().toList().any { nif ->
+        nif.isUp && !nif.isLoopback &&
+          nif.inetAddresses.toList().any {
+            it is java.net.Inet4Address && !it.isLoopbackAddress
+          }
+      }
+    } catch (e: Exception) {
+      false
+    }
+
   // ── 텔레메트리(heartbeat 겸용) ─────────────────────────────────────
   private suspend fun telemetryLoop() {
+    awaitNetwork()
     while (scope.isActive) {
       val hwid = config.hardwareId()
       val ok =
@@ -177,17 +197,16 @@ class WatchdogService : Service() {
     }
   }
 
-  // ── 화면 캡처 업로드 ───────────────────────────────────────────────
-  private suspend fun captureLoop() {
-    while (scope.isActive) {
-      delay(CAPTURE_INTERVAL_MS)
-      val hwid = config.hardwareId()
-      val jpeg = withContext(Dispatchers.IO) { ScreenCapture.captureJpeg() } ?: continue
-      try {
-        repository.uploadScreenshot(hwid, jpeg)
-      } catch (e: Exception) {
-        Log.w(TAG, "screenshot upload failed: ${e.message}")
-      }
+  // ── 화면 캡처 업로드 (주기 업로드 제거 — 어드민 원격 요청 시에만) ──────
+  private suspend fun captureAndUpload(): Pair<String, String?> {
+    val jpeg =
+      withContext(Dispatchers.IO) { ScreenCapture.captureJpeg() }
+        ?: return "failed" to "capture returned null"
+    return try {
+      repository.uploadScreenshot(config.hardwareId(), jpeg)
+      "done" to null
+    } catch (e: Exception) {
+      "failed" to (e.message ?: "upload error")
     }
   }
 
@@ -245,8 +264,9 @@ class WatchdogService : Service() {
     private const val PLAYER_PACKAGE = "com.ddadan.player"
     private const val NOTIFICATION_ID = 1
     private const val WATCHDOG_INTERVAL_MS = 2_000L
-    private const val TELEMETRY_INTERVAL_MS = 20_000L
-    private const val CAPTURE_INTERVAL_MS = 30_000L
+    // 하트비트(텔레메트리) 주기. 서버 HEARTBEAT_OFFLINE_AFTER_SECONDS(360s)의 1/3 —
+    // 3번 연속 놓쳐야 오프라인 판정. 매장에서 순단에 오프라인으로 깜빡이지 않게.
+    private const val TELEMETRY_INTERVAL_MS = 120_000L
     private const val COMMAND_INTERVAL_MS = 10_000L
     private const val OTA_INTERVAL_MS = 10 * 60_000L
 

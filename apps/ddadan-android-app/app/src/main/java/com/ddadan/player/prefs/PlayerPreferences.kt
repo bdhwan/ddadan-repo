@@ -9,7 +9,10 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.ddadan.core.DeviceIdentity
 import com.ddadan.player.BuildConfig
+import com.ddadan.player.util.gatherNetDiag
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.playerDataStore: DataStore<Preferences> by preferencesDataStore(name = "ddadan_player")
@@ -33,6 +36,7 @@ class PlayerPreferences(private val context: Context) {
   private val slotKey = intPreferencesKey("slot")
   private val apiBaseKey = stringPreferencesKey("api_base_override")
   private val discoveredApiBaseKey = stringPreferencesKey("discovered_api_base")
+  private val lastScreenKey = stringPreferencesKey("last_screen_json")
 
   // 박스별 고유 기본 deviceId(= 워치독과 동일 로직). 최초 1회 su 호출이라 캐시.
   private val defaultDeviceId: String by lazy { DeviceIdentity.hardwareId(context) }
@@ -72,6 +76,24 @@ class PlayerPreferences(private val context: Context) {
       } else {
         it[discoveredApiBaseKey] = value.trim()
       }
+    }
+  }
+
+  /** 마지막으로 정상 수신한 화면(JSON). 부팅 시 네트워크 붙기 전에 먼저 띄운다. */
+  suspend fun setLastScreen(json: String) {
+    context.playerDataStore.edit { it[lastScreenKey] = json }
+  }
+
+  suspend fun getLastScreen(): String? =
+    context.playerDataStore.data.first()[lastScreenKey]?.takeIf { it.isNotBlank() }
+
+  /**
+   * 네트워크(IP 할당)가 준비될 때까지 대기한다. 부팅 직후 Wi-Fi가 붙기 전에 서버 접속을
+   * 시도하면 무조건 실패하므로, IP를 받을 때까지 기다린 뒤 폴링/탐색을 시작하게 한다.
+   */
+  suspend fun awaitNetworkReady() {
+    while (gatherNetDiag(context).ips.isEmpty()) {
+      delay(1000)
     }
   }
 

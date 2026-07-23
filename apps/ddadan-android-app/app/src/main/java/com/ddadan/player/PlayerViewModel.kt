@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import kotlin.coroutines.coroutineContext
 
 data class PlayerUiState(
@@ -44,6 +45,8 @@ data class PlayerUiState(
   val retryCountdownSec: Int = 0,
   // 콘텐츠는 있는데 서버 폴링이 연속 실패 중(탐색 진입 전 유예 구간). 화면 유지 + 배지.
   val reconnecting: Boolean = false,
+  // 부팅 직후 네트워크(Wi-Fi/IP) 연결을 기다리는 중.
+  val awaitingNetwork: Boolean = false,
 )
 
 class PlayerViewModel(
@@ -58,6 +61,9 @@ class PlayerViewModel(
   private var pollJob: Job? = null
   private var rotationJob: Job? = null
   private var lastRotationKey = ""
+  private var lastCachedJson = ""
+
+  private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
 
   /** 사용자가 수동으로 API 주소를 지정한 상태인지. true면 자동 탐색을 하지 않는다. */
   private var overridePresent = false
@@ -65,6 +71,13 @@ class PlayerViewModel(
   fun start() {
     if (pollJob?.isActive == true) return
     viewModelScope.launch {
+      // 1) 캐시된 마지막 화면을 먼저 띄운다 — 네트워크가 붙기 전에도 곧바로 콘텐츠가 보인다.
+      restoreCachedScreen()
+      // 2) 네트워크(IP 할당)까지 대기. 부팅 직후 Wi-Fi 전에 서버 접속하면 무조건 실패하므로.
+      _uiState.update { it.copy(awaitingNetwork = true) }
+      preferences.awaitNetworkReady()
+      _uiState.update { it.copy(awaitingNetwork = false) }
+      // 3) 설정을 구독하며 폴링 시작.
       preferences.config.collect { config ->
         overridePresent = config.apiBaseOverride != null
         _uiState.update {
@@ -76,6 +89,40 @@ class PlayerViewModel(
         }
         restartPolling()
       }
+    }
+  }
+
+  /**
+   * 방금 받은 화면을 캐시에 저장한다(다음 부팅 때 먼저 보여줄 용도).
+   * 내용이 바뀌었을 때만 기록해 5초 폴링마다 플래시에 쓰지 않는다.
+   */
+  private fun cacheScreen(res: ScreenResponse) {
+    val enc =
+      try {
+        json.encodeToString(ScreenResponse.serializer(), res)
+      } catch (e: Exception) {
+        return
+      }
+    if (enc == lastCachedJson) return
+    lastCachedJson = enc
+    viewModelScope.launch {
+      try {
+        preferences.setLastScreen(enc)
+      } catch (e: Exception) {
+        android.util.Log.w("PlayerViewModel", "cache write failed: ${e.message}")
+      }
+    }
+  }
+
+  /** 저장된 마지막 화면(JSON)이 있으면 복원해 즉시 표시한다. */
+  private suspend fun restoreCachedScreen() {
+    val cached = preferences.getLastScreen() ?: return
+    try {
+      val screen = json.decodeFromString(ScreenResponse.serializer(), cached)
+      lastCachedJson = cached
+      applyResponse(screen)
+    } catch (e: Exception) {
+      android.util.Log.w("PlayerViewModel", "cached screen restore failed: ${e.message}")
     }
   }
 
@@ -189,6 +236,7 @@ class PlayerViewModel(
 
   private fun applyResponse(res: ScreenResponse) {
     _uiState.update { it.copy(screen = res, isLoading = false) }
+    cacheScreen(res)
     val slides = res.rotation?.slides
     if (res.mode == "rotation" && slides != null && slides.size >= 2) {
       val key =

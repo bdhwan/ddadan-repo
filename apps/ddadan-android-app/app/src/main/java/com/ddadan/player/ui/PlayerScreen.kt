@@ -102,6 +102,14 @@ fun PlayerScreen(
           modifier = Modifier.fillMaxSize(),
         )
       }
+      state.awaitingNetwork -> {
+        Text(
+          text = "네트워크 연결 대기 중...",
+          color = Color.White.copy(alpha = 0.7f),
+          fontSize = 24.sp,
+          modifier = Modifier.align(Alignment.Center),
+        )
+      }
       state.isLoading -> {
         Text(
           text = "브로트베르크 연결 중...",
