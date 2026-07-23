@@ -42,6 +42,8 @@ data class PlayerUiState(
   val scanDone: Int = 0,
   val scanTotal: Int = 0,
   val retryCountdownSec: Int = 0,
+  // 콘텐츠는 있는데 서버 폴링이 연속 실패 중(탐색 진입 전 유예 구간). 화면 유지 + 배지.
+  val reconnecting: Boolean = false,
 )
 
 class PlayerViewModel(
@@ -87,14 +89,39 @@ class PlayerViewModel(
     pollJob?.cancel()
     pollJob =
       viewModelScope.launch {
+        // 서버가 잠깐 끊긴 것(api 재시작·순단)만으로 곧장 전체 탐색에 들어가면, 잘 나오던
+        // 메뉴가 성급하게 탐색 화면으로 바뀐다. 연속 실패가 임계값을 넘을 때만 탐색한다.
+        var consecutiveFailures = 0
         while (isActive) {
           val ok = fetchOnce()
-          if (ok || overridePresent) {
-            // 정상 응답이거나 수동 지정 모드면 평소대로 폴링만 반복.
-            delay(BuildConfig.POLL_INTERVAL_MS)
-          } else {
-            // 자동 모드에서 응답이 없으면 서버를 찾을 때까지 탐색한 뒤 폴링 재개.
-            runDiscoveryUntilFound()
+          when {
+            ok -> {
+              // 정상 응답 — 실패 카운터/재연결 배지 해제.
+              if (consecutiveFailures != 0) {
+                consecutiveFailures = 0
+                _uiState.update { it.copy(reconnecting = false) }
+              }
+              delay(BuildConfig.POLL_INTERVAL_MS)
+            }
+            overridePresent -> {
+              // 수동 지정 모드: 탐색하지 않고 같은 주소로 계속 재시도.
+              delay(BuildConfig.POLL_INTERVAL_MS)
+            }
+            else -> {
+              consecutiveFailures++
+              // 이미 보여줄 콘텐츠가 있으면 화면은 그대로 두고, 좌상단에 재연결 배지만 띄운다.
+              if (_uiState.value.screen != null) {
+                _uiState.update { it.copy(reconnecting = true) }
+              }
+              if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                // 충분히 오래(≈MAX×폴링간격) 못 붙었으면 서버를 다시 탐색.
+                _uiState.update { it.copy(reconnecting = false) }
+                runDiscoveryUntilFound()
+                consecutiveFailures = 0
+              } else {
+                delay(BuildConfig.POLL_INTERVAL_MS)
+              }
+            }
           }
         }
       }
@@ -300,5 +327,11 @@ class PlayerViewModel(
   companion object {
     /** 서버를 못 찾았을 때 다음 스캔까지 대기 시간(초). */
     private const val RETRY_DELAY_SEC = 30
+
+    /**
+     * 자동 모드에서 폴링이 이만큼 연속 실패해야 전체 탐색에 들어간다.
+     * 폴링 간격 5초 × 10 ≈ 50초 — 짧은 서버 순단/재시작은 화면을 안 건드리고 넘어간다.
+     */
+    private const val MAX_CONSECUTIVE_FAILURES = 10
   }
 }

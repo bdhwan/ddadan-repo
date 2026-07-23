@@ -112,16 +112,9 @@ fun PlayerScreen(
       }
     }
 
-    if (state.discovering) {
-      if (state.screen != null) {
-        // 이미 보여줄 콘텐츠가 있으면 화면을 덮지 않는다. 서버가 잠깐 끊긴 것뿐일 수
-        // 있으니 마지막 메뉴를 계속 띄운 채, 좌상단에 작게 재연결 상태만 표시한다.
-        ReconnectingBadge(
-          retryCountdownSec = state.retryCountdownSec,
-          modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
-        )
-      } else {
-        // 보여줄 콘텐츠가 없으면(첫 부팅 등) 기존 전체 탐색 화면.
+    when {
+      // 보여줄 콘텐츠가 없이 탐색 중이면(첫 부팅 등) 기존 전체 탐색 화면.
+      state.discovering && state.screen == null -> {
         DiscoveryOverlay(
           scanCurrentIp = state.scanCurrentIp,
           scanDone = state.scanDone,
@@ -130,6 +123,14 @@ fun PlayerScreen(
           hardwareId = state.hardwareId,
           apiBase = state.apiBase,
           modifier = Modifier.fillMaxSize(),
+        )
+      }
+      // 콘텐츠가 있는데 재연결 유예 중이거나 탐색 중이면, 화면은 그대로 두고
+      // 좌상단에 작게 재연결 상태만 표시한다.
+      (state.reconnecting || state.discovering) && state.screen != null -> {
+        ReconnectingBadge(
+          retryCountdownSec = state.retryCountdownSec,
+          modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
         )
       }
     }
