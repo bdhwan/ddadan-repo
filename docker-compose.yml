@@ -13,7 +13,7 @@ services:
       DB_LOGGING: "false"
       ASSETS_DIR: /app/storage/assets
       ASSETS_PUBLIC_PATH: /static/assets
-      HEARTBEAT_OFFLINE_AFTER_SECONDS: "60"
+      HEARTBEAT_OFFLINE_AFTER_SECONDS: "360"
     volumes:
       - api-data:/app/data
       - api-assets:/app/storage/assets
