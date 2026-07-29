@@ -73,6 +73,13 @@ import { ApiService, ApkInfo, DeviceView, MonitorView, ScreenView } from '../api
                 <span [class.online]="d.status === 'online'" [class.offline]="d.status !== 'online'">
                   {{ d.status }}
                 </span>
+                <!-- 디스크가 임계에 가까울 때만 노출(평소엔 표시 안 함). 워치독이 85%에서
+                     자동 정리하지만, 정리로도 안 내려가는 상황을 사람이 알 수 있게. -->
+                @if (d.diskUsedPercent != null && d.diskUsedPercent >= 80) {
+                  <span class="disk-warn" [title]="'디스크 사용률 ' + d.diskUsedPercent + '%'">
+                    디스크 {{ d.diskUsedPercent }}%
+                  </span>
+                }
               </td>
               <td class="ver-cell">
                 <div><span class="vc-label">플레이어</span><code>{{ d.appVersion ?? '—' }}</code></div>
@@ -156,6 +163,18 @@ import { ApiService, ApkInfo, DeviceView, MonitorView, ScreenView } from '../api
       }
       .offline {
         color: var(--muted);
+      }
+      .disk-warn {
+        display: inline-block;
+        margin-left: 6px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: #fff4f2;
+        border: 1px solid #f3a29b;
+        color: #b42318;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
       }
       .assign-col {
         vertical-align: top;

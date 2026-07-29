@@ -41,6 +41,7 @@ class WatchdogService : Service() {
   private lateinit var updater: AppUpdater
   private val discovering = AtomicBoolean(false)
   private var loopsStarted = false
+  private var lastDiskCleanupAt = 0L
 
   override fun onCreate() {
     super.onCreate()
@@ -184,17 +185,45 @@ class WatchdogService : Service() {
     awaitNetwork()
     while (scope.isActive) {
       val hwid = config.hardwareId()
+      val telemetry = Telemetry.gather(applicationContext)
       val ok =
         try {
-          repository.postTelemetry(hwid, Telemetry.gather(applicationContext))
+          repository.postTelemetry(hwid, telemetry)
           true
         } catch (e: Exception) {
           Log.w(TAG, "telemetry failed: ${e.message}")
           false
         }
       if (!ok) discover()
+      // 매장에 두고 오면 디스크가 차도 사람이 손댈 수 없다. 임계 초과면 스스로 비운다.
+      telemetry.diskUsedPercent?.let { maybeFreeDisk(it) }
       delay(TELEMETRY_INTERVAL_MS)
     }
+  }
+
+  /**
+   * 디스크가 [DISK_CLEANUP_PERCENT] 를 넘으면 캐시를 비운다. 가장 흔한 원인은 플레이어의
+   * 이미지 캐시(보드 이미지를 계속 받아 쌓임)와 OTA 잔여 APK.
+   *
+   * 지우는 대상은 모두 재생성 가능한 것뿐이다 — 캐시/임시 APK. 설정(DataStore)이나 앱
+   * 데이터는 건드리지 않으므로 등록정보·서버주소·마지막 화면 캐시는 유지된다.
+   * 한 번 돌린 뒤에는 [DISK_CLEANUP_COOLDOWN_MS] 동안 다시 시도하지 않는다(무한 반복 방지).
+   */
+  private fun maybeFreeDisk(usedPercent: Double) {
+    if (usedPercent < DISK_CLEANUP_PERCENT) return
+    val now = System.currentTimeMillis()
+    if (now - lastDiskCleanupAt < DISK_CLEANUP_COOLDOWN_MS) return
+    lastDiskCleanupAt = now
+    Log.w(TAG, "disk ${usedPercent}% >= $DISK_CLEANUP_PERCENT% — 캐시 정리 실행")
+    RootShell.run(
+      // 1) 전체 앱 캐시 회수(pm trim-caches), 2) OTA 스테이징 잔여, 3) 우리 앱 캐시 디렉터리.
+      "pm trim-caches 999G; " +
+        "rm -f /data/local/tmp/ddadan-*.apk; " +
+        "rm -rf /data/data/$PLAYER_PACKAGE/cache/* /data/data/$PLAYER_PACKAGE/code_cache/*; " +
+        "rm -rf /data/data/$packageName/cache/* /data/data/$packageName/code_cache/*",
+    )
+    val after = Telemetry.gather(applicationContext).diskUsedPercent
+    Log.i(TAG, "캐시 정리 후 디스크: ${after}%")
   }
 
   // ── 화면 캡처 업로드 (주기 업로드 제거 — 어드민 원격 요청 시에만) ──────
@@ -269,6 +298,10 @@ class WatchdogService : Service() {
     private const val TELEMETRY_INTERVAL_MS = 120_000L
     private const val COMMAND_INTERVAL_MS = 10_000L
     private const val OTA_INTERVAL_MS = 10 * 60_000L
+    /** 이 사용률(%) 이상이면 워치독이 스스로 캐시를 비운다. */
+    private const val DISK_CLEANUP_PERCENT = 85.0
+    /** 정리 후 재시도 최소 간격 — 못 비우는 상황에서 매 사이클 반복하지 않도록. */
+    private const val DISK_CLEANUP_COOLDOWN_MS = 6 * 60 * 60_000L
 
     fun start(context: Context) {
       val intent = Intent(context, WatchdogService::class.java)

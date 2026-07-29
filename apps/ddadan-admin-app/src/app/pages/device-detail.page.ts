@@ -31,7 +31,9 @@ import { isMenuLine, textAlignStyle } from '../screen-utils';
           @if (d.appVersion) { <span class="tchip">v{{ d.appVersion }}</span> }
           @if (d.cpuPercent != null) { <span class="tchip">CPU {{ d.cpuPercent }}%</span> }
           @if (d.ramUsedMb != null) { <span class="tchip">RAM {{ d.ramUsedMb }}/{{ d.ramTotalMb }}MB</span> }
-          @if (d.diskUsedPercent != null) { <span class="tchip">디스크 {{ d.diskUsedPercent }}%</span> }
+          @if (d.diskUsedPercent != null) {
+            <span class="tchip" [class.warn]="d.diskUsedPercent >= 80">디스크 {{ d.diskUsedPercent }}%</span>
+          }
         </div>
 
         <div class="cmd-row">
@@ -157,6 +159,8 @@ import { isMenuLine, textAlignStyle } from '../screen-utils';
       .tbadge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: #6b7280; color: #fff; }
       .tbadge.on { background: #22a06b; }
       .tchip { font-size: 12px; color: var(--muted, #8a93a6); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; }
+      /* 디스크 임계(80%) 초과 — 워치독은 85%에서 자동 정리하지만 눈으로도 보이게. */
+      .tchip.warn { color: #b42318; border-color: #f3a29b; background: #fff4f2; font-weight: 700; }
       .cmd-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
       .cmd-row button { padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
       .cmd-row .shell { flex: 1 1 200px; min-width: 160px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; }

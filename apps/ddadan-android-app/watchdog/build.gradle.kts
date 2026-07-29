@@ -9,8 +9,8 @@ android {
     applicationId = "com.ddadan.watchdog"
     minSdk = 22
     targetSdk = 36
-    versionCode = 8
-    versionName = "8.0"
+    versionCode = 9
+    versionName = "9.0"
   }
 
   signingConfigs {
