@@ -11,6 +11,12 @@ coverage/
 # Firebase service account credentials
 **/firebase/service-account.json
 
+# Google OAuth client secrets (rclone/Drive backup 등). 값은 설정에만 넣고
+# 파일 자체는 절대 커밋하지 않는다.
+client_secret_*.json
+client_secret_*.apps.googleusercontent.com*
+**/client_secret_*.json
+
 # Local asset uploads (user content)
 apps/ddadan-api-server/storage/assets/*
 !apps/ddadan-api-server/storage/assets/.gitkeep
