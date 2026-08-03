@@ -97,14 +97,20 @@ class WatchdogService : Service() {
           if (out != null) "done" to out.take(4000) else "failed" to null
         }
         "updateApp" -> {
+          // 다운로드+설치는 수십 초가 걸린다. commandLoop 은 executeCommand 를 동기로
+          // 기다리므로 여기서 붙잡고 있으면 뒤따르는 screenshot/shell/reboot 이 전부
+          // pending 에 갇힌다(실제로 박스 2대가 이 상태로 멈췄다). 별도 코루틴에 맡기고
+          // 명령은 즉시 ack 한다 — 진행 상황은 OTA 진행 오버레이와 버전 보고로 확인된다.
           val target = cmd.payload?.takeIf { it.isNotBlank() }
-          if (target != null) {
-            updater.updateApp(target)
-          } else {
-            updater.updateApp(PLAYER_PACKAGE)
-            updater.updateApp(packageName)
+          scope.launch {
+            if (target != null) {
+              updater.updateApp(target)
+            } else {
+              updater.updateApp(PLAYER_PACKAGE)
+              updater.updateApp(packageName)
+            }
           }
-          "done" to null
+          "done" to "queued"
         }
         else -> "failed" to "unknown type ${cmd.type}"
       }

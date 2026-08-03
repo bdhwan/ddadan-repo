@@ -18,8 +18,8 @@ android {
     applicationId = "com.ddadan.player"
     minSdk = 22
     targetSdk = 36
-    versionCode = 24
-    versionName = "1.8"
+    versionCode = 25
+    versionName = "1.9"
     buildConfigField("String", "API_BASE", "\"$ddadanApiBase\"")
     buildConfigField("long", "POLL_INTERVAL_MS", "5000L")
   }

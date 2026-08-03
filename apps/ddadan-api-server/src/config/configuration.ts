@@ -17,6 +17,10 @@ export interface AppConfig {
   heartbeat: {
     offlineAfterSeconds: number;
   };
+  commands: {
+    /** 박스가 가져간 뒤 이 시간 안에 ack 이 없으면 실패 처리(원격 제어가 영구히 막히는 것 방지). */
+    timeoutSeconds: number;
+  };
 }
 
 const toBool = (v: string | undefined, fallback: boolean) =>
@@ -53,6 +57,9 @@ export const loadConfig = (): AppConfig => {
     },
     heartbeat: {
       offlineAfterSeconds: toInt(process.env.HEARTBEAT_OFFLINE_AFTER_SECONDS, 60),
+    },
+    commands: {
+      timeoutSeconds: toInt(process.env.COMMAND_TIMEOUT_SECONDS, 600),
     },
   };
 };

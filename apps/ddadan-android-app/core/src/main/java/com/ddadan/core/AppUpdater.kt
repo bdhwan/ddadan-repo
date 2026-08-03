@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -29,8 +31,34 @@ class AppUpdater(
       .readTimeout(60, TimeUnit.SECONDS)
       .build()
 
-  /** applicationId 대상 앱을 최신 버전이면 갱신. */
+  /** OTA 동시 실행 방지 — otaLoop 과 commandLoop 이 겹쳐 같은 파일을 받는 것을 막는다. */
+  private val updateMutex = Mutex()
+
+  /**
+   * applicationId 대상 앱을 최신 버전이면 갱신.
+   *
+   * 호출 경로가 둘이다 — otaLoop(10분 주기)과 commandLoop(admin 의 updateApp 명령). 예전에는
+   * 서로를 몰라서 동시에 같은 APK 를 **같은 캐시 파일**에 내려받았다. 진행률이 68% 까지
+   * 갔다가 3% 로 되돌아가는 현상이 그것이고(다른 다운로드가 0 부터 덮어씀), 반쯤 겹쳐 쓴
+   * APK 는 설치에 실패한다. commandLoop 은 executeCommand 를 동기로 기다리므로 그 명령이
+   * 끝나지 않으면 뒤따르는 screenshot/shell 까지 전부 pending 에 갇힌다.
+   *
+   * 뮤텍스로 한 번에 하나만 돌게 하고, 이미 진행 중이면 조용히 건너뛴다(기다렸다 또 받으면
+   * 같은 문제가 반복된다).
+   */
   suspend fun updateApp(applicationId: String) {
+    if (!updateMutex.tryLock()) {
+      Log.i(TAG, "update already in progress; skip $applicationId")
+      return
+    }
+    try {
+      updateAppLocked(applicationId)
+    } finally {
+      updateMutex.unlock()
+    }
+  }
+
+  private suspend fun updateAppLocked(applicationId: String) {
     val latest =
       try {
         repository.getLatestApk(applicationId)
