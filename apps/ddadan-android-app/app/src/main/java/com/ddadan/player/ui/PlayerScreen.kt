@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import com.ddadan.player.util.gatherNetDiag
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
@@ -143,6 +144,10 @@ fun PlayerScreen(
       }
     }
 
+    // 우측 하단에 워치독/플레이어 버전을 반투명으로 작게. 화면만 보고도 OTA 가 실제로
+    // 적용됐는지 알 수 있다(어드민을 열지 않아도 됨).
+    VersionBadge(modifier = Modifier.align(Alignment.BottomEnd).padding(10.dp))
+
     DeviceIdOverlay(
       visible = needsRegister,
       hardwareId = state.hardwareId,
@@ -187,6 +192,33 @@ fun PlayerScreen(
       )
     }
   }
+}
+
+/**
+ * 우측 하단 버전 배지 — "v9.0/v1.8" (워치독/플레이어).
+ *
+ * 워치독 버전은 설치된 패키지에서 직접 읽는다. 플레이어만 OTA 되고 워치독은 안 된(또는 그
+ * 반대) 상태가 화면에서 바로 드러나므로, 매장에 두고 온 박스의 배포 상태를 눈으로 확인할
+ * 수 있다. 워치독이 없으면 "-" 로 표시.
+ */
+@Composable
+private fun VersionBadge(modifier: Modifier = Modifier) {
+  val context = LocalContext.current
+  val label = remember {
+    val watchdog =
+      try {
+        context.packageManager.getPackageInfo("com.ddadan.watchdog", 0).versionName ?: "?"
+      } catch (e: Exception) {
+        "-"
+      }
+    "v$watchdog/v${BuildConfig.VERSION_NAME}"
+  }
+  Text(
+    text = label,
+    color = Color.Black.copy(alpha = 0.28f),
+    fontSize = 11.sp,
+    modifier = modifier,
+  )
 }
 
 /**

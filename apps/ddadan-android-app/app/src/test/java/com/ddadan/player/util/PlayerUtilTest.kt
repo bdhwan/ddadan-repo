@@ -3,6 +3,7 @@ package com.ddadan.player.util
 import com.ddadan.player.data.ScreenItem
 import com.ddadan.player.data.SlidePayload
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class FontSizeTest {
@@ -96,44 +97,69 @@ class UrlResolverTest {
 }
 
 class RotationKeyTest {
-  @Test
-  fun buildRotationKey_changesWhenSlideContentChanges() {
-    val slidesA =
-      listOf(
-        SlidePayload(
-          width = 1920,
-          height = 1080,
-          items =
-            listOf(
-              ScreenItem(id = "a", kind = "text", x = 0.0, y = 0.0, width = 10.0, height = 10.0),
-            ),
-        ),
-        SlidePayload(
-          width = 1920,
-          height = 1080,
-          items =
-            listOf(
-              ScreenItem(id = "b", kind = "text", x = 0.0, y = 0.0, width = 10.0, height = 10.0),
-            ),
-        ),
-      )
-    val slidesB =
-      slidesA.mapIndexed { index, slide ->
-        if (index == 0) {
-          slide.copy(
-            items =
-              listOf(
-                ScreenItem(id = "c", kind = "text", x = 0.0, y = 0.0, width = 10.0, height = 10.0),
-              ),
-          )
-        } else {
-          slide
-        }
-      }
+  private fun item(id: String, text: String? = null, price: String? = null) =
+    ScreenItem(
+      id = id, kind = "text", text = text, textSecondary = price,
+      x = 0.0, y = 0.0, width = 10.0, height = 10.0,
+    )
 
-    val keyA = buildRotationKey(slidesA, 10000, 800)
-    val keyB = buildRotationKey(slidesB, 10000, 800)
-    assertEquals("2|10000|800|a||b", keyA)
-    assertEquals("2|10000|800|c||b", keyB)
+  private fun slides(vararg its: ScreenItem) =
+    its.map { SlidePayload(width = 1920, height = 1080, items = listOf(it)) }
+
+  @Test
+  fun changesWhenItemIdChanges() {
+    val a = slides(item("a"), item("b"))
+    val b = slides(item("c"), item("b"))
+    assertNotEquals(buildRotationKey(a, 10000, 800), buildRotationKey(b, 10000, 800))
+  }
+
+  /**
+   * 실제로 겪은 버그: 메뉴 가격만 고치면 id 는 그대로라 키가 같았고, 플레이어가 옛 화면을
+   * 계속 렌더해 재시작해야만 반영됐다. 이 케이스가 가장 흔한 편집이다.
+   */
+  @Test
+  fun changesWhenOnlyPriceChanges() {
+    val before = slides(item("row1", "딸기쉐이크", "7,000"))
+    val after = slides(item("row1", "딸기쉐이크", "6,000"))
+    assertNotEquals(
+      buildRotationKey(before, 10000, 800),
+      buildRotationKey(after, 10000, 800),
+    )
+  }
+
+  @Test
+  fun changesWhenOnlyTextChanges() {
+    val before = slides(item("row1", "생과일주스"))
+    val after = slides(item("row1", "생과일 주스"))
+    assertNotEquals(
+      buildRotationKey(before, 10000, 800),
+      buildRotationKey(after, 10000, 800),
+    )
+  }
+
+  /** 보조가(EXTRA SIZE의 "+1.0") 제거처럼 필드 하나가 비워지는 편집도 감지돼야 한다. */
+  @Test
+  fun changesWhenPriceExtraCleared() {
+    val before = slides(item("row1", "아메리카노", "3.0").copy(priceExtra = "+1.0"))
+    val after = slides(item("row1", "아메리카노", "3.0").copy(priceExtra = ""))
+    assertNotEquals(
+      buildRotationKey(before, 10000, 800),
+      buildRotationKey(after, 10000, 800),
+    )
+  }
+
+  @Test
+  fun changesWhenIntervalOrFadeChanges() {
+    val s = slides(item("a"), item("b"))
+    assertNotEquals(buildRotationKey(s, 10000, 800), buildRotationKey(s, 18000, 800))
+    assertNotEquals(buildRotationKey(s, 10000, 800), buildRotationKey(s, 10000, 900))
+  }
+
+  /** 내용이 같으면 키도 같아야 한다 — 매 폴링(5초)마다 로테이션이 리셋되면 안 된다. */
+  @Test
+  fun stableWhenNothingChanged() {
+    val a = slides(item("row1", "아메리카노", "3.0"), item("row2", "카페라떼", "4.0"))
+    val b = slides(item("row1", "아메리카노", "3.0"), item("row2", "카페라떼", "4.0"))
+    assertEquals(buildRotationKey(a, 10000, 800), buildRotationKey(b, 10000, 800))
   }
 }
