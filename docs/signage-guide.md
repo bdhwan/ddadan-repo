@@ -198,13 +198,55 @@ curl -s -X POST "$API/devices/{DEVICE_ID}/commands" -H "Content-Type: applicatio
 
 ## 6. 서버/Admin 배포
 
-display-4에서 docker compose로 구동. 소스 변경 후:
+display-4에서 docker compose로 구동. **빌드는 개발 머신에서 하고 Pi 는 받아 쓰기만 한다.**
+
+> ⚠ `docker compose up --build` 를 Pi 에서 돌리지 말 것. Pi 가 소스를 직접 컴파일해
+> **30분 이상** 걸린다(같은 빌드가 개발 머신에서 ARM64 크로스 빌드로 **2분**). 예전 문서의
+> `rsync` + `--build` 절차가 이것이었다.
+
+### 6.1 최초 1회 준비 (개발 머신)
 ```bash
-cd ~/git/ddadan-repo   # (개발 머신)
-rsync -az apps/ddadan-api-server/src/  display-4:~/ddadan-repo/apps/ddadan-api-server/src/
-rsync -az apps/ddadan-admin-app/src/   display-4:~/ddadan-repo/apps/ddadan-admin-app/src/
-ssh display-4 "cd ~/ddadan-repo && docker compose up -d --build api admin"   # 필요 서비스만
+sudo apt-get install -y docker-buildx qemu-user-static binfmt-support   # ARM64 크로스 빌드
+docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+# 로컬 레지스트리(항상 켜둠) — Pi 가 여기서 이미지를 받아간다
+docker run -d --name ddadan-registry -p 5000:5000 --restart unless-stopped registry:2
+
+# buildx 빌더: 평문 HTTP 레지스트리 허용 (없으면 push 가 HTTPS 를 요구하며 실패)
+cat > /tmp/buildkitd.toml <<EOF
+[registry."192.168.150.185:5000"]
+  http = true
+  insecure = true
+EOF
+docker buildx create --name ddadan-builder --use --config /tmp/buildkitd.toml
 ```
+
+### 6.2 최초 1회 준비 (Pi, sudo 필요)
+평문 레지스트리를 신뢰하게 한다. **LAN 과 Tailscale 주소를 모두** 넣어야 사무실 밖에서도 배포된다.
+```bash
+ssh -t display-4 'echo "{\"insecure-registries\":[\"192.168.150.185:5000\",\"100.126.172.59:5000\"]}" \
+  | sudo tee /etc/docker/daemon.json && sudo systemctl restart docker'
+```
+
+### 6.3 평소 배포 (소스 변경 후)
+```bash
+cd ~/git/ddadan-repo                      # 개발 머신
+REG=192.168.150.185:5000                  # 사무실 밖이면 100.126.172.59:5000
+
+# 1) ARM64 크로스 빌드 → 레지스트리로 바로 push (~2분)
+docker buildx build --platform linux/arm64 \
+  -f apps/ddadan-api-server/Dockerfile -t $REG/ddadan-repo-api:latest --push .
+
+# 2) Pi 가 받아서 컨테이너 교체 (빌드 없음)
+ssh display-4 "docker pull $REG/ddadan-repo-api:latest \
+  && docker tag $REG/ddadan-repo-api:latest ddadan-repo-api:latest \
+  && cd ~/ddadan-repo && docker compose up -d --no-build --force-recreate api"
+```
+admin 은 `apps/ddadan-admin-app/Dockerfile` + `ddadan-repo-admin` 으로 같은 절차.
+
+- **`docker save | ssh docker load` 는 쓰지 말 것.** 특정 레이어에서 진행이 멈춘 채 매달린다
+  (Pi 부하는 0 인데 끝나지 않음). 레지스트리 경유가 확실하다.
+- 배포 후 검증: `curl -s -o /dev/null -w "%{http_code}" http://100.96.152.109:7800/api/health/live` → 200.
 - DB/에셋은 named volume이라 재빌드에도 유지. 화면 레이아웃 새 필드는 JSON `layout` 안이라 마이그레이션 불필요.
 - ⚠ `ValidationPipe(whitelist:true)` → **새 스키마 필드는 `screen.dto.ts`에 추가해야 통과**(안 그러면 서버가 벗겨냄). 추가 후 반드시 서버 재배포.
 - api 재시작 시 박스가 잠깐 서버를 놓쳐 탐색 화면이 뜰 수 있음(재발견되면 복구).
@@ -221,6 +263,19 @@ ssh display-4 "cd ~/ddadan-repo && docker compose up -d --build api admin"   # �
 - **스크린샷**: 주기 촬영이 아니라 **온디맨드** — admin에서 `screenshot` 원격명령을 보내면 그때 캡처·업로드(서버는 기기당 최근 10장 유지).
 - **`adb install` "Success" 없이 조용히 실패**: 앱 실행 중 `pm install -r` 간섭. `am force-stop` 후 재설치.
 - **adb 기기 안 잡힘**: `adb kill-server && adb start-server`, 박스 "Connect to PC"/USB디버깅 확인.
+- **원격 명령이 전부 `pending` 에서 안 넘어감 (박스는 online)**: 박스는 명령을 **순서대로 하나씩**
+  처리하므로 앞의 명령이 끝나지 않으면 뒤가 전부 막힌다. 텔레메트리는 별도 루프라 계속 올라와
+  **online 으로 보이는 게 함정**. 증상 확인은 `GET /devices/{id}/commands` 로 pending 이 쌓이는지 보면 된다.
+  - 서버가 **10분(`COMMAND_TIMEOUT_SECONDS`) 뒤 자동으로 failed 처리**해 큐를 푼다(1분 주기 스윕).
+    큐가 풀리면 같은 작업을 다시 큐잉해 재시도할 수 있다.
+  - 그래도 박스 쪽 루프 자체가 멎었다면 **원격 수단이 없다**(`reboot` 명령도 같은 큐를 탄다).
+    **전원 재인가만이 복구 방법.** 켜면 워치독이 새로 시작하며 밀린 OTA 까지 자동으로 받아간다.
+- **OTA 진행률이 되돌아감(예: 68% → 3%)**: `otaLoop`(10분 주기)과 `commandLoop`(updateApp 명령)이
+  같은 APK 를 같은 캐시 파일에 **동시에** 내려받던 문제. 겹쳐 쓴 APK 는 설치에 실패하고 그 명령이
+  끝나지 않아 위의 "명령 전부 pending" 으로 이어졌다. 워치독 v10.0 에서 뮤텍스로 차단하고,
+  updateApp 은 별도 코루틴으로 돌려 명령 루프를 붙잡지 않게 했다.
+- **화면 우측 하단 `v10.0/v1.9` 배지**(워치독/플레이어): 어느 박스가 구버전인지 화면만 보고 판단.
+  배지가 안 보이면 플레이어가 1.9 미만이라는 뜻.
 
 ---
 
