@@ -10,6 +10,8 @@ DDADAN 상점별 쿠폰 발급 시스템의 로컬 개발 환경 셋업 방법�
 | [scenarios.md](./scenarios.md) | 시나리오 명세 |
 | [api-endpoints.md](./api-endpoints.md) | 엔드포인트 목록 (구현 진행 체크리스트) |
 | [acceptance-checklist.md](./acceptance-checklist.md) | MVP 인수 시나리오 체크리스트 |
+| [concurrency-decisions.md](./concurrency-decisions.md) | 동시성 결정표와 구현 위치 |
+| [runbook.md](./runbook.md) | 운영 런북 (헬스·배포·테스트 DB·DLQ) |
 
 ## 모노레포 구조
 
@@ -37,7 +39,7 @@ docs/coupon-system/
 
 | 항목 | 값 |
 |---|---|
-| PostgreSQL | 호스트 포트 `55432`, DB `coupon`, user `coupon`, password `coupon` |
+| PostgreSQL | 호스트 포트 `55432`, 개발 DB `coupon` / 테스트 DB `coupon_test`, user `coupon`, password `coupon_dev_password` |
 | Redis | 호스트 포트 `56379` |
 | coupon API 서버 | `7810` |
 | 소비자 앱 | `4310` |
@@ -67,11 +69,19 @@ compose 파일: `apps/coupon-api-server/docker-compose.dev.yml`
 
 ## 테스트 실행
 
-DB 통합 테스트는 `COUPON_TEST_DATABASE_URL` 이 없으면 조용히 skip 되면서 통과처럼 보인다. 반드시 다음처럼 돌린다:
+통합 테스트는 개발용 DB(`coupon`)가 아니라 테스트 전용 DB(`coupon_test`)를 사용한다. `COUPON_TEST_DATABASE_URL` 이 없으면 DB 통합 테스트가 조용히 skip 되면서 통과처럼 보이므로, 아래 스크립트로 실행한다.
 
 ```sh
-COUPON_TEST_DATABASE_URL=postgres://coupon:coupon_dev_password@localhost:55432/coupon cargo test --workspace
+./scripts/coupon/test.sh
 ```
+
+테스트 DB만 비우고 다시 만들려면:
+
+```sh
+./scripts/coupon/db-test-reset.sh
+```
+
+상세는 [runbook.md](./runbook.md) 의 「테스트 DB」 절을 본다.
 
 ## 주의: 기존 사이니지 제품과 분리
 

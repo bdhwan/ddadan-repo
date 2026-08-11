@@ -8,6 +8,10 @@ import { MyQrComponent } from "./my-qr.component";
 import { WalletComponent } from "./wallet.component";
 import { NotificationsComponent } from "./notifications.component";
 import { StoreDetailComponent } from "./store-detail.component";
+import { AccountNotificationsComponent } from "./account-notifications.component";
+import { AccountSecurityComponent } from "./account-security.component";
+import { AccountWithdrawComponent } from "./account-withdraw.component";
+import { TermsComponent } from "./terms.component";
 
 const authRoutes: Routes = [
   {
@@ -32,23 +36,19 @@ const authRoutes: Routes = [
   },
   {
     path: "terms",
-    component: CouponAuthRouteComponent,
-    data: { mode: "terms" },
+    component: TermsComponent,
   },
   {
     path: "account/security",
-    component: CouponAuthRouteComponent,
-    data: { mode: "security" },
+    component: AccountSecurityComponent,
   },
   {
     path: "account/notifications",
-    component: CouponAuthRouteComponent,
-    data: { mode: "notifications" },
+    component: AccountNotificationsComponent,
   },
   {
     path: "account/withdraw",
-    component: CouponAuthRouteComponent,
-    data: { mode: "withdraw" },
+    component: AccountWithdrawComponent,
   },
 ];
 

@@ -253,6 +253,15 @@ interface BarcodeDetectorConstructor {
           <coupon-card
             ><fieldset>
               <legend>주문 정보</legend>
+              @if (transactionType() === "redeem") {
+                <label
+                  >쿠폰 ID <span aria-hidden="true">*</span
+                  ><input
+                    formControlName="coupon_id"
+                    autocomplete="off"
+                    placeholder="소비자 쿠폰 상세의 UUID"
+                /></label>
+              }
               <label
                 >주문 금액 <span aria-hidden="true">*</span>
                 <div class="won-input">
@@ -1075,6 +1084,12 @@ export class StoreScanComponent implements OnInit, AfterViewInit, OnDestroy {
       ],
     ],
     external_order_ref: ["", Validators.maxLength(80)],
+    coupon_id: [
+      "",
+      Validators.pattern(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      ),
+    ],
     catalog_item_id: [""],
     item_name: ["", [Validators.required, Validators.maxLength(80)]],
     quantity: [
@@ -1175,6 +1190,13 @@ export class StoreScanComponent implements OnInit, AfterViewInit, OnDestroy {
     this.previewing.set(true);
     this.previewError.set(null);
     if (this.transactionType() === "redeem") {
+      if (!this.orderForm.controls.coupon_id.value) {
+        this.previewing.set(false);
+        this.previewError.set(
+          "소비자 쿠폰 상세에 표시된 쿠폰 ID를 입력해 주세요.",
+        );
+        return;
+      }
       this.requestRedemptionPreview(false);
       return;
     }
@@ -1247,6 +1269,7 @@ export class StoreScanComponent implements OnInit, AfterViewInit, OnDestroy {
       type: "stamp",
       gross_amount: 0,
       external_order_ref: "",
+      coupon_id: "",
       catalog_item_id: "",
       item_name: "",
       quantity: 1,
@@ -1393,6 +1416,7 @@ export class StoreScanComponent implements OnInit, AfterViewInit, OnDestroy {
       .previewRedemption(
         {
           scan_session_id: customer.scan_session_id,
+          coupon_id: this.orderForm.controls.coupon_id.value,
           order: this.orderPayload(),
         },
         createUuid(),

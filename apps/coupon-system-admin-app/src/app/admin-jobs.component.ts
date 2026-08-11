@@ -269,12 +269,10 @@ export class AdminJobsComponent implements OnInit {
       .retryJob(job.id, { reason: this.retryReason.trim() }, createUuid())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (updated) => {
-          this.items.update((items) =>
-            items.map((item) => (item.id === updated.id ? updated : item)),
-          );
+        next: () => {
           this.retryTarget.set(null);
           this.retrying.set(false);
+          this.load();
         },
         error: () => {
           this.retryError.set(

@@ -3,9 +3,12 @@
 //! The cursor is an opaque base64url string over `(created_at, id)`. Keyset paging on
 //! that pair is stable while rows are inserted, which offset paging is not.
 
+use std::fmt;
+
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use chrono::{DateTime, Utc};
+use serde::de::{self, Deserializer, Visitor};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -46,12 +49,68 @@ impl Cursor {
 }
 
 /// `?limit=&cursor=` on any list endpoint.
-#[derive(Debug, Clone, Default, Deserialize, IntoParams)]
+#[derive(Debug, Clone, Default, Deserialize, IntoParams, ToSchema)]
 pub struct PageQuery {
     /// 1–100. Defaults to 20.
+    #[serde(default, deserialize_with = "page_size")]
     pub limit: Option<u32>,
     /// `next_cursor` from the previous page.
     pub cursor: Option<String>,
+}
+
+/// Deserialise `?limit=`, tolerating the blank a client sends for "no preference".
+///
+/// `?limit=` with nothing after it is what an HTML form and an unset Angular `HttpParams`
+/// both put on the wire, and answering it with a 400 forces every client to strip the
+/// parameter by hand. §11.1 fixes what `limit` *does* — 1 to 100, 20 by default — and
+/// [`PageQuery::limit`] already corrects an out-of-range number rather than rejecting it;
+/// a blank one is the same kind of "nothing useful was said" and defaults the same way.
+///
+/// A value that is present and *not* a number is still a 400. That is a typo, and paging
+/// silently at 20 would hide it.
+pub fn page_size<'de, D>(deserializer: D) -> Result<Option<u32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct PageSize;
+
+    impl<'de> Visitor<'de> for PageSize {
+        type Value = Option<u32>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+            formatter.write_str("a page size between 1 and 100, or nothing")
+        }
+
+        fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+            let value = value.trim();
+            if value.is_empty() {
+                return Ok(None);
+            }
+            value.parse::<u32>().map(Some).map_err(E::custom)
+        }
+
+        fn visit_u64<E: de::Error>(self, value: u64) -> Result<Self::Value, E> {
+            u32::try_from(value).map(Some).map_err(E::custom)
+        }
+
+        fn visit_i64<E: de::Error>(self, value: i64) -> Result<Self::Value, E> {
+            u32::try_from(value).map(Some).map_err(E::custom)
+        }
+
+        fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(None)
+        }
+
+        fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(None)
+        }
+
+        fn visit_some<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+            deserializer.deserialize_any(self)
+        }
+    }
+
+    deserializer.deserialize_option(PageSize)
 }
 
 impl PageQuery {
@@ -116,6 +175,8 @@ impl<T> Page<T> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     fn cursor() -> Cursor {
@@ -189,6 +250,36 @@ mod tests {
             .fetch_limit(),
             21
         );
+    }
+
+    #[test]
+    fn a_page_size_is_read_from_a_string_or_a_number_and_a_blank_one_is_absent() {
+        // A query string hands every value over as text; JSON hands it over as a number.
+        // Both reach `limit()` as the same page size.
+        for (raw, expected) in [
+            (json!({}), None),
+            (json!({ "limit": null }), None),
+            (json!({ "limit": "" }), None),
+            (json!({ "limit": "   " }), None),
+            (json!({ "limit": "50" }), Some(50)),
+            (json!({ "limit": 50 }), Some(50)),
+            (json!({ "limit": "1000" }), Some(1000)),
+        ] {
+            let query: PageQuery =
+                serde_json::from_value(raw.clone()).unwrap_or_else(|error| panic!("{raw}: {error}"));
+            assert_eq!(query.limit, expected, "{raw}");
+        }
+
+        // Out of range is corrected on the way out, not refused on the way in.
+        let query: PageQuery = serde_json::from_value(json!({ "limit": "1000" })).expect("parses");
+        assert_eq!(query.limit(), MAX_PAGE_SIZE);
+        let query: PageQuery = serde_json::from_value(json!({ "limit": "" })).expect("parses");
+        assert_eq!(query.limit(), DEFAULT_PAGE_SIZE);
+
+        // A typo is not an absence.
+        for raw in [json!({ "limit": "abc" }), json!({ "limit": -1 })] {
+            serde_json::from_value::<PageQuery>(raw.clone()).expect_err(&format!("{raw}"));
+        }
     }
 
     #[test]

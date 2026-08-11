@@ -27,6 +27,9 @@ pub enum ErrorCode {
     Unauthenticated,
     TokenExpired,
     TokenInvalid,
+    /// §15.4: a provider callback whose signature or freshness window did not hold.
+    /// Deliberately one code for both, so a caller cannot probe which half failed.
+    WebhookSignatureInvalid,
 
     // 403 — role, account state, terms, origin.
     Forbidden,
@@ -52,6 +55,11 @@ pub enum ErrorCode {
     CouponNotFound,
     CampaignNotFound,
     ReservationNotFound,
+    NotificationNotFound,
+    /// §11.5: 민원·보안 사건.
+    CaseNotFound,
+    /// §17.3: 보존기간 설정 항목.
+    RetentionPolicyNotFound,
 
     // 409 — state, version and quantity contention.
     Conflict,
@@ -77,6 +85,8 @@ pub enum ErrorCode {
     ReservationAlreadyActive,
     /// §5.4: 주문 1건에 혜택 1개.
     OrderAlreadyDiscounted,
+    /// ADMIN-002: 한 회원에게 동시에 유효한 제재는 하나다.
+    SanctionAlreadyActive,
 
     // 422 — well-formed but the business rule says no.
     UnprocessableRequest,
@@ -108,6 +118,12 @@ pub enum ErrorCode {
     CouponExpired,
     /// REDEEM-003: 사용 가능 요일·시간대 아님.
     CouponOutsideUsageWindow,
+    /// §3.3: 고위험 관리자 작업은 사건 티켓을 요구한다.
+    CaseReferenceRequired,
+    /// §17.3 / ADMIN-006: 법정 보존 또는 분쟁 hold 가 걸린 대상은 파기하지 않는다.
+    LegalHoldActive,
+    /// §19: 집단 크기가 개인정보 최소 기준 미만이면 세부 구분을 제공하지 않는다.
+    CohortTooSmall,
 
     // 429 / 503.
     RateLimited,
@@ -182,6 +198,14 @@ impl ErrorCode {
             ErrorCode::CouponNotYetUsable => "COUPON_NOT_YET_USABLE",
             ErrorCode::CouponExpired => "COUPON_EXPIRED",
             ErrorCode::CouponOutsideUsageWindow => "COUPON_OUTSIDE_USAGE_WINDOW",
+            ErrorCode::WebhookSignatureInvalid => "WEBHOOK_SIGNATURE_INVALID",
+            ErrorCode::NotificationNotFound => "NOTIFICATION_NOT_FOUND",
+            ErrorCode::CaseNotFound => "CASE_NOT_FOUND",
+            ErrorCode::RetentionPolicyNotFound => "RETENTION_POLICY_NOT_FOUND",
+            ErrorCode::SanctionAlreadyActive => "SANCTION_ALREADY_ACTIVE",
+            ErrorCode::CaseReferenceRequired => "CASE_REFERENCE_REQUIRED",
+            ErrorCode::LegalHoldActive => "LEGAL_HOLD_ACTIVE",
+            ErrorCode::CohortTooSmall => "COHORT_TOO_SMALL",
             ErrorCode::RateLimited => "RATE_LIMITED",
             ErrorCode::ServiceUnavailable => "SERVICE_UNAVAILABLE",
             ErrorCode::DependencyUnavailable => "DEPENDENCY_UNAVAILABLE",
@@ -200,7 +224,10 @@ impl ErrorCode {
             | ErrorCode::InvalidVersion => StatusCode::BAD_REQUEST,
 
             // 401: no credential, or one we cannot accept.
-            ErrorCode::Unauthenticated | ErrorCode::TokenExpired | ErrorCode::TokenInvalid => {
+            ErrorCode::Unauthenticated
+            | ErrorCode::TokenExpired
+            | ErrorCode::TokenInvalid
+            | ErrorCode::WebhookSignatureInvalid => {
                 StatusCode::UNAUTHORIZED
             }
 
@@ -225,7 +252,10 @@ impl ErrorCode {
             | ErrorCode::TransactionNotFound
             | ErrorCode::CouponNotFound
             | ErrorCode::CampaignNotFound
-            | ErrorCode::ReservationNotFound => StatusCode::NOT_FOUND,
+            | ErrorCode::ReservationNotFound
+            | ErrorCode::NotificationNotFound
+            | ErrorCode::CaseNotFound
+            | ErrorCode::RetentionPolicyNotFound => StatusCode::NOT_FOUND,
 
             // 409: state, version or quantity contention.
             ErrorCode::Conflict
@@ -243,7 +273,8 @@ impl ErrorCode {
             | ErrorCode::CouponNotAvailable
             | ErrorCode::ReservationExpired
             | ErrorCode::ReservationAlreadyActive
-            | ErrorCode::OrderAlreadyDiscounted => StatusCode::CONFLICT,
+            | ErrorCode::OrderAlreadyDiscounted
+            | ErrorCode::SanctionAlreadyActive => StatusCode::CONFLICT,
 
             // 422: shape is fine, the business condition is not met.
             ErrorCode::UnprocessableRequest
@@ -265,7 +296,10 @@ impl ErrorCode {
             | ErrorCode::AudienceNotEligible
             | ErrorCode::CouponNotYetUsable
             | ErrorCode::CouponExpired
-            | ErrorCode::CouponOutsideUsageWindow => StatusCode::UNPROCESSABLE_ENTITY,
+            | ErrorCode::CouponOutsideUsageWindow
+            | ErrorCode::CaseReferenceRequired
+            | ErrorCode::LegalHoldActive
+            | ErrorCode::CohortTooSmall => StatusCode::UNPROCESSABLE_ENTITY,
 
             ErrorCode::RateLimited => StatusCode::TOO_MANY_REQUESTS,
 
@@ -381,6 +415,14 @@ impl ErrorCode {
             ErrorCode::CouponOutsideUsageWindow => {
                 "지금은 사용할 수 없는 쿠폰입니다. 사용 가능한 요일·시간을 확인해 주세요."
             }
+            ErrorCode::WebhookSignatureInvalid => "콜백 서명을 확인할 수 없습니다.",
+            ErrorCode::NotificationNotFound => "알림을 찾을 수 없습니다.",
+            ErrorCode::CaseNotFound => "사건을 찾을 수 없습니다.",
+            ErrorCode::RetentionPolicyNotFound => "보존 정책을 찾을 수 없습니다.",
+            ErrorCode::SanctionAlreadyActive => "이미 진행 중인 제재가 있습니다.",
+            ErrorCode::CaseReferenceRequired => "이 작업에는 사건 티켓이 필요합니다.",
+            ErrorCode::LegalHoldActive => "법정 보존 또는 분쟁 보존이 적용된 대상입니다.",
+            ErrorCode::CohortTooSmall => "대상 인원이 적어 세부 지표를 제공하지 않습니다.",
             ErrorCode::RateLimited => "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
             ErrorCode::ServiceUnavailable => "일시적인 오류입니다. 잠시 후 다시 시도해 주세요.",
             ErrorCode::DependencyUnavailable => "일시적인 오류입니다. 잠시 후 다시 시도해 주세요.",

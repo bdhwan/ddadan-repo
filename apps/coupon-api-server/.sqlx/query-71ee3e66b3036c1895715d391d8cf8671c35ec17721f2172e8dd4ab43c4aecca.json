@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE coupon.users\n                SET display_name = $2,\n                    primary_email_ciphertext = NULL,\n                    primary_email_lookup_hash = NULL,\n                    email_verified_at = NULL,\n                    suspension_reason = NULL,\n                    -- The Firebase uid is an external identifier for a person, so it is\n                    -- replaced rather than kept. Deriving it from the subject id keeps the\n                    -- unique constraint satisfiable on a replay.\n                    firebase_uid = $3,\n                    status = 'WITHDRAWN',\n                    withdrawn_at = COALESCE(withdrawn_at, clock_timestamp()),\n                    tombstoned_at = COALESCE(tombstoned_at, clock_timestamp()),\n                    pseudonym_label = $2,\n                    -- Every existing session is worthless the moment the account is gone.\n                    sessions_valid_after = clock_timestamp(),\n                    version = version + 1\n                WHERE id = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "71ee3e66b3036c1895715d391d8cf8671c35ec17721f2172e8dd4ab43c4aecca"
+}

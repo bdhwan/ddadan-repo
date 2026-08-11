@@ -24,7 +24,7 @@ export interface ErrorResponseDto {
 export interface CursorPageDto<T> {
   items: T[];
   next_cursor: string | null;
-  request_id: string;
+  has_more: boolean;
 }
 
 export interface MoneyDto {

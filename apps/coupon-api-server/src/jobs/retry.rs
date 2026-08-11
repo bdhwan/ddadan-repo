@@ -158,12 +158,24 @@ pub fn classify_api_error(error: &ApiError) -> RetryClass {
         | ErrorCode::CouponOutsideUsageWindow
         | ErrorCode::OrderAlreadyDiscounted
         | ErrorCode::AudienceNotEligible
-        | ErrorCode::ApprovalSeparationRequired => RetryClass::Permanent,
+        | ErrorCode::ApprovalSeparationRequired
+        // Phase 4. §14.6 names 수신 거부·템플릿 거절 and 법적 hold 활성 as the permanent
+        // failures for notification sending and erasure; the rest are the same shape as
+        // the refusals above — a retry reproduces them exactly.
+        | ErrorCode::WebhookSignatureInvalid
+        | ErrorCode::NotificationNotFound
+        | ErrorCode::CaseNotFound
+        | ErrorCode::RetentionPolicyNotFound
+        | ErrorCode::CaseReferenceRequired
+        | ErrorCode::LegalHoldActive
+        | ErrorCode::CohortTooSmall => RetryClass::Permanent,
 
         ErrorCode::RateLimited => RetryClass::ProviderThrottled { retry_after_secs: 60 },
 
         // Contention and infrastructure. All of these can resolve on their own.
-        ErrorCode::Conflict
+        // A live sanction is somebody else having got there first, which is contention.
+        ErrorCode::SanctionAlreadyActive
+        | ErrorCode::Conflict
         | ErrorCode::VersionConflict
         | ErrorCode::IdempotencyKeyReused
         | ErrorCode::IdempotencyRequestInProgress

@@ -1,0 +1,108 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT business_day, stamp_earned_count, stamp_voided_count,\n                   stamp_transaction_count, active_customer_count, reward_issued_count,\n                   reward_used_count, campaign_coupon_issued_count,\n                   campaign_coupon_used_count, campaign_coupon_revoked_count,\n                   coupon_expired_count, redemption_voided_count, discount_amount_total,\n                   computed_through, is_final\n            FROM coupon.analytics_daily_store\n            WHERE store_id = $1 AND business_day BETWEEN $2 AND $3\n            ORDER BY business_day\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "business_day",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 1,
+        "name": "stamp_earned_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "stamp_voided_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "stamp_transaction_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "active_customer_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "reward_issued_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "reward_used_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 7,
+        "name": "campaign_coupon_issued_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "campaign_coupon_used_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "campaign_coupon_revoked_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "coupon_expired_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 11,
+        "name": "redemption_voided_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 12,
+        "name": "discount_amount_total",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 13,
+        "name": "computed_through",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "is_final",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "79642139517eea6134e6436e4e38053f5503117088d7c13c9afaf833d88f0957"
+}

@@ -11,6 +11,7 @@ import { StoreScanComponent } from "./store-scan.component";
 import { LoyaltyComponent } from "./loyalty.component";
 import { CatalogComponent } from "./catalog.component";
 import { CampaignProgressComponent } from "./campaign-progress.component";
+import { AnalyticsComponent } from "./analytics.component";
 
 export const routes: Routes = [
   {
@@ -78,11 +79,7 @@ export const routes: Routes = [
       },
       {
         path: "analytics",
-        component: StoreFeatureStateComponent,
-        data: {
-          title: "통계",
-          description: "실시간 잠정치와 일 배치 확정치를 구분합니다.",
-        },
+        component: AnalyticsComponent,
       },
       {
         path: "settings",

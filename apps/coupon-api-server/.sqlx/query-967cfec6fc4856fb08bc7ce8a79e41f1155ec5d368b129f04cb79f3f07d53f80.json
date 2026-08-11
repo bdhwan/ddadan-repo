@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE coupon.push_subscriptions\n                SET status = 'ARCHIVED', token_ciphertext = ''::bytea,\n                    -- The unique index over the lookup hash still has to hold, so the\n                    -- placeholder is derived from the row's own id rather than zeroed.\n                    token_lookup_hash = sha256(('tombstone:' || id::text)::bytea),\n                    disabled_at = COALESCE(disabled_at, clock_timestamp()),\n                    disabled_reason = 'ERASED', version = version + 1\n                WHERE user_id = $1 AND disabled_reason IS DISTINCT FROM 'ERASED'\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "967cfec6fc4856fb08bc7ce8a79e41f1155ec5d368b129f04cb79f3f07d53f80"
+}

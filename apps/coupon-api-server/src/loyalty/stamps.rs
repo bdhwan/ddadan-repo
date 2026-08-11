@@ -651,20 +651,6 @@ impl StampService {
         self.touch_customer(&mut tx, customer_id, now, assessment.self_transaction)
             .await?;
 
-        self.publish_outbox(
-            &mut tx,
-            "stamp_transaction",
-            transaction_id,
-            1,
-            "STAMP_EARNED",
-            serde_json::json!({
-                "store_id": store.id,
-                "user_id": nonce.user_id,
-                "quantity": assessment.quantity,
-                "expires_at": assessment.stamps_expire_at,
-            }),
-        )
-        .await?;
         for reward in &issued_rewards {
             self.publish_outbox(
                 &mut tx,
@@ -674,7 +660,9 @@ impl StampService {
                 "REWARD_ISSUED",
                 serde_json::json!({
                     "store_id": store.id,
+                    "store_name": store.name,
                     "user_id": nonce.user_id,
+                    "benefit": reward.title,
                     "expires_at": reward.expires_at,
                     "source_transaction_id": transaction_id,
                 }),
@@ -706,6 +694,26 @@ impl StampService {
             .load_board(&mut tx, store.id, nonce.user_id, &policy, now, true)
             .await?;
         let customer = self.describe_customer(&mut tx, store.id, nonce.user_id).await?;
+
+        // Published after the board is known so the notification can say how many stamps
+        // are left (§15.2 requires 잔여 목표 on this event). The outbox row and the accrual
+        // commit together either way, which is what §14.2 asks for.
+        self.publish_outbox(
+            &mut tx,
+            "stamp_transaction",
+            transaction_id,
+            1,
+            "STAMP_EARNED",
+            serde_json::json!({
+                "store_id": store.id,
+                "store_name": store.name,
+                "user_id": nonce.user_id,
+                "quantity": assessment.quantity,
+                "remaining": board.remaining_to_goal,
+                "expires_at": assessment.stamps_expire_at,
+            }),
+        )
+        .await?;
 
         // Step 9. The idempotent response itself is stored by the middleware once this
         // returns, so the commit is the last thing that happens here.
@@ -894,9 +902,11 @@ impl StampService {
             "TRANSACTION_VOIDED",
             serde_json::json!({
                 "store_id": store.id,
+                "store_name": store.name,
                 "user_id": original.user_id,
                 "restored_stamps": earned,
                 "revoked_rewards": reward_ids,
+                "detail": format!("도장 {earned}개가 회수되었습니다."),
             }),
         )
         .await?;

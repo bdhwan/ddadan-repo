@@ -11,6 +11,7 @@
 //! * **A correction is never an edit.** The preview describes what new events *would* be
 //!   appended; it never proposes rewriting a ledger row (§13.4, product principle 2).
 
+pub mod operations;
 pub mod routes;
 
 use std::sync::Arc;

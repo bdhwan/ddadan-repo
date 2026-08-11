@@ -133,7 +133,7 @@ export interface CampaignClaimResponseDto {
 
 export interface RedemptionPreviewRequestDto {
   scan_session_id: Uuid;
-  coupon_id?: Uuid;
+  coupon_id: Uuid;
   order: StampOrderDto;
 }
 
@@ -197,8 +197,8 @@ export interface AdminCampaignListResponseDto extends VersionedDto {
 export interface AdminEmergencyCampaignRequestDto {
   action: "EMERGENCY_STOP" | "REVOKE";
   reason: string;
-  reauthentication_token: string;
   understood_reversibility: boolean;
+  case_id?: Uuid | null;
 }
 
 export interface AdminJobDto extends VersionedDto {

@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, subject_user_id, deletion_scope, pseudonym_label\n            FROM coupon.deletion_ledger\n            WHERE status = 'SUCCEEDED'\n            ORDER BY executed_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "subject_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "deletion_scope",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 3,
+        "name": "pseudonym_label",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "ce0f666fd9c0c5dc32ed4b34ca1d29dfd725665df2487c4c64bca489b65c0829"
+}

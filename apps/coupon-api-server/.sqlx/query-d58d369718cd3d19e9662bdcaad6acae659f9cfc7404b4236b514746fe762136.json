@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT provider_profile_snapshot ->> 'phone_number'\n        FROM coupon.auth_identities\n        WHERE user_id = $1 AND provider = 'KAKAO' AND status = 'ACTIVE'\n        ORDER BY linked_at DESC\n        LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "?column?",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "d58d369718cd3d19e9662bdcaad6acae659f9cfc7404b4236b514746fe762136"
+}

@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT retention_days, legal_basis, erasable_on_request\n            FROM coupon.retention_policies WHERE data_category = $1 FOR UPDATE\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "retention_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 1,
+        "name": "legal_basis",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "erasable_on_request",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "a4234ecc91939925f1abf30ca7c6a9a028ee76b860bb5d9fea1237fb8a952bd7"
+}

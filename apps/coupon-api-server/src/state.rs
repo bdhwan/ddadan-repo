@@ -8,6 +8,8 @@ use std::sync::Arc;
 use sqlx::PgPool;
 
 use crate::admin::AdminService;
+use crate::admin::operations::OperationsService;
+use crate::analytics::AnalyticsService;
 use crate::audit::AuditService;
 use crate::auth::AuthService;
 use crate::campaigns::CampaignService;
@@ -19,7 +21,12 @@ use crate::error::ApiResult;
 use crate::http::rate_limit::RateLimiter;
 use crate::jobs::JobService;
 use crate::loyalty::{PolicyService, StampService};
-use crate::notifications::NotificationPreferenceService;
+use crate::http::metrics::MetricsRegistry;
+use crate::notifications::providers::{
+    AlimtalkProvider, HttpMessageProvider, RecordingProvider, WebPushProvider,
+};
+use crate::notifications::{NotificationPreferenceService, NotificationService};
+use crate::privacy::PrivacyService;
 use crate::qr::QrService;
 use crate::redemptions::RedemptionService;
 use crate::stores::StoreService;
@@ -57,6 +64,19 @@ pub struct AppState {
     pub jobs: Arc<JobService>,
     pub campaigns: Arc<CampaignService>,
     pub redemptions: Arc<RedemptionService>,
+    // Phase 4: notification delivery, the operational surface, analytics, and retention.
+    pub notifications: Arc<NotificationService>,
+    pub operations: Arc<OperationsService>,
+    pub analytics: Arc<AnalyticsService>,
+    pub privacy: Arc<PrivacyService>,
+    /// The two §15.1 seams. Held as `dyn` so a 대행사 swap is a wiring change here and
+    /// nothing else.
+    pub web_push_provider: Arc<dyn WebPushProvider>,
+    pub alimtalk_provider: Arc<dyn AlimtalkProvider>,
+    /// Opening a push token needs the same sealer the registration used (§16.5).
+    pub sealer: Arc<Sealer>,
+    /// §18.4's process counters.
+    pub metrics: Arc<MetricsRegistry>,
 }
 
 impl AppState {
@@ -75,13 +95,14 @@ impl AppState {
         let lookup_hash = Arc::new(lookup_hash);
         let notification_preferences = Arc::new(NotificationPreferenceService::new());
         let users = Arc::new(UserService::new(sealer.clone(), lookup_hash.clone()));
+        let audit = Arc::new(AuditService::new());
         let stores = Arc::new(StoreService::new(
-            sealer,
+            sealer.clone(),
             lookup_hash.clone(),
             users.clone(),
+            audit.clone(),
         ));
 
-        let audit = Arc::new(AuditService::new());
         let catalog = Arc::new(CatalogService::new());
         let qr = Arc::new(QrService::new(config.clone(), lookup_hash.clone())?);
         let loyalty_policies = Arc::new(PolicyService::new(catalog.clone()));
@@ -96,6 +117,11 @@ impl AppState {
         ));
 
         let jobs = Arc::new(JobService::new());
+        let notifications = Arc::new(NotificationService::new(
+            jobs.clone(),
+            sealer.clone(),
+            lookup_hash.clone(),
+        ));
         let campaigns = Arc::new(CampaignService::new(
             stores.clone(),
             catalog.clone(),
@@ -111,8 +137,40 @@ impl AppState {
             config.redemption_void_window(),
         ));
 
+        // §15.1: 알림톡은 `AlimtalkProvider` 인터페이스 뒤에 둬 교체 가능하게 한다. Web
+        // push gets the same treatment for the same reason. With no endpoint configured the
+        // recording stub runs, which `Config::validate` refuses in production.
+        let web_push_provider: Arc<dyn WebPushProvider> = match &config.fcm_endpoint {
+            Some(endpoint) => Arc::new(HttpMessageProvider::new(
+                "fcm",
+                endpoint,
+                config.fcm_authorization.clone(),
+            )),
+            None => Arc::new(RecordingProvider::new("fcm-stub")),
+        };
+        let alimtalk_provider: Arc<dyn AlimtalkProvider> = match &config.alimtalk_endpoint {
+            Some(endpoint) => Arc::new(HttpMessageProvider::new(
+                "alimtalk",
+                endpoint,
+                config.alimtalk_authorization.clone(),
+            )),
+            None => Arc::new(RecordingProvider::new("alimtalk-stub")),
+        };
+
         Ok(Self {
             auth: Arc::new(AuthService::new(config.clone())),
+            operations: Arc::new(OperationsService::new(audit.clone())),
+            analytics: Arc::new(AnalyticsService::new(config.min_cohort_size())),
+            privacy: Arc::new(PrivacyService::new(
+                audit.clone(),
+                jobs.clone(),
+                config.deletion_grace(),
+            )),
+            metrics: Arc::new(MetricsRegistry::new()),
+            web_push_provider,
+            alimtalk_provider,
+            notifications,
+            sealer,
             consents: Arc::new(ConsentService::new(
                 lookup_hash,
                 notification_preferences.clone(),

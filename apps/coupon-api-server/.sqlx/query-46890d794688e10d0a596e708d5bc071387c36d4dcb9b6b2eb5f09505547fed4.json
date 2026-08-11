@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT\n            id, store_id, status::text AS \"status!\", version_no, name, customer_description,\n            benefit_type::text AS \"benefit_type!\", fixed_amount, percentage,\n            maximum_discount_amount, free_item_ids, minimum_order_amount, eligible_item_ids,\n            eligible_category_ids, excluded_item_ids, issue_mode::text AS \"issue_mode!\",\n            audience_type, audience_criteria, audience_size, audience_snapshot_at,\n            total_quantity, unlimited_total_cap, per_user_quantity,\n            per_business_day_quantity, restore_quantity_on_revoke, revoke_policy,\n            global_issued_count, global_reserved_count, global_revoked_count,\n            issue_starts_at, issue_ends_at, usable_from, usable_until,\n            relative_validity_days, allowed_weekdays, allowed_local_time_ranges,\n            external_discount_stackable, notification_channels, notification_message,\n            published_at, paused_at, cancelled_at, cancellation_reason,\n            emergency_stopped_at, issue_generation, created_at, updated_at, version\n        FROM coupon.campaigns\n        WHERE store_id = $1 AND ($2::uuid IS NULL OR id = $2)\n        ORDER BY created_at DESC\n        ",
+  "query": "\n        SELECT\n            id, store_id, status::text AS \"status!\", version_no, name, customer_description,\n            benefit_type::text AS \"benefit_type!\", fixed_amount, percentage,\n            maximum_discount_amount, free_item_ids, minimum_order_amount, eligible_item_ids,\n            eligible_category_ids, excluded_item_ids, issue_mode::text AS \"issue_mode!\",\n            audience_type, audience_criteria, audience_size, audience_snapshot_at,\n            total_quantity, unlimited_total_cap, per_user_quantity,\n            per_business_day_quantity, restore_quantity_on_revoke, revoke_policy,\n            global_issued_count, global_revoked_count, issue_starts_at, issue_ends_at,\n            usable_from, usable_until, relative_validity_days, allowed_weekdays,\n            allowed_local_time_ranges, external_discount_stackable, notification_channels,\n            notification_message, published_at, paused_at, cancelled_at, cancellation_reason,\n            emergency_stopped_at, issue_generation, created_at, updated_at, version\n        FROM coupon.campaigns\n        WHERE store_id = $1\n          AND ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))\n        ORDER BY created_at DESC, id DESC\n        LIMIT $4\n        ",
   "describe": {
     "columns": [
       {
@@ -140,106 +140,101 @@
       },
       {
         "ordinal": 27,
-        "name": "global_reserved_count",
-        "type_info": "Int8"
-      },
-      {
-        "ordinal": 28,
         "name": "global_revoked_count",
         "type_info": "Int8"
       },
       {
-        "ordinal": 29,
+        "ordinal": 28,
         "name": "issue_starts_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 30,
+        "ordinal": 29,
         "name": "issue_ends_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 31,
+        "ordinal": 30,
         "name": "usable_from",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 32,
+        "ordinal": 31,
         "name": "usable_until",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 33,
+        "ordinal": 32,
         "name": "relative_validity_days",
         "type_info": "Int2"
       },
       {
-        "ordinal": 34,
+        "ordinal": 33,
         "name": "allowed_weekdays",
         "type_info": "Int2Array"
       },
       {
-        "ordinal": 35,
+        "ordinal": 34,
         "name": "allowed_local_time_ranges",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 36,
+        "ordinal": 35,
         "name": "external_discount_stackable",
         "type_info": "Bool"
       },
       {
-        "ordinal": 37,
+        "ordinal": 36,
         "name": "notification_channels",
         "type_info": "Jsonb"
       },
       {
-        "ordinal": 38,
+        "ordinal": 37,
         "name": "notification_message",
         "type_info": "Text"
       },
       {
-        "ordinal": 39,
+        "ordinal": 38,
         "name": "published_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 40,
+        "ordinal": 39,
         "name": "paused_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 41,
+        "ordinal": 40,
         "name": "cancelled_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 42,
+        "ordinal": 41,
         "name": "cancellation_reason",
         "type_info": "Text"
       },
       {
-        "ordinal": 43,
+        "ordinal": 42,
         "name": "emergency_stopped_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 44,
+        "ordinal": 43,
         "name": "issue_generation",
         "type_info": "Int4"
       },
       {
-        "ordinal": 45,
+        "ordinal": 44,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 46,
+        "ordinal": 45,
         "name": "updated_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 47,
+        "ordinal": 46,
         "name": "version",
         "type_info": "Int8"
       }
@@ -247,7 +242,9 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid"
+        "Timestamptz",
+        "Uuid",
+        "Int8"
       ]
     },
     "nullable": [
@@ -281,7 +278,6 @@
       false,
       false,
       false,
-      false,
       true,
       true,
       true,
@@ -301,5 +297,5 @@
       false
     ]
   },
-  "hash": "61a33475eb99a90908d625a6e424c9fe5366d21e067722bf579376f57da679d1"
+  "hash": "46890d794688e10d0a596e708d5bc071387c36d4dcb9b6b2eb5f09505547fed4"
 }

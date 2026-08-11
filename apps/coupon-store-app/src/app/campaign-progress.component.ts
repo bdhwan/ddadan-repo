@@ -9,7 +9,7 @@ import {
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormsModule } from "@angular/forms";
 import type { CampaignStatus, OwnerCampaignDto } from "@coupon/contracts";
-import { visibilityAwarePoll } from "@coupon/client-core";
+import { AuthSessionService, visibilityAwarePoll } from "@coupon/client-core";
 import { formatKoreaDateTime, formatWon } from "@coupon/domain";
 import {
   CouponBadgeComponent,
@@ -174,7 +174,9 @@ type CampaignAction = "pause" | "cancel" | "revoke";
                   >대상 집합<select [(ngModel)]="draft.audience_type">
                     <option value="ALL_FAVORITES">관심 상점 전체</option>
                     <option value="SEGMENT">세그먼트</option>
-                    <option value="SPECIFIC_CUSTOMERS">특정 고객</option>
+                    <option value="SPECIFIC_CUSTOMERS" disabled>
+                      특정 고객 · 고객 ID 입력 기능 준비 중
+                    </option>
                   </select></label
                 >
                 <label
@@ -591,7 +593,7 @@ type CampaignAction = "pause" | "cancel" | "revoke";
             autocomplete="off"
         /></label>
         <label
-          >재인증 토큰<input
+          >현재 비밀번호<input
             type="password"
             [(ngModel)]="publishReauthentication"
             autocomplete="current-password"
@@ -823,6 +825,7 @@ type CampaignAction = "pause" | "cancel" | "revoke";
 })
 export class CampaignProgressComponent implements OnInit {
   private readonly api = inject(CampaignsApi);
+  private readonly auth = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
   private inFlight = false;
   readonly steps = CAMPAIGN_WIZARD_STEPS;
@@ -989,7 +992,7 @@ export class CampaignProgressComponent implements OnInit {
     this.publishReauthentication = "";
   }
 
-  confirmPublish(): void {
+  async confirmPublish(): Promise<void> {
     const target = this.publishTarget();
     if (
       !target ||
@@ -999,15 +1002,16 @@ export class CampaignProgressComponent implements OnInit {
     )
       return;
     this.saving.set(true);
+    try {
+      await this.auth.reauthenticateWithPassword(this.publishReauthentication);
+    } catch {
+      this.publishReauthentication = "";
+      this.publishError.set("현재 비밀번호로 재인증하지 못했습니다.");
+      this.saving.set(false);
+      return;
+    }
     this.api
-      .publish(
-        target.id,
-        {
-          confirmation_phrase: this.publishConfirmation,
-          reauthentication_token: this.publishReauthentication,
-        },
-        createUuid(),
-      )
+      .publish(target.id, createUuid())
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (published) => {

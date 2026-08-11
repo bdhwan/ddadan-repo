@@ -8,6 +8,7 @@ import {
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, RouterLink } from "@angular/router";
+import { AuthSessionService } from "@coupon/client-core";
 import {
   CouponButtonComponent,
   CouponCardComponent,
@@ -83,7 +84,7 @@ import { AdminOperationsApi } from "./admin-operations.api";
               입력하세요.</small
             ></label
           ><label
-            >관리자 재인증 토큰<input
+            >관리자 현재 비밀번호<input
               name="reauth"
               type="password"
               [(ngModel)]="reauthenticationToken"
@@ -220,6 +221,7 @@ import { AdminOperationsApi } from "./admin-operations.api";
 export class AdminEmergencyActionComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(AdminOperationsApi);
+  private readonly auth = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
   readonly campaignId = this.route.snapshot.paramMap.get("id") ?? "";
   readonly action =
@@ -248,7 +250,7 @@ export class AdminEmergencyActionComponent {
   actionLabel(): string {
     return this.action === "revoke" ? "대량 회수" : "긴급 중단";
   }
-  submit(): void {
+  async submit(): Promise<void> {
     if (
       this.reason.trim().length < 10 ||
       !this.reauthenticationToken ||
@@ -258,13 +260,20 @@ export class AdminEmergencyActionComponent {
       return;
     this.submitting.set(true);
     this.error.set(null);
+    try {
+      await this.auth.reauthenticateWithPassword(this.reauthenticationToken);
+    } catch {
+      this.error.set("현재 비밀번호로 재인증하지 못했습니다.");
+      this.reauthenticationToken = "";
+      this.submitting.set(false);
+      return;
+    }
     this.api
       .emergencyCampaignAction(
         this.campaignId,
         {
           action: this.action === "revoke" ? "REVOKE" : "EMERGENCY_STOP",
           reason: this.reason.trim(),
-          reauthentication_token: this.reauthenticationToken,
           understood_reversibility: true,
         },
         createUuid(),
@@ -272,7 +281,9 @@ export class AdminEmergencyActionComponent {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (response) => {
-          this.transactionId.set(response.transaction_id);
+          this.transactionId.set(
+            response.transaction_id ?? response.request_id,
+          );
           this.completed.set(true);
           this.reauthenticationToken = "";
           this.submitting.set(false);

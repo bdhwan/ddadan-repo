@@ -1,8 +1,10 @@
 # 쿠폰 시스템 엔드포인트 목록 (구현 체크리스트)
 
-> Phase 1(기반)·Phase 2(도장 핵심) 경로는 `apps/coupon-api-server/openapi.json` 에 반영되어 `구현완료`다. Phase 3(캠페인·사용·관리자 확장) 경로는 아직 openapi `paths` 에 없으므로 `미구현`이다.
+> Phase 1(기반)·Phase 2(도장 핵심)·Phase 3(캠페인·사용·관리자 작업/보정) 경로 중 `apps/coupon-api-server/openapi.json` 에 있는 것은 `구현완료`다.
+> 카카오 인증, 공개 상점·관심 등록, 알림/푸시, 관리자 검수·회원·민원·감사 검색 등은 아직 openapi `paths` 에 없으므로 `미구현`이다.
 > 상태의 유일한 기준은 `apps/coupon-api-server/openapi.json` 의 `paths` 이다. openapi에 없으면 `구현완료`로 표시하지 않는다.
 > 원본: `product-spec.md` §11.2 ~ §11.5
+> 대조 시각: 작업 마무리 직전 openapi 재확인.
 
 ## 공통 규약
 
@@ -37,7 +39,7 @@
 | `GET` | `/me/wallet/coupons/:id` | 조건 스냅샷 포함 상세 | 구현완료 |
 | `GET` | `/me/wallet/stamps` | 상점별 가용·만료 예정 도장 | 구현완료 |
 | `POST` | `/me/qr-tokens` | 60초 회전형 QR와 보조 코드 발급 | 구현완료 |
-| `POST` | `/campaigns/:id/claims` | 선착순 쿠폰 받기 | 미구현 |
+| `POST` | `/campaigns/:id/claims` | 선착순 쿠폰 받기 | 구현완료 |
 | `GET/PATCH` | `/me/notifications` | 앱 내 알림 조회·읽음 | 미구현 |
 | `POST/DELETE` | `/me/push-subscriptions` | FCM Web Push 토큰 등록·해제 | 미구현 |
 
@@ -58,15 +60,16 @@
 | `POST` | `/owner/stamp-transactions/preview` | 적립 조건·예상 결과 검증 | 구현완료 |
 | `POST` | `/owner/stamp-transactions` | 최종 적립 승인 | 구현완료 |
 | `POST` | `/owner/stamp-transactions/:id/void` | 24시간 내 취소 | 구현완료 |
-| `GET/POST` | `/owner/campaigns` | 캠페인 목록·초안 생성 | 미구현 |
-| `PATCH` | `/owner/campaigns/:id` | 초안/허용 필드 수정 | 미구현 |
-| `POST` | `/owner/campaigns/:id/publish` | 캠페인 게시·발급 작업 등록 | 미구현 |
-| `POST` | `/owner/campaigns/:id/pause` | 신규 발급 중지 | 미구현 |
-| `POST` | `/owner/campaigns/:id/resume` | 안전 재개 | 미구현 |
-| `POST` | `/owner/campaigns/:id/cancel` | 취소와 회수 정책 지정 | 미구현 |
-| `POST` | `/owner/redemptions/preview` | 조건 검증과 2분 예약 생성 | 미구현 |
-| `POST` | `/owner/redemptions/:id/confirm` | 사용 최종 승인 | 미구현 |
-| `POST` | `/owner/redemptions/:id/cancel` | 예약 또는 10분 내 사용 취소 | 미구현 |
+| `GET/POST` | `/owner/campaigns` | 캠페인 목록·초안 생성 | 구현완료 |
+| `PATCH` | `/owner/campaigns/:id` | 초안/허용 필드 수정 | 구현완료 |
+| `GET` | `/owner/campaigns/:id/estimate` | 대상 규모 추정 | 구현완료 |
+| `POST` | `/owner/campaigns/:id/publish` | 캠페인 게시·발급 작업 등록 | 구현완료 |
+| `POST` | `/owner/campaigns/:id/pause` | 신규 발급 중지 | 구현완료 |
+| `POST` | `/owner/campaigns/:id/resume` | 안전 재개 | 구현완료 |
+| `POST` | `/owner/campaigns/:id/cancel` | 취소와 회수 정책 지정 | 구현완료 |
+| `POST` | `/owner/redemptions/preview` | 조건 검증과 2분 예약 생성 | 구현완료 |
+| `POST` | `/owner/redemptions/:id/confirm` | 사용 최종 승인 | 구현완료 |
+| `POST` | `/owner/redemptions/:id/cancel` | 예약 또는 10분 내 사용 취소 | 구현완료 |
 | `GET` | `/owner/customers` | 가명 고객과 자기 상점 지표 | 미구현 |
 | `GET` | `/owner/analytics` | 잠정/확정 통계 | 미구현 |
 
@@ -100,10 +103,11 @@ preview는 표시 편의를 위한 것이며 confirm에서 모든 조건을 다�
 | `POST` | `/admin/users/:id/revoke-sessions` | Firebase 세션 폐기 | 미구현 |
 | `GET` | `/admin/transactions/:id` | 연결 원장과 감사 타임라인 | 구현완료 |
 | `POST` | `/admin/adjustments/preview` | 보정 결과 시뮬레이션 | 구현완료 |
-| `POST` | `/admin/adjustments` | 승인된 보정 사건 생성 | 미구현 |
-| `POST` | `/admin/campaigns/:id/emergency-stop` | 긴급 중단 | 미구현 |
-| `POST` | `/admin/campaigns/:id/revoke-job` | 대량 회수 작업 | 미구현 |
+| `POST` | `/admin/adjustments` | 승인된 보정 사건 생성 | 구현완료 |
+| `POST` | `/admin/campaigns/:id/emergency-stop` | 긴급 중단 | 구현완료 |
+| `POST` | `/admin/campaigns/:id/revoke-job` | 대량 회수 작업 | 구현완료 |
 | `GET/POST` | `/admin/cases` | 민원·보안 사건 관리 | 미구현 |
-| `GET` | `/admin/jobs` | 작업·시도·체크포인트 | 미구현 |
-| `POST` | `/admin/jobs/:id/retry` | 사유 포함 재처리 | 미구현 |
+| `GET` | `/admin/jobs` | 작업·시도·체크포인트 | 구현완료 |
+| `GET` | `/admin/jobs/:id` | 단일 작업 상세 | 구현완료 |
+| `POST` | `/admin/jobs/:id/retry` | 사유 포함 재처리 | 구현완료 |
 | `GET` | `/admin/audit-logs` | 감사 검색 | 미구현 |

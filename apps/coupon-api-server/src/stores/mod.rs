@@ -230,14 +230,23 @@ pub struct StoreService {
     sealer: Arc<Sealer>,
     lookup_hash: Arc<LookupHash>,
     users: Arc<UserService>,
+    /// A review decision activates or refuses a business (§11.5), which SEC-005 puts
+    /// squarely in "every change is audited".
+    audit: Arc<crate::audit::AuditService>,
 }
 
 impl StoreService {
-    pub fn new(sealer: Arc<Sealer>, lookup_hash: Arc<LookupHash>, users: Arc<UserService>) -> Self {
+    pub fn new(
+        sealer: Arc<Sealer>,
+        lookup_hash: Arc<LookupHash>,
+        users: Arc<UserService>,
+        audit: Arc<crate::audit::AuditService>,
+    ) -> Self {
         Self {
             sealer,
             lookup_hash,
             users,
+            audit,
         }
     }
 
@@ -661,6 +670,210 @@ impl StoreService {
             .await?
             .ok_or_else(|| ApiError::new(ErrorCode::StoreNotFound))
     }
+
+    /// `GET /admin/store-reviews` — the review queue (§11.5, STORE-002).
+    ///
+    /// Lives here rather than in `admin` because `store_reviews` is this module's table
+    /// (§10.2). The queue is ordered oldest-first: a review queue sorted newest-first
+    /// starves the submissions that have already waited longest.
+    pub async fn review_queue(
+        &self,
+        pool: &PgPool,
+        status: Option<&str>,
+        page: &crate::http::pagination::PageQuery,
+    ) -> ApiResult<crate::http::pagination::Page<StoreReviewQueueEntry>> {
+        let cursor = page.cursor()?;
+
+        let rows = sqlx::query!(
+            r#"
+            SELECT r.id, r.store_id, s.name AS store_name, s.status::text AS "store_status!",
+                   r.status::text AS "status!", r.submission_snapshot, r.submitted_at,
+                   r.reviewer_user_id, r.decided_at, r.public_reason, r.created_at
+            FROM coupon.store_reviews r
+            JOIN coupon.stores s ON s.id = r.store_id
+            WHERE ($1::text IS NULL OR r.status::text = $1)
+              AND ($2::timestamptz IS NULL OR (r.created_at, r.id) > ($2::timestamptz, $3::uuid))
+            ORDER BY r.created_at, r.id
+            LIMIT $4
+            "#,
+            status,
+            cursor.as_ref().map(|cursor| cursor.created_at),
+            cursor.as_ref().map(|cursor| cursor.id),
+            page.fetch_limit(),
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let items: Vec<StoreReviewQueueEntry> = rows
+            .into_iter()
+            .map(|row| StoreReviewQueueEntry {
+                id: row.id,
+                store_id: row.store_id,
+                store_name: row.store_name,
+                store_status: StoreStatus::from_db(&row.store_status),
+                status: ReviewStatus::from_db(&row.status),
+                submission_snapshot: row.submission_snapshot,
+                submitted_at: row.submitted_at,
+                reviewer_user_id: row.reviewer_user_id,
+                decided_at: row.decided_at,
+                public_reason: row.public_reason,
+                created_at: row.created_at,
+            })
+            .collect();
+
+        Ok(crate::http::pagination::Page::from_rows(
+            items,
+            page.limit(),
+            |entry| crate::http::pagination::Cursor::new(entry.created_at, entry.id),
+        ))
+    }
+
+    /// `POST /admin/store-reviews/:id/decision` — 승인·보완·거절 (§11.5, STORE-002).
+    ///
+    /// Approval is what activates a store, so the decision and the status change commit
+    /// together: a review marked approved beside a store still stuck in `PENDING_REVIEW`
+    /// would be indistinguishable from a review nobody has looked at.
+    pub async fn decide_review(
+        &self,
+        pool: &PgPool,
+        reviewer_user_id: Uuid,
+        review_id: Uuid,
+        decision: ReviewStatus,
+        public_reason: Option<&str>,
+        internal_reason: &str,
+    ) -> ApiResult<StoreReviewQueueEntry> {
+        if decision == ReviewStatus::Pending {
+            return Err(ApiError::with_message(
+                ErrorCode::ValidationFailed,
+                "검수 결과는 APPROVED, CHANGES_REQUESTED, REJECTED 중 하나여야 합니다.",
+            ));
+        }
+
+        let mut tx = pool.begin().await?;
+
+        let review = sqlx::query!(
+            r#"
+            SELECT store_id, status::text AS "status!"
+            FROM coupon.store_reviews WHERE id = $1 FOR UPDATE
+            "#,
+            review_id,
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| ApiError::new(ErrorCode::NotFound))?;
+
+        if review.status != "PENDING" {
+            return Err(ApiError::with_message(
+                ErrorCode::InvalidStateTransition,
+                "이미 처리된 검수입니다.",
+            ));
+        }
+
+        let decision_db = match decision {
+            ReviewStatus::Approved => "APPROVED",
+            ReviewStatus::ChangesRequested => "CHANGES_REQUESTED",
+            ReviewStatus::Rejected => "REJECTED",
+            ReviewStatus::Cancelled => "CANCELLED",
+            ReviewStatus::Pending => unreachable!("rejected above"),
+        };
+
+        let row = sqlx::query!(
+            r#"
+            UPDATE coupon.store_reviews
+            SET status = $2::text::coupon.review_status, reviewer_user_id = $3,
+                decided_at = clock_timestamp(), public_reason = $4, internal_reason = $5,
+                version = version + 1
+            WHERE id = $1
+            RETURNING id, store_id, status::text AS "status!", submission_snapshot,
+                      submitted_at, reviewer_user_id, decided_at, public_reason, created_at
+            "#,
+            review_id,
+            decision_db,
+            reviewer_user_id,
+            public_reason,
+            internal_reason,
+        )
+        .fetch_one(&mut *tx)
+        .await?;
+
+        // STORE-002: 승인되면 영업을 시작한다. A rejection or a request for changes sends the
+        // store back to `DRAFT` so the owner can edit and resubmit.
+        let next_status = match decision {
+            ReviewStatus::Approved => "ACTIVE",
+            _ => "DRAFT",
+        };
+
+        let store = sqlx::query!(
+            r#"
+            UPDATE coupon.stores
+            SET status = $2::text::coupon.store_status,
+                activated_at = CASE WHEN $2 = 'ACTIVE' THEN COALESCE(activated_at, clock_timestamp())
+                                    ELSE activated_at END
+            WHERE id = $1 AND status = 'PENDING_REVIEW'
+            RETURNING name, status::text AS "status!"
+            "#,
+            review.store_id,
+            next_status,
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| {
+            ApiError::new(ErrorCode::InvalidStateTransition)
+                .internal("store left PENDING_REVIEW while the decision was being recorded")
+        })?;
+
+        self.audit
+            .record(
+                &mut tx,
+                crate::audit::AuditEntry::new(
+                    crate::audit::ActorType::SystemAdmin,
+                    "store_review.decided",
+                    "store_review",
+                )
+                .actor(reviewer_user_id)
+                .resource(review_id)
+                .store(review.store_id)
+                .reason(internal_reason.to_owned())
+                .transition(
+                    &serde_json::json!({ "review": review.status, "store": "PENDING_REVIEW" }),
+                    &serde_json::json!({ "review": decision_db, "store": store.status }),
+                ),
+            )
+            .await?;
+
+        tx.commit().await?;
+
+        Ok(StoreReviewQueueEntry {
+            id: row.id,
+            store_id: row.store_id,
+            store_name: store.name,
+            store_status: StoreStatus::from_db(&store.status),
+            status: ReviewStatus::from_db(&row.status),
+            submission_snapshot: row.submission_snapshot,
+            submitted_at: row.submitted_at,
+            reviewer_user_id: row.reviewer_user_id,
+            decided_at: row.decided_at,
+            public_reason: row.public_reason,
+            created_at: row.created_at,
+        })
+    }
+}
+
+/// One row of the administrative review queue (§11.5).
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct StoreReviewQueueEntry {
+    pub id: Uuid,
+    pub store_id: Uuid,
+    pub store_name: String,
+    pub store_status: StoreStatus,
+    pub status: ReviewStatus,
+    /// What the owner submitted, frozen at submission time (STORE-002).
+    pub submission_snapshot: serde_json::Value,
+    pub submitted_at: DateTime<Utc>,
+    pub reviewer_user_id: Option<Uuid>,
+    pub decided_at: Option<DateTime<Utc>>,
+    pub public_reason: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 /// The preconditions for review submission, separated so they can be tested directly.

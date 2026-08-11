@@ -29,9 +29,10 @@
     "build:coupon-all": "npm run build:coupon-consumer && npm run build:coupon-store && npm run build:coupon-admin",
     "test:coupon-consumer": "npm run test --workspace coupon-consumer-app",
     "test:coupon-store": "npm run test --workspace coupon-store-app",
+    "test:coupon-admin": "npm run test --workspace coupon-system-admin-app",
     "test:coupon-domain": "npm run test --workspace @coupon/domain",
     "test:coupon-pwa": "npm run test --workspace @coupon/client-core",
-    "test:coupon-all": "npm run test:coupon-domain && npm run test:coupon-pwa && npm run test:coupon-consumer && npm run test:coupon-store",
+    "test:coupon-all": "npm run test:coupon-domain && npm run test:coupon-pwa && npm run test:coupon-consumer && npm run test:coupon-store && npm run test:coupon-admin",
     "format:coupon": "npx --yes prettier@3.6.2 --write \"apps/coupon-{consumer,store,system-admin}-app/src/**/*.{ts,html,scss}\" \"libs/**/src/**/*.{ts,html,scss}\"",
     "format:coupon:check": "npx --yes prettier@3.6.2 --check \"apps/coupon-{consumer,store,system-admin}-app/src/**/*.{ts,html,scss}\" \"libs/**/src/**/*.{ts,html,scss}\"",
     "generate:coupon-contracts": "npm run generate --workspace @coupon/contracts"

@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT status::text AS \"status!\", priority, resolution_type, assignee_user_id\n            FROM coupon.admin_cases WHERE id = $1 FOR UPDATE\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "priority",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 2,
+        "name": "resolution_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "assignee_user_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "05a070afbc55e9540fb35b76720c2f45d27275acd4c853b6b2a6985a290f79b5"
+}

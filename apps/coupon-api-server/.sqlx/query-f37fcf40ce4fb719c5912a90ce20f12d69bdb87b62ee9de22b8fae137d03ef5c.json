@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            (SELECT COUNT(*) FROM coupon.job_registry\n             WHERE job_type IN ('issue_campaign', 'build_campaign_audience', 'revoke_campaign')\n               AND status IN ('PENDING_OUTBOX', 'QUEUED', 'RUNNING', 'RETRY_WAIT'))\n                AS \"campaign_backlog!\",\n            COALESCE((\n                SELECT EXTRACT(EPOCH FROM (clock_timestamp() - MIN(created_at)))::bigint\n                FROM coupon.outbox_events WHERE status IN ('PENDING', 'FAILED')\n            ), 0) AS \"outbox_age!\",\n            (SELECT COUNT(*) FROM coupon.outbox_events WHERE status IN ('PENDING', 'FAILED'))\n                AS \"outbox_count!\",\n            (SELECT COUNT(*) FROM coupon.job_registry\n             WHERE status = 'DEAD_LETTER'\n               AND dead_lettered_at > clock_timestamp() - interval '1 hour')\n                AS \"dead_letters_hour!\",\n            (SELECT COUNT(*) FROM coupon.job_registry WHERE status = 'DEAD_LETTER')\n                AS \"dead_letters_total!\",\n            (SELECT COUNT(*) FROM coupon.job_registry\n             WHERE status = 'RUNNING'\n               AND heartbeat_at < clock_timestamp() - (visibility_timeout_secs || ' seconds')::interval)\n                AS \"stalled!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "campaign_backlog!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "outbox_age!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "outbox_count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "dead_letters_hour!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "dead_letters_total!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "stalled!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "f37fcf40ce4fb719c5912a90ce20f12d69bdb87b62ee9de22b8fae137d03ef5c"
+}

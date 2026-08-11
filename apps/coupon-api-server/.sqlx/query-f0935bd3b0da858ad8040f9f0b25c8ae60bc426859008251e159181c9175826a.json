@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT d.id, d.notification_id, n.user_id, n.store_id,\n               d.channel::text AS \"channel!\", d.status::text AS \"status!\", d.purpose,\n               d.template_id, d.attempt_count, d.max_attempts, d.provider_reference,\n               d.scheduled_at, d.deliver_before, d.correlation_id, d.rendered_variables,\n               s.timezone AS \"timezone?\"\n        FROM coupon.notification_deliveries d\n        JOIN coupon.notifications n ON n.id = d.notification_id\n        LEFT JOIN coupon.stores s ON s.id = n.store_id\n        WHERE d.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "notification_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "channel!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "purpose",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "template_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "attempt_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "max_attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 10,
+        "name": "provider_reference",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "scheduled_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "deliver_before",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "correlation_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 14,
+        "name": "rendered_variables",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 15,
+        "name": "timezone?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      null,
+      null,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "f0935bd3b0da858ad8040f9f0b25c8ae60bc426859008251e159181c9175826a"
+}

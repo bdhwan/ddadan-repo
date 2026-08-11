@@ -71,6 +71,25 @@ struct AdjustmentPayload {
     adjustment_id: Uuid,
 }
 
+/// One notification delivery to attempt (§14.6: 알림 발송은 1건/제공자 batch).
+#[derive(Debug, Clone, Deserialize)]
+struct NotifyPayload {
+    delivery_id: Uuid,
+}
+
+/// One store-day to rebuild (§14.6: store+business day).
+#[derive(Debug, Clone, Deserialize)]
+struct AggregatePayload {
+    store_id: Uuid,
+    business_day: chrono::NaiveDate,
+}
+
+/// One erasure to carry out (§14.6: request/case, §17.3).
+#[derive(Debug, Clone, Deserialize)]
+struct PurgePayload {
+    erasure_id: Uuid,
+}
+
 /// Everything a running worker needs.
 pub struct JobRuntime {
     state: AppState,
@@ -98,6 +117,228 @@ impl JobRuntime {
             .jobs
             .relay_outbox(&self.state.pool, self.transport.as_ref(), POLL_BATCH, now)
             .await
+    }
+
+    /// Turn committed domain events into notifications (§15.1, §14.2).
+    ///
+    /// The relay is what makes NOTIFY-003 structurally true: the accrual, the issuance and
+    /// the use each commit an `outbox_events` row inside their own transaction and nothing
+    /// else, so the notification — and every way it can fail — happens strictly afterwards.
+    /// A provider that is down cannot reach back into a coupon.
+    ///
+    /// At-least-once by design. `uq_notifications_user_event_type` and the delivery dedupe
+    /// key mean a row relayed twice produces the same single notification (NOTIFY-004), so
+    /// the relay never has to be careful, only eventual.
+    pub async fn relay_notifications(&self) -> ApiResult<u64> {
+        let now = self.now().await?;
+
+        let pending = sqlx::query!(
+            r#"
+            SELECT id, aggregate_type, aggregate_id, event_type, correlation_id, payload,
+                   created_at
+            FROM coupon.outbox_events
+            WHERE status IN ('PENDING', 'FAILED')
+              AND event_type NOT IN ('JOB_ENQUEUED', 'JOB_RESUMED')
+              AND available_at <= $1
+            ORDER BY created_at
+            LIMIT $2
+            FOR UPDATE SKIP LOCKED
+            "#,
+            now,
+            POLL_BATCH,
+        )
+        .fetch_all(&self.state.pool)
+        .await?;
+
+        let mut relayed = 0u64;
+        for event in pending {
+            let Some(kind) = crate::notifications::NotificationEvent::from_outbox_event(
+                &event.event_type,
+            ) else {
+                // A domain event nobody notifies about is still consumed: leaving it
+                // PENDING forever would make §18.4's outbox-age alert fire on a healthy
+                // system, which is how an alert stops being read.
+                self.mark_outbox_published(event.id, now).await?;
+                continue;
+            };
+
+            match self
+                .publish_notification(kind, event.aggregate_id, event.correlation_id, &event.payload, now)
+                .await
+            {
+                Ok(()) => {
+                    self.mark_outbox_published(event.id, now).await?;
+                    relayed += 1;
+                }
+                Err(error) => {
+                    // Same shape as the job relay: the row stays, backs off, and is retried.
+                    sqlx::query!(
+                        r#"
+                        UPDATE coupon.outbox_events
+                        SET status = 'FAILED', attempt_count = attempt_count + 1,
+                            available_at = $2, last_error = $3
+                        WHERE id = $1
+                        "#,
+                        event.id,
+                        now + chrono::Duration::seconds(30),
+                        // The internal detail, not the customer-facing message: this row is
+                        // read by whoever is working out why a notification never appeared.
+                        format!(
+                            "{}: {}",
+                            error.code.as_str(),
+                            error.internal.as_deref().unwrap_or(&error.message)
+                        ),
+                    )
+                    .execute(&self.state.pool)
+                    .await?;
+                    tracing::warn!(
+                        error = ?error,
+                        outbox_id = %event.id,
+                        event_type = event.event_type,
+                        "notification relay failed"
+                    );
+                }
+            }
+        }
+
+        Ok(relayed)
+    }
+
+    async fn mark_outbox_published(&self, outbox_id: Uuid, now: DateTime<Utc>) -> ApiResult<()> {
+        sqlx::query!(
+            r#"
+            UPDATE coupon.outbox_events
+            SET status = 'PUBLISHED', published_at = $2, attempt_count = attempt_count + 1
+            WHERE id = $1
+            "#,
+            outbox_id,
+            now,
+        )
+        .execute(&self.state.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Build the §15.2 variable set for one domain event and hand it to the notifier.
+    ///
+    /// The variables come from the outbox payload rather than from a fresh read of the
+    /// domain: the payload is what was true when the event happened, and §15.2's 과거 발송
+    /// 재현 wants the message to describe that rather than the world as it is now.
+    async fn publish_notification(
+        &self,
+        kind: crate::notifications::NotificationEvent,
+        aggregate_id: Uuid,
+        correlation_id: Uuid,
+        payload: &serde_json::Value,
+        now: DateTime<Utc>,
+    ) -> ApiResult<()> {
+        use crate::notifications::NotificationEvent;
+
+        let Some(user_id) = payload.get("user_id").and_then(|v| v.as_str()).and_then(|v| Uuid::parse_str(v).ok())
+        else {
+            // An event with no recipient is not a notification. Consuming it silently is
+            // right: the domain change already happened and nobody is waiting to be told.
+            return Ok(());
+        };
+        let store_id = payload
+            .get("store_id")
+            .and_then(|v| v.as_str())
+            .and_then(|v| Uuid::parse_str(v).ok());
+
+        let timezone = match store_id {
+            Some(store_id) => sqlx::query_scalar!(
+                r#"SELECT timezone FROM coupon.stores WHERE id = $1"#,
+                store_id
+            )
+            .fetch_optional(&self.state.pool)
+            .await?,
+            None => None,
+        };
+
+        let mut variables = std::collections::BTreeMap::new();
+        let mut put = |key: &str, value: String| {
+            variables.insert(key.to_owned(), value);
+        };
+
+        if let Some(name) = payload.get("store_name").and_then(|v| v.as_str()) {
+            put("store_name", name.to_owned());
+        }
+
+        match kind {
+            NotificationEvent::StampEarned => {
+                put("quantity", number(payload, "quantity"));
+                put("remaining", number(payload, "remaining"));
+                put("expires_at", text(payload, "expires_at"));
+            }
+            NotificationEvent::RewardIssued => {
+                put("benefit", text(payload, "benefit"));
+                put("expires_at", text(payload, "expires_at"));
+            }
+            NotificationEvent::CouponIssued => {
+                put("campaign_name", text(payload, "campaign_name"));
+                put("benefit", text(payload, "benefit"));
+                put("expires_at", text(payload, "expires_at"));
+            }
+            NotificationEvent::CouponExpiring => {
+                put("benefit", text(payload, "benefit"));
+                put("days_left", number(payload, "days_left"));
+                put("expires_at", text(payload, "expires_at"));
+            }
+            NotificationEvent::CouponUsed => {
+                put("used_at", text(payload, "confirmed_at"));
+                put("discount_amount", number(payload, "discount_amount"));
+                put("transaction_id", aggregate_id.to_string());
+            }
+            NotificationEvent::TransactionVoided => {
+                put("detail", text(payload, "detail"));
+                put("restored", text(payload, "restored"));
+            }
+            NotificationEvent::StoreSuspended | NotificationEvent::StoreClosed => {
+                put("detail", text(payload, "detail"));
+            }
+            NotificationEvent::SecurityAlert => {
+                put("occurred_at", now.to_rfc3339());
+                put("detail", text(payload, "detail"));
+            }
+        }
+
+        let request = crate::notifications::NotificationRequest {
+            user_id,
+            store_id,
+            // The aggregate is the event: two relays of one outbox row produce the same
+            // dedupe key, and so does a redelivery after a crash (NOTIFY-004).
+            event_id: aggregate_id,
+            event: kind,
+            correlation_id,
+            occurred_at: now,
+            expires_at: payload
+                .get("expires_at")
+                .and_then(|v| v.as_str())
+                .and_then(|v| DateTime::parse_from_rfc3339(v).ok())
+                .map(|value| value.with_timezone(&Utc)),
+            deep_link: None,
+            variables,
+            data: payload.clone(),
+            timezone,
+            source_event_type: Some(kind.code().to_owned()),
+        };
+
+        let outcome = self
+            .state
+            .notifications
+            .publish(&self.state.pool, &request)
+            .await?;
+
+        tracing::info!(
+            notification_id = %outcome.notification_id,
+            deduplicated = outcome.deduplicated,
+            queued = outcome.queued_delivery_ids.len(),
+            suppressed = outcome.suppressed.len(),
+            %correlation_id,
+            "notifications.published"
+        );
+
+        Ok(())
     }
 
     /// Take everything currently due. The registry poll is both the JOB-005 fallback and
@@ -245,6 +486,9 @@ impl JobRuntime {
             JobType::RevokeCampaign => self.revoke_campaign(job).await,
             JobType::ExpireCoupons => self.expire(job).await,
             JobType::ExecuteAdjustment => self.execute_adjustment(job).await,
+            JobType::NotifyEvent => self.notify_event(job).await,
+            JobType::AggregateDailyStats => self.aggregate_daily_stats(job).await,
+            JobType::PurgeUserData => self.purge_user_data(job).await,
         }
     }
 
@@ -471,12 +715,12 @@ impl JobRuntime {
                 last_user_id = Some(member.user_id);
 
                 // §12.6-4/5, re-checked per member because the counters move as we go.
-                let committed = campaign.issued_count + campaign.reserved_count + issued_this_batch;
+                let committed = campaign.issued_count + issued_this_batch;
                 if committed >= cap {
                     break;
                 }
                 if let Some(daily) = campaign.per_business_day_quantity
-                    && counter.issued_count + counter.reserved_count + issued_this_batch >= daily
+                    && counter.issued_count + issued_this_batch >= daily
                 {
                     break;
                 }
@@ -792,7 +1036,16 @@ impl JobRuntime {
             .await
             .map_err(|error| Failure::from_api(error, &checkpoint, progress))?;
 
-        progress.processed = (stamps + coupons + reservations) as i64;
+        // §15.2's `COUPON_EXPIRING`. It belongs to this job rather than to a schedule of
+        // its own because the sweep already walks the expiry index, and JOB-004 makes this
+        // job the one that is allowed to run late: a notice that arrives with the coupon
+        // still valid is useful, and one that never arrives costs nobody a benefit.
+        let expiring = self
+            .emit_expiring_notices(now, batch)
+            .await
+            .map_err(|error| Failure::from_api(error, &checkpoint, progress))?;
+
+        progress.processed = (stamps + coupons + reservations + expiring) as i64;
         progress.succeeded = progress.processed;
 
         Ok(Completion {
@@ -800,6 +1053,50 @@ impl JobRuntime {
             progress,
             control: JobControl::Continue,
         })
+    }
+
+    /// Queue a 만료 임박 notice for every coupon crossing the lead time (§15.2, §14.6).
+    ///
+    /// The outbox's own unique key is the deduplication: one `COUPON_EXPIRING` row per
+    /// coupon, ever, however many times the sweep runs.
+    async fn emit_expiring_notices(&self, now: DateTime<Utc>, batch: i64) -> ApiResult<u64> {
+        let horizon = now + self.state.config.coupon_expiring_lead();
+
+        let inserted = sqlx::query!(
+            r#"
+            INSERT INTO coupon.outbox_events
+                (aggregate_type, aggregate_id, aggregate_version, event_type, correlation_id,
+                 payload)
+            SELECT 'coupon_instance', c.id, 1, 'COUPON_EXPIRING', public.gen_random_uuid(),
+                   jsonb_build_object(
+                       'store_id', c.store_id,
+                       'store_name', s.name,
+                       'user_id', c.user_id,
+                       'benefit', c.title,
+                       'expires_at', c.expires_at,
+                       'days_left', GREATEST(
+                           0,
+                           CEIL(EXTRACT(EPOCH FROM (c.expires_at - $1)) / 86400)::bigint
+                       )
+                   )
+            FROM coupon.coupon_instances c
+            JOIN coupon.stores s ON s.id = c.store_id
+            WHERE c.status = 'AVAILABLE'
+              AND c.expires_at > $1
+              AND c.expires_at <= $2
+            ORDER BY c.expires_at
+            LIMIT $3
+            ON CONFLICT (aggregate_type, aggregate_id, aggregate_version, event_type)
+            DO NOTHING
+            "#,
+            now,
+            horizon,
+            batch,
+        )
+        .execute(&self.state.pool)
+        .await?;
+
+        Ok(inserted.rows_affected())
     }
 
     /// ADMIN-003: 대량 보정은 동기 API 가 아니라 검토 가능한 큐 작업으로 실행한다.
@@ -831,6 +1128,145 @@ impl JobRuntime {
             progress,
             control: JobControl::Continue,
         })
+    }
+
+    /// Send one notification (§15.4, NOTIFY-001, NOTIFY-003).
+    ///
+    /// Every outcome the dispatcher can report — sent, suppressed, retrying, permanently
+    /// failed — is a *successful* job. NOTIFY-003 says an external failure must not roll
+    /// anything back, and the delivery row already records what happened; turning a
+    /// provider's 400 into a failed job as well would dead-letter work that has nothing
+    /// left to do and page somebody about a customer who turned push notifications off.
+    ///
+    /// The exception is `Retrying`: the retry schedule lives on the delivery row, and the
+    /// job is re-queued to match it so the two do not drift.
+    async fn notify_event(&self, job: &ClaimedJob) -> Result<Completion, Failure> {
+        let checkpoint = Checkpoint::read(&job.checkpoint);
+        let mut progress = JobProgress::default();
+
+        let payload: NotifyPayload = parse_payload(&job.payload, &checkpoint, progress)?;
+
+        let outcome = crate::notifications::delivery::dispatch(&self.state, payload.delivery_id)
+            .await
+            .map_err(|error| Failure::from_api(error, &checkpoint, progress))?;
+
+        progress.processed = 1;
+        match &outcome {
+            crate::notifications::delivery::DispatchOutcome::Sent { .. }
+            | crate::notifications::delivery::DispatchOutcome::Suppressed { .. }
+            | crate::notifications::delivery::DispatchOutcome::AlreadySettled { .. } => {
+                progress.succeeded = 1;
+            }
+            crate::notifications::delivery::DispatchOutcome::Retrying { after, .. } => {
+                progress.succeeded = 1;
+                self.requeue_after(job.job_id, *after).await;
+            }
+            crate::notifications::delivery::DispatchOutcome::Failed { .. } => {
+                progress.failed = 1;
+            }
+        }
+
+        tracing::info!(
+            job_id = %job.job_id,
+            delivery_id = %payload.delivery_id,
+            ?outcome,
+            "notifications.dispatched"
+        );
+
+        Ok(Completion {
+            checkpoint: checkpoint.value(),
+            progress,
+            control: JobControl::Continue,
+        })
+    }
+
+    /// Rebuild one store-day (§14.6, §19).
+    async fn aggregate_daily_stats(&self, job: &ClaimedJob) -> Result<Completion, Failure> {
+        let checkpoint = Checkpoint::read(&job.checkpoint);
+        let mut progress = JobProgress::default();
+
+        let payload: AggregatePayload = parse_payload(&job.payload, &checkpoint, progress)?;
+
+        let now = self
+            .now()
+            .await
+            .map_err(|error| Failure::from_api(error, &checkpoint, progress))?;
+
+        let state = self
+            .state
+            .analytics
+            .aggregate_day(
+                &self.state.pool,
+                payload.store_id,
+                payload.business_day,
+                Some(job.job_id),
+                now,
+            )
+            .await
+            .map_err(|error| Failure::from_api(error, &checkpoint, progress))?;
+
+        progress.processed = 1;
+        progress.succeeded = 1;
+
+        tracing::info!(
+            store_id = %payload.store_id,
+            business_day = %payload.business_day,
+            ?state,
+            "analytics.aggregated"
+        );
+
+        Ok(Completion {
+            checkpoint: checkpoint.value(),
+            progress,
+            control: JobControl::Continue,
+        })
+    }
+
+    /// Carry out one erasure (§17.3, ADMIN-006).
+    ///
+    /// A live legal hold is a *permanent* failure, exactly as §14.6 says: retrying cannot
+    /// dissolve a dispute, and the ledger row is left as `BLOCKED_LEGAL_HOLD` so the
+    /// obligation stays visible rather than being quietly retried into a dead letter.
+    async fn purge_user_data(&self, job: &ClaimedJob) -> Result<Completion, Failure> {
+        let checkpoint = Checkpoint::read(&job.checkpoint);
+        let mut progress = JobProgress::default();
+
+        let payload: PurgePayload = parse_payload(&job.payload, &checkpoint, progress)?;
+
+        match self
+            .state
+            .privacy
+            .execute(&self.state.pool, payload.erasure_id)
+            .await
+        {
+            Ok(record) => {
+                progress.processed = 1;
+                progress.succeeded = 1;
+                tracing::info!(
+                    erasure_id = %record.id,
+                    applied = %record.applied_scopes,
+                    "privacy.erased"
+                );
+                Ok(Completion {
+                    checkpoint: checkpoint.value(),
+                    progress,
+                    control: JobControl::Continue,
+                })
+            }
+            Err(error) if error.code == ErrorCode::LegalHoldActive => {
+                progress.processed = 1;
+                progress.failed = 1;
+                Err(Failure::permanent("LEGAL_HOLD_ACTIVE", &checkpoint, progress))
+            }
+            Err(error) => Err(Failure::from_api(error, &checkpoint, progress)),
+        }
+    }
+
+    /// Ask the transport to deliver this job again after `delay`.
+    async fn requeue_after(&self, job_id: Uuid, delay: Duration) {
+        if let Err(error) = self.transport.publish_after(job_id, delay).await {
+            tracing::warn!(%error, %job_id, "could not schedule the delivery retry");
+        }
     }
 
     /// Heartbeat, checkpoint and ask whether to keep going (§14.5-7).
@@ -959,6 +1395,24 @@ fn campaign_stop_reason(campaign: &Campaign) -> Option<&'static str> {
             }
         }
     }
+}
+
+/// Read a JSON field as display text, whatever shape it arrived in.
+fn text(payload: &serde_json::Value, key: &str) -> String {
+    match payload.get(key) {
+        Some(serde_json::Value::String(value)) => value.clone(),
+        Some(serde_json::Value::Null) | None => String::new(),
+        Some(other) => other.to_string(),
+    }
+}
+
+/// The same for a number, so `2` renders as `2` rather than `2.0`.
+fn number(payload: &serde_json::Value, key: &str) -> String {
+    payload
+        .get(key)
+        .and_then(serde_json::Value::as_i64)
+        .map(|value| value.to_string())
+        .unwrap_or_default()
 }
 
 fn parse_payload<T: serde::de::DeserializeOwned>(

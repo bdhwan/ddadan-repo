@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE coupon.deletion_ledger\n                    SET reapplied_at = clock_timestamp(), reapply_count = reapply_count + 1,\n                        version = version + 1\n                    WHERE id = $1\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5f1ef2b859ae6e4b85ff6789858857ff7a617626e4b2248c079263c8e96795fa"
+}

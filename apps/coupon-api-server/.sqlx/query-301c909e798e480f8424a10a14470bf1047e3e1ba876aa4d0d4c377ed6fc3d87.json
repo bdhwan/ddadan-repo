@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE coupon.notification_deliveries\n        SET status = 'SENDING', attempt_count = attempt_count + 1, sent_at = $2,\n            version = version + 1\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "301c909e798e480f8424a10a14470bf1047e3e1ba876aa4d0d4c377ed6fc3d87"
+}

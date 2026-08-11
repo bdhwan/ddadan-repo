@@ -985,6 +985,8 @@ async fn approvals_are_rate_limited_per_store_and_owner() {
     let harness = harness_or_skip!(json!({ "rate_limit_stamp_approval_per_min": 2 }));
     let scenario = scenario(&harness, "ratelimit", default_rules()).await;
 
+    on_a_fresh_rate_limit_window().await;
+
     let mut outcomes = Vec::new();
     for round in 0..4 {
         let (token, _) = issue_qr(&harness.app, &scenario.customer_uid).await;
@@ -998,7 +1000,6 @@ async fn approvals_are_rate_limited_per_store_and_owner() {
         .await;
         outcomes.push(response);
     }
-
     assert_eq!(outcomes[0].status, StatusCode::CREATED, "{}", outcomes[0].json);
     assert_eq!(outcomes[1].status, StatusCode::CREATED, "{}", outcomes[1].json);
     assert_eq!(outcomes[2].status, StatusCode::TOO_MANY_REQUESTS);
@@ -1020,6 +1021,27 @@ async fn approvals_are_rate_limited_per_store_and_owner() {
     .await
     .expect("ledger count");
     assert_eq!(ledger, 2);
+}
+
+/// Begin a rate-limit burst on a window that will not roll over underneath it.
+///
+/// §16.4's ceiling is counted over a *fixed* calendar minute, so a burst that straddles a
+/// boundary is counted from zero twice and the third approval is then correctly allowed.
+/// That is the limiter working, not failing — but it makes the assertions above depend on
+/// what the clock happened to read when the suite got here, which is how a test starts
+/// disagreeing with itself once a minute or so. Waiting out the tail of a window costs
+/// nothing on the runs that do not need it.
+async fn on_a_fresh_rate_limit_window() {
+    const WINDOW: i64 = 60;
+    /// Comfortably longer than the burst, which is a few milliseconds of requests.
+    const MARGIN: i64 = 5;
+
+    let remaining = WINDOW - chrono::Utc::now().timestamp().rem_euclid(WINDOW);
+    if remaining <= MARGIN {
+        let past_the_boundary =
+            std::time::Duration::from_secs(remaining as u64) + std::time::Duration::from_millis(50);
+        tokio::time::sleep(past_the_boundary).await;
+    }
 }
 
 // ---------------------------------------------------------------------------

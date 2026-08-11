@@ -3,8 +3,10 @@
 
 pub mod concurrency;
 pub mod health;
+pub mod metrics;
 pub mod middleware;
 pub mod pagination;
+pub mod query;
 pub mod rate_limit;
 pub mod request_id;
 pub mod response;

@@ -1,6 +1,8 @@
 //! `/owner/catalog/*` (§11.4).
 
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
+
+use crate::http::query::Query;
 use axum::http::HeaderMap;
 use axum::routing::{get, patch};
 use axum::{Json, Router};

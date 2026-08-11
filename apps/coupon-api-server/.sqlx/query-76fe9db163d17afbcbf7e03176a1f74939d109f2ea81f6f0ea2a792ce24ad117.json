@@ -1,0 +1,62 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.push_subscriptions\n                (user_id, token_ciphertext, token_lookup_hash, browser_family, device_label,\n                 status)\n            VALUES ($1, $2, $3, $4, $5, 'ACTIVE')\n            ON CONFLICT (token_lookup_hash) DO UPDATE\n            SET user_id = EXCLUDED.user_id,\n                token_ciphertext = EXCLUDED.token_ciphertext,\n                browser_family = COALESCE(EXCLUDED.browser_family, coupon.push_subscriptions.browser_family),\n                device_label = COALESCE(EXCLUDED.device_label, coupon.push_subscriptions.device_label),\n                status = 'ACTIVE',\n                disabled_at = NULL,\n                disabled_reason = NULL,\n                failure_count = 0,\n                last_seen_at = clock_timestamp()\n            RETURNING id, browser_family, device_label, status::text AS \"status!\",\n                      disabled_reason, last_seen_at, created_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "browser_family",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "device_label",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "disabled_reason",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_seen_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Bytea",
+        "Varchar",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      null,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "76fe9db163d17afbcbf7e03176a1f74939d109f2ea81f6f0ea2a792ce24ad117"
+}

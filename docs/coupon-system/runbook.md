@@ -96,11 +96,35 @@ cargo run --bin coupon-api
 # coupon-consumer-app / coupon-store-app / coupon-system-admin-app
 ```
 
-통합 테스트 경고: `COUPON_TEST_DATABASE_URL` 이 없으면 DB 통합 테스트가 조용히 skip 되어 통과처럼 보인다. 실제로 돌리려면:
+## 테스트 DB
+
+통합 테스트가 개발용 DB(`coupon`)를 그대로 쓰면 테스트 픽스처·불완전 payload 가 `job_registry` 등에 남아, 실제 개발 상태와 구분할 수 없다. 그래서 같은 Postgres 컨테이너 안에 **별도 데이터베이스** `coupon_test` 를 두고 테스트만 그쪽으로 보낸다. 컨테이너를 새로 띄우지 않는다.
 
 ```bash
-COUPON_TEST_DATABASE_URL=postgres://coupon:coupon_dev_password@localhost:55432/coupon cargo test --workspace
+# 테스트 DB 생성 + 마이그레이션 (개발용 DB 는 건드리지 않음)
+./scripts/coupon/db-test-up.sh
+
+# 테스트 DB 만 drop 후 재생성·마이그레이션 (개발용 DB 는 건드리지 않음)
+./scripts/coupon/db-test-reset.sh
+
+# COUPON_TEST_DATABASE_URL 을 coupon_test 로 설정한 뒤 cargo test --workspace
+./scripts/coupon/test.sh
 ```
+
+`COUPON_TEST_DATABASE_URL` 이 없으면 DB 통합 테스트가 조용히 skip 되어 통과처럼 보인다. `test.sh` 가 이 변수를 반드시 설정한다.
+
+## DLQ(dead-letter) 대응
+
+기획서 §14.7: dead-letter 재처리는 원인 해결 확인, 관리자 사유, 새 generation 을 요구한다. §18.4 핵심 경보에 dead-letter 신규 발생이 포함된다.
+
+확인 순서:
+
+1. `GET /api/coupon/v1/admin/jobs` 로 dead-letter·실패 작업과 시도·체크포인트를 조회한다. 단건은 `GET /api/coupon/v1/admin/jobs/:id`.
+2. payload·오류 원인·generation 을 확인하고, 잘못된 픽스처·스키마 불일치·워커 버그 등 **원인을 먼저 해결**한다.
+3. 원인 해결이 확인되면 `POST /api/coupon/v1/admin/jobs/:id/retry` 로 관리자 사유를 포함해 재처리한다(새 generation).
+4. 재처리 후에도 dead-letter 가 반복되면 §18.4 경보로 보고하고, 동일 원인 재시도만 반복하지 않는다.
+
+로컬에서 테스트 잔여 행이 dead-letter 로 보이는 경우: 개발용 DB 에 테스트가 섞인 것일 수 있다. `./scripts/coupon/test.sh` 경로(테스트 DB)를 쓰고, 개발용 DB 는 수동 정리하거나 필요 시 `db-reset.sh`(전체 볼륨 삭제, 확인 입력 필요)를 검토한다.
 
 ## 기능 플래그
 

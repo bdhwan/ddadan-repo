@@ -646,3 +646,102 @@ async fn every_response_carries_a_request_id() {
         "the error body carries the id too (§11.1)"
     );
 }
+
+// ---------------------------------------------------------------------------
+// §11.1: ?limit= on a list endpoint
+// ---------------------------------------------------------------------------
+
+/// A page size is corrected, never rejected — and a blank one is no page size at all.
+///
+/// §11.1 fixes `limit` at 1–100 with a default of 20. The question these pin is what the
+/// *wire* does with the values a browser actually sends: `?limit=` for a control the user
+/// never touched, and a number outside the range.
+#[tokio::test]
+async fn a_page_size_is_clamped_rather_than_refused() {
+    let app = app_or_skip!();
+    let uid = unique_uid("pagesize");
+    send(
+        &app,
+        "POST",
+        "/api/coupon/v1/users/bootstrap",
+        &uid,
+        Some(Uuid::new_v4()),
+        Some(serde_json::json!({ "display_name": "페이지 크기" })),
+    )
+    .await;
+
+    for query in ["", "?limit=", "?limit=%20", "?limit=5", "?limit=0", "?limit=1000"] {
+        let response = send(
+            &app,
+            "GET",
+            &format!("/api/coupon/v1/me/wallet/coupons{query}"),
+            &uid,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(
+            response.status,
+            StatusCode::OK,
+            "'{query}' must page, not fail: {}",
+            response.json
+        );
+        assert!(
+            response.data()["items"].is_array(),
+            "'{query}' must return a page"
+        );
+    }
+}
+
+/// A `limit` that is not a number is a 400 — in the envelope every other error uses.
+///
+/// The value being unparseable is a typo in the client, and paging silently at the
+/// default would hide it. What must not happen is axum's bare `text/plain` rejection:
+/// §11.1 promises every error carries a code, and a client that cannot read the body
+/// cannot tell this apart from a 400 for any other reason.
+#[tokio::test]
+async fn an_unparseable_query_parameter_is_reported_in_the_error_envelope() {
+    let app = app_or_skip!();
+    let uid = unique_uid("badlimit");
+    send(
+        &app,
+        "POST",
+        "/api/coupon/v1/users/bootstrap",
+        &uid,
+        Some(Uuid::new_v4()),
+        Some(serde_json::json!({ "display_name": "잘못된 리밋" })),
+    )
+    .await;
+
+    for (query, field) in [
+        ("?limit=abc", "limit"),
+        ("?limit=-1", "limit"),
+        ("?limit=1.5", "limit"),
+        ("?store_id=nope", "store_id"),
+        // No field name to attribute it to; the envelope is still the envelope.
+        ("?limit=5&limit=7", "query"),
+    ] {
+        let response = send(
+            &app,
+            "GET",
+            &format!("/api/coupon/v1/me/wallet/coupons{query}"),
+            &uid,
+            None,
+            None,
+        )
+        .await;
+
+        assert_eq!(response.status, StatusCode::BAD_REQUEST, "'{query}'");
+        assert_eq!(response.error_code(), "VALIDATION_FAILED", "'{query}'");
+        assert_eq!(
+            response.json["error"]["field_errors"][0]["field"], field,
+            "'{query}' must name the parameter at fault: {}",
+            response.json
+        );
+        assert!(
+            response.request_id().starts_with("req_"),
+            "'{query}' must still carry a request id"
+        );
+    }
+}

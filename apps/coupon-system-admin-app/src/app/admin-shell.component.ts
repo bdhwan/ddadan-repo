@@ -22,6 +22,8 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
           <a routerLink="/transactions" routerLinkActive="active">거래 탐색</a>
           <a routerLink="/campaigns" routerLinkActive="active">캠페인</a>
           <a routerLink="/jobs" routerLinkActive="active">작업 큐</a>
+          <a routerLink="/notifications" routerLinkActive="active">알림</a>
+          <a routerLink="/cases" routerLinkActive="active">민원</a>
           <a routerLink="/audit" routerLinkActive="active">감사</a>
         </nav>
       </aside>

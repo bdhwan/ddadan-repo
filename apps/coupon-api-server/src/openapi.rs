@@ -78,6 +78,29 @@ pub const SPEC_FILE: &str = "openapi.json";
         crate::admin::routes::list_jobs,
         crate::admin::routes::get_job,
         crate::admin::routes::retry_job,
+        // Phase 4 — 알림·운영 (§15, §11.5, §19, §17.3).
+        crate::notifications::routes::list_notifications,
+        crate::notifications::routes::update_notifications,
+        crate::notifications::routes::list_push_subscriptions,
+        crate::notifications::routes::register_push_subscription,
+        crate::notifications::routes::delete_push_subscription,
+        crate::notifications::routes::provider_callback,
+        crate::analytics::routes::get_analytics,
+        crate::admin::routes::list_cases,
+        crate::admin::routes::get_case,
+        crate::admin::routes::create_case,
+        crate::admin::routes::patch_case,
+        crate::admin::routes::suspend_user,
+        crate::admin::routes::revoke_sessions,
+        crate::admin::routes::list_audit_logs,
+        crate::admin::routes::list_store_reviews,
+        crate::admin::routes::decide_store_review,
+        crate::admin::routes::get_metrics,
+        crate::privacy::routes::list_retention_policies,
+        crate::privacy::routes::patch_retention_policy,
+        crate::privacy::routes::list_erasures,
+        crate::privacy::routes::request_erasure,
+        crate::privacy::routes::reapply_erasures,
     ),
     components(schemas(
         crate::error::ErrorEnvelope,
@@ -161,7 +184,6 @@ pub const SPEC_FILE: &str = "openapi.json";
         crate::admin::routes::ReasonRequest,
         crate::admin::routes::RevokeJobRequest,
         crate::campaigns::Campaign,
-        crate::campaigns::CampaignsResponse,
         crate::campaigns::CampaignStatus,
         crate::campaigns::IssueMode,
         crate::campaigns::RevokePolicy,
@@ -194,6 +216,47 @@ pub const SPEC_FILE: &str = "openapi.json";
         crate::jobs::JobDetail,
         crate::jobs::JobAttempt,
         crate::jobs::EnqueuedJob,
+        // Phase 4.
+        crate::notifications::Notification,
+        crate::notifications::NotificationChannel,
+        crate::notifications::NotificationEvent,
+        crate::notifications::DeliveryStatus,
+        crate::notifications::NotificationAction,
+        crate::notifications::UpdateNotificationsRequest,
+        crate::notifications::NotificationUpdateResult,
+        crate::notifications::PushSubscription,
+        crate::notifications::PushSubscriptionsResponse,
+        crate::notifications::RegisterPushSubscriptionRequest,
+        crate::notifications::policy::NotificationPurpose,
+        crate::notifications::policy::SuppressionReason,
+        crate::notifications::delivery::CallbackOutcome,
+        crate::notifications::routes::ProviderCallbackBody,
+        crate::notifications::routes::CallbackAck,
+        crate::analytics::AggregationState,
+        crate::analytics::DailyCounts,
+        crate::analytics::DailyMetrics,
+        crate::analytics::AnalyticsResponse,
+        crate::admin::operations::AdminCase,
+        crate::admin::operations::CreateCaseRequest,
+        crate::admin::operations::UpdateCaseRequest,
+        crate::admin::operations::SuspendUserRequest,
+        crate::admin::operations::UserSanction,
+        crate::admin::operations::RevokeSessionsRequest,
+        crate::admin::operations::SessionRevocation,
+        crate::admin::operations::AuditLogEntry,
+        crate::admin::routes::ReviewDecisionRequest,
+        crate::stores::StoreReviewQueueEntry,
+        crate::privacy::RetentionPolicy,
+        crate::privacy::RetentionPoliciesResponse,
+        crate::privacy::UpdateRetentionPolicyRequest,
+        crate::privacy::RequestErasureRequest,
+        crate::privacy::ErasureRecord,
+        crate::privacy::ErasuresResponse,
+        crate::privacy::ReapplyResult,
+        crate::http::metrics::ProcessMetrics,
+        crate::http::metrics::QueueMetrics,
+        crate::http::metrics::NotificationMetrics,
+        crate::http::metrics::OperationalMetrics,
     )),
     modifiers(&SecurityAddon),
     tags(
@@ -207,7 +270,9 @@ pub const SPEC_FILE: &str = "openapi.json";
         (name = "wallet", description = "소비자 지갑: 도장판과 리워드 쿠폰 (§6.2)"),
         (name = "campaigns", description = "할인 캠페인 작성·게시·선착순 발급 (§8.2, §11.4, §13.2)"),
         (name = "redemptions", description = "쿠폰 사용 예약·승인·취소 (§13.3, §8.6)"),
-        (name = "admin", description = "거래 탐색, 보정, 캠페인 긴급 중단, 작업 큐 (§11.5)"),
+        (name = "admin", description = "거래 탐색, 보정, 캠페인 긴급 중단, 작업 큐, 민원·제재·감사 (§11.5)"),
+        (name = "notifications", description = "앱 내 알림, Web Push 구독, 제공자 콜백 (§15)"),
+        (name = "analytics", description = "점주 기간별 지표와 개인정보 최소 기준 (§6.3, §19)"),
     ),
 )]
 pub struct ApiDoc;
@@ -326,6 +391,66 @@ mod tests {
         ] {
             assert!(paths.contains_key(path), "{path} must be documented");
         }
+    }
+
+    #[test]
+    fn the_spec_describes_the_phase_four_surface() {
+        let spec: serde_json::Value =
+            serde_json::from_str(&spec_json()).expect("spec is valid JSON");
+        let paths = spec["paths"].as_object().expect("paths object");
+
+        // §15's consumer surface, §11.5's remaining administrative rows, §6.3's dashboard
+        // and §17.3's retention controls.
+        for path in [
+            "/api/coupon/v1/me/notifications",
+            "/api/coupon/v1/me/push-subscriptions",
+            "/api/coupon/v1/me/push-subscriptions/{subscription_id}",
+            "/api/coupon/v1/notifications/callbacks/{provider}",
+            "/api/coupon/v1/owner/analytics",
+            "/api/coupon/v1/admin/cases",
+            "/api/coupon/v1/admin/cases/{case_id}",
+            "/api/coupon/v1/admin/users/{user_id}/suspend",
+            "/api/coupon/v1/admin/users/{user_id}/revoke-sessions",
+            "/api/coupon/v1/admin/audit-logs",
+            "/api/coupon/v1/admin/store-reviews",
+            "/api/coupon/v1/admin/store-reviews/{review_id}/decision",
+            "/api/coupon/v1/admin/metrics",
+            "/api/coupon/v1/admin/retention-policies",
+            "/api/coupon/v1/admin/privacy/erasures",
+        ] {
+            assert!(paths.contains_key(path), "{path} must be documented");
+        }
+    }
+
+    #[test]
+    fn the_campaign_list_is_paginated_in_the_contract() {
+        // §11.1: 목록은 커서 페이지네이션. A generated client that cannot page cannot be
+        // fixed without a breaking change, so the shape is asserted here.
+        let spec: serde_json::Value =
+            serde_json::from_str(&spec_json()).expect("spec is valid JSON");
+        let parameters = spec["paths"]["/api/coupon/v1/owner/campaigns"]["get"]["parameters"]
+            .as_array()
+            .expect("query parameters");
+
+        let names: Vec<&str> = parameters
+            .iter()
+            .filter_map(|parameter| parameter["name"].as_str())
+            .collect();
+        assert!(names.contains(&"limit"), "{names:?}");
+        assert!(names.contains(&"cursor"), "{names:?}");
+    }
+
+    #[test]
+    fn a_delivery_status_is_never_reported_as_a_read_receipt() {
+        // §15.4: DELIVERED 는 제공자 정의를 따르며 사용자가 읽었다는 뜻이 아니다. The
+        // contract must not offer a `READ` state for a client to misinterpret.
+        let spec: serde_json::Value =
+            serde_json::from_str(&spec_json()).expect("spec is valid JSON");
+        let rendered = spec["components"]["schemas"]["DeliveryStatus"].to_string();
+
+        assert!(rendered.contains("DELIVERED"), "{rendered}");
+        assert!(rendered.contains("SUPPRESSED"), "{rendered}");
+        assert!(!rendered.contains("READ"), "{rendered}");
     }
 
     #[test]

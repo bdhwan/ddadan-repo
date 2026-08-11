@@ -1,0 +1,96 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.deletion_ledger\n            SET status = 'SUCCEEDED', executed_at = clock_timestamp(),\n                applied_scopes = $2, pseudonym_label = $3, blocked_reason = NULL,\n                version = version + 1\n            WHERE id = $1\n            RETURNING id, subject_user_id, case_id, status, requested_at, execute_after,\n                      executed_at, deletion_scope, applied_scopes, pseudonym_label,\n                      blocked_reason, reapply_count, job_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "subject_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "case_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "requested_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "execute_after",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "executed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "deletion_scope",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 8,
+        "name": "applied_scopes",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 9,
+        "name": "pseudonym_label",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "blocked_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "reapply_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "job_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "e887ef9efdff7b2f39b087ab5345a1df52e9664c3fcaa3a4b46528cc181dd292"
+}

@@ -56,6 +56,12 @@ pub enum JobType {
     ExpireCoupons,
     /// 관리자 원장 보정 실행 (ADMIN-003: 대량 보정은 동기 API 가 아니라 큐 작업이다).
     ExecuteAdjustment,
+    /// 알림 발송 (§14.6: 동시성 키는 event+channel+recipient).
+    NotifyEvent,
+    /// 일 통계 집계 (§14.6: 동시성 키는 store+business day).
+    AggregateDailyStats,
+    /// 개인정보 파기 (§14.6: 동시성 키는 request/case, §17.3).
+    PurgeUserData,
 }
 
 impl JobType {
@@ -66,6 +72,9 @@ impl JobType {
             JobType::RevokeCampaign => "revoke_campaign",
             JobType::ExpireCoupons => "expire_coupons",
             JobType::ExecuteAdjustment => "execute_adjustment",
+            JobType::NotifyEvent => "notify_event",
+            JobType::AggregateDailyStats => "aggregate_daily_stats",
+            JobType::PurgeUserData => "purge_user_data",
         }
     }
 
@@ -76,6 +85,9 @@ impl JobType {
             "revoke_campaign" => Some(JobType::RevokeCampaign),
             "expire_coupons" => Some(JobType::ExpireCoupons),
             "execute_adjustment" => Some(JobType::ExecuteAdjustment),
+            "notify_event" => Some(JobType::NotifyEvent),
+            "aggregate_daily_stats" => Some(JobType::AggregateDailyStats),
+            "purge_user_data" => Some(JobType::PurgeUserData),
             _ => None,
         }
     }
@@ -90,6 +102,13 @@ impl JobType {
             JobType::RevokeCampaign => 500,
             JobType::ExpireCoupons => 1_000,
             JobType::ExecuteAdjustment => 1,
+            // §14.6: 알림 발송은 1건/제공자 batch. One message per job keeps the retry
+            // budget and the dedupe key attached to a single recipient.
+            JobType::NotifyEvent => 1,
+            // §14.6: 일 통계 집계는 상점 1개.
+            JobType::AggregateDailyStats => 1,
+            // §14.6: 개인정보 파기는 사용자 1명.
+            JobType::PurgeUserData => 1,
         }
     }
 
@@ -104,6 +123,9 @@ impl JobType {
             // is behind on tidying rather than letting anyone spend an expired coupon.
             JobType::ExpireCoupons => RetryBudget::UnlimitedDelayed { alert_after: 20 },
             JobType::ExecuteAdjustment => RetryBudget::Limited(5),
+            JobType::NotifyEvent => RetryBudget::Limited(5),
+            JobType::AggregateDailyStats => RetryBudget::Limited(5),
+            JobType::PurgeUserData => RetryBudget::Limited(10),
         }
     }
 
@@ -113,6 +135,9 @@ impl JobType {
     pub fn visibility_timeout_secs(self) -> i32 {
         match self {
             JobType::ExecuteAdjustment => 120,
+            // A provider call is bounded by its own client timeout, so a notify job that
+            // has gone quiet for two minutes has genuinely stopped.
+            JobType::NotifyEvent => 120,
             _ => 300,
         }
     }
@@ -284,6 +309,28 @@ impl JobKey {
             GLOBAL_TENANT,
             shard.format("%Y-%m-%dT%H:00Z").to_string(),
             "v1",
+        )
+    }
+
+    /// `aggregate_daily_stats:store-uuid:2026-08-11:v1` — §14.6's store+business day key.
+    pub fn aggregate_daily_stats(store_id: Uuid, business_day: chrono::NaiveDate) -> Self {
+        Self::new(
+            JobType::AggregateDailyStats,
+            store_id.to_string(),
+            business_day.to_string(),
+            "v1",
+        )
+    }
+
+    /// `purge_user_data:request-uuid:user-uuid:v1` — §14.6's request/case key. The request
+    /// is the tenant slot because §17.3 tracks erasure per request, and two requests about
+    /// one person are two obligations with two deadlines.
+    pub fn purge_user_data(request_id: Uuid, subject_user_id: Uuid, generation: i64) -> Self {
+        Self::new(
+            JobType::PurgeUserData,
+            request_id.to_string(),
+            subject_user_id.to_string(),
+            format!("v{generation}"),
         )
     }
 

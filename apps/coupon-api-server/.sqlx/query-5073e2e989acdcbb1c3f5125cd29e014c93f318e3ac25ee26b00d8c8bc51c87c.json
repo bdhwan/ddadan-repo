@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE coupon.auth_identities\n                SET provider_subject = 'tombstone:' || id::text,\n                    provider_profile_snapshot = '{}'::jsonb,\n                    status = 'UNLINKED',\n                    unlinked_at = COALESCE(unlinked_at, clock_timestamp()),\n                    version = version + 1\n                WHERE user_id = $1 AND provider_subject NOT LIKE 'tombstone:%'\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5073e2e989acdcbb1c3f5125cd29e014c93f318e3ac25ee26b00d8c8bc51c87c"
+}

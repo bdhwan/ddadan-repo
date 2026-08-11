@@ -16,6 +16,7 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 
 use crate::admin::admin_router;
+use crate::analytics::owner_analytics_router;
 use crate::campaigns::{campaign_claim_router, owner_campaign_router};
 use crate::catalog::owner_catalog_router;
 use crate::consents::consents_router;
@@ -23,7 +24,9 @@ use crate::error::{ApiError, ErrorCode};
 use crate::http::middleware as coupon_middleware;
 use crate::http::{API_BASE_PATH, health};
 use crate::loyalty::owner_loyalty_router;
+use crate::notifications::{me_notifications_router, notification_webhook_router};
 use crate::openapi::swagger_router;
+use crate::privacy::admin_privacy_router;
 use crate::qr::qr_router;
 use crate::redemptions::owner_redemption_router;
 use crate::state::AppState;
@@ -37,7 +40,11 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_BODY_BYTES: usize = 1024 * 1024;
 
 pub fn build(state: AppState) -> Router {
-    let public = health::health_router();
+    // Provider callbacks authenticate with a body signature rather than a bearer token
+    // (§15.4), so they sit on the public tree beside the probes. Putting them on the
+    // authenticated tree and exempting them would leave the exemption one refactor away
+    // from being forgotten.
+    let public = health::health_router().merge(notification_webhook_router());
 
     let protected = Router::new()
         .merge(users_router())
@@ -51,7 +58,10 @@ pub fn build(state: AppState) -> Router {
         .merge(owner_campaign_router())
         .merge(campaign_claim_router())
         .merge(owner_redemption_router())
+        .merge(me_notifications_router())
+        .merge(owner_analytics_router())
         .merge(admin_router())
+        .merge(admin_privacy_router())
         // Applied bottom-up: auth runs first, then origin, then idempotency — which needs
         // the actor auth established.
         .layer(middleware::from_fn_with_state(
@@ -74,10 +84,17 @@ pub fn build(state: AppState) -> Router {
         // Infrastructure probes are usually configured against a bare path, so the health
         // endpoints answer there too.
         .merge(health::health_router())
+        .merge(crate::http::metrics::metrics_router())
         .merge(swagger_router())
         .fallback(not_found)
         .method_not_allowed_fallback(method_not_allowed)
         .layer(middleware::from_fn(coupon_middleware::request_id::layer))
+        // Outermost of the two, so the §18.4 latency figure includes everything the client
+        // waited for rather than only the handler.
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::http::metrics::layer,
+        ))
         .layer(cors_layer(&state))
         // 503 rather than tower-http's default 408: from the client's point of view this
         // is a transient server-side failure that is safe to retry (§11.1).

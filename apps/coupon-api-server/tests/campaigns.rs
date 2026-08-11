@@ -343,7 +343,7 @@ async fn drive_jobs(harness: &Harness, campaign_id: Uuid, rounds: usize) {
     let runtime = harness.runtime();
 
     for _ in 0..rounds {
-        runtime.relay().await.expect("relay the outbox");
+        relay_until_dispatched(harness, &runtime, campaign_id).await;
 
         let due: Vec<Uuid> = sqlx::query_scalar(
             "SELECT id FROM coupon.job_registry
@@ -362,6 +362,37 @@ async fn drive_jobs(harness: &Harness, campaign_id: Uuid, rounds: usize) {
             runtime.run_once(job_id).await.expect("run the job");
         }
     }
+}
+
+/// Wait until `id`'s jobs have left the outbox — `id` being either a job id or the
+/// campaign whose jobs these are.
+///
+/// One relay pass publishes at most `POLL_BATCH` rows, oldest first, from an
+/// `outbox_events` table every test in this binary shares. Under `cargo test`'s default
+/// parallelism a single pass can therefore spend its whole batch on another test's
+/// backlog and leave this test's row `PENDING_OUTBOX` — where `claim` correctly refuses
+/// it, and the test reads a job that silently never ran. That is a test-harness artefact,
+/// not a defect: in production the relay is a loop and the next tick takes the remainder.
+/// This spells that loop out, and waits for the *effect* rather than for its own pass to
+/// have caused it, because a parallel test's relay may well publish the row first.
+async fn relay_until_dispatched(harness: &Harness, runtime: &JobRuntime, id: Uuid) {
+    for _ in 0..60 {
+        let waiting: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM coupon.job_registry
+             WHERE status = 'PENDING_OUTBOX' AND (id = $1 OR resource_id = $1)",
+        )
+        .bind(id)
+        .fetch_one(&harness.pool)
+        .await
+        .expect("jobs still in the outbox");
+
+        if waiting == 0 {
+            return;
+        }
+        runtime.relay().await.expect("relay the outbox");
+    }
+
+    panic!("{id}: 아웃박스에 남은 job 이 릴레이되지 않았다");
 }
 
 async fn consumer(app: &Router, label: &str) -> String {
@@ -1669,7 +1700,7 @@ async fn a_ledger_correction_needs_a_second_administrator_and_runs_as_a_job() {
 
     // ADMIN-003: 대량 보정은 동기 API 가 아니라 검토 가능한 큐 작업으로 실행한다.
     let runtime = harness.runtime();
-    runtime.relay().await.expect("relay");
+    relay_until_dispatched(&harness, &runtime, job_id).await;
     runtime.run_once(job_id).await.expect("run");
 
     let granted: i64 = sqlx::query_scalar(

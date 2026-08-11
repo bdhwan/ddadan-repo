@@ -1,0 +1,151 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.admin_cases\n            SET status = COALESCE($2::text::coupon.admin_case_status, status),\n                assignee_user_id = COALESCE($3, assignee_user_id),\n                priority = COALESCE($4, priority),\n                resolution_type = COALESCE($5, resolution_type),\n                public_resolution = COALESCE($6, public_resolution),\n                internal_resolution = COALESCE($7, internal_resolution),\n                legal_hold_until = COALESCE($8, legal_hold_until),\n                due_at = COALESCE($9, due_at),\n                -- The CHECK constraint demands these timestamps for the terminal statuses,\n                -- so they are derived here rather than trusted from the request.\n                resolved_at = CASE\n                    WHEN COALESCE($2, status::text) IN ('RESOLVED', 'CLOSED')\n                        THEN COALESCE(resolved_at, clock_timestamp())\n                    ELSE resolved_at END,\n                closed_at = CASE\n                    WHEN COALESCE($2, status::text) = 'CLOSED'\n                        THEN COALESCE(closed_at, clock_timestamp())\n                    ELSE closed_at END,\n                resolved_by_user_id = CASE\n                    WHEN COALESCE($2, status::text) IN ('RESOLVED', 'CLOSED')\n                        THEN COALESCE(resolved_by_user_id, $10)\n                    ELSE resolved_by_user_id END,\n                version = version + 1\n            WHERE id = $1\n            RETURNING id, case_number, case_type::text AS \"case_type!\",\n                      status::text AS \"status!\", priority, title, description,\n                      subject_user_id, subject_store_id, subject_resource_type,\n                      subject_resource_id, assignee_user_id, resolution_type,\n                      public_resolution, internal_resolution, legal_hold_until, due_at,\n                      resolved_at, created_at, updated_at, version\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "case_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "case_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "priority",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 5,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "subject_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "subject_store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "subject_resource_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "subject_resource_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 11,
+        "name": "assignee_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 12,
+        "name": "resolution_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 13,
+        "name": "public_resolution",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "internal_resolution",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "legal_hold_until",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 16,
+        "name": "due_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 17,
+        "name": "resolved_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 18,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 19,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 20,
+        "name": "version",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Int2",
+        "Varchar",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "71a1dbc24f7bc2bc7474174a55f71952ff59c223febdce3a44953bb4679b3f70"
+}

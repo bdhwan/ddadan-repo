@@ -779,9 +779,15 @@ impl RedemptionService {
             "REDEMPTION_VOIDED",
             serde_json::json!({
                 "store_id": store.id,
+                "store_name": store.name,
                 "user_id": coupon.user_id,
                 "coupon_id": coupon.id,
                 "restored": restorable,
+                "detail": if restorable {
+                    "쿠폰 사용이 취소되어 다시 사용할 수 있습니다."
+                } else {
+                    "쿠폰 사용이 취소되었습니다."
+                },
             }),
         )
         .await?;

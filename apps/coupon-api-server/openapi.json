@@ -124,6 +124,134 @@
         ]
       }
     },
+    "/api/coupon/v1/admin/audit-logs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "감사 검색 (§11.5, §12.5).",
+        "description": "Each row carries `chain_intact`, recomputed on read. §12.5 asks for 변조 탐지 and a flag\nnobody looks at is not detection — so it travels with the data an investigator is\nalready reading.",
+        "operationId": "list_audit_logs",
+        "parameters": [
+          {
+            "name": "actor_user_id",
+            "in": "query",
+            "description": "Who acted",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "Exact action verb",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource_type",
+            "in": "query",
+            "description": "e.g. stamp_transaction",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "query",
+            "description": "One resource's history",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "Scoped to a store",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "case_id",
+            "in": "query",
+            "description": "Everything attached to a case",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "RFC 3339, inclusive",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "RFC 3339, exclusive",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1–100, default 20",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "next_cursor from the previous page",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AuditLogEntry"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not read the audit trail"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
     "/api/coupon/v1/admin/campaigns/{campaign_id}/emergency-stop": {
       "post": {
         "tags": [
@@ -242,6 +370,243 @@
           },
           "404": {
             "description": "No such campaign"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/cases": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "The case queue (§11.5, ADMIN-004).",
+        "operationId": "list_cases",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "OPEN, INVESTIGATING, RESOLVED, …",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "case_type",
+            "in": "query",
+            "description": "QR_ABUSE, PRIVACY_REQUEST, …",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subject_user_id",
+            "in": "query",
+            "description": "Cases about one member",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "subject_store_id",
+            "in": "query",
+            "description": "Cases about one store",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1–100, default 20",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "next_cursor from the previous page",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_AdminCase"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Open a case (ADMIN-002 신고·자동 위험 신호·외부 요청을 사건 티켓으로 만든다).",
+        "description": "Every administrative role may open one, including `SUPPORT`: a complaint arriving at\nthe support desk is exactly the thing that should become a ticket, and making that\nrequire a higher role would push it into an email thread instead.",
+        "operationId": "create_case",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Opened",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCase"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Unknown case type"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/cases/{case_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "One case (§11.5).",
+        "operationId": "get_case",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "description": "Case id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Case",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCase"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such case"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Work a case (ADMIN-004).",
+        "operationId": "patch_case",
+        "parameters": [
+          {
+            "name": "case_id",
+            "in": "path",
+            "description": "Case id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCaseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCase"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not change a case"
+          },
+          "404": {
+            "description": "No such case"
           }
         },
         "security": [
@@ -425,6 +790,366 @@
         ]
       }
     },
+    "/api/coupon/v1/admin/metrics": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "§18.4's alert inputs, as numbers (§18.3, §18.4).",
+        "operationId": "get_metrics",
+        "responses": {
+          "200": {
+            "description": "Operational metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationalMetrics"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/privacy/erasures": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Erasure requests and their outcomes (ADMIN-006).",
+        "operationId": "list_erasures",
+        "responses": {
+          "200": {
+            "description": "Newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErasuresResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Queue an erasure (ADMIN-006 삭제).",
+        "description": "The request does not erase anything: it registers the obligation, records the case that\nauthorises it, and queues a job that runs after the grace period. §17.3's hold check\nhappens both here and in the job, because a dispute can open in between.",
+        "operationId": "request_erasure",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestErasureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErasureRecord"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not request erasure"
+          },
+          "404": {
+            "description": "No such subject or case"
+          },
+          "422": {
+            "description": "LEGAL_HOLD_ACTIVE"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/privacy/erasures/reapply": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Re-apply every completed erasure (§18.5).",
+        "description": "The runbook step after a restore. Safe to run at any time — the erasure is idempotent —\nand `reapplied > 0` outside a restore means something wrote an erased subject back,\nwhich is worth an alert rather than a shrug.",
+        "operationId": "reapply_erasures",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How many subjects had to be erased again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReapplyResult"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not replay the deletion ledger"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/retention-policies": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "The configured retention periods (§17.3).",
+        "operationId": "list_retention_policies",
+        "responses": {
+          "200": {
+            "description": "Per-category retention",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionPoliciesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/retention-policies/{data_category}": {
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Change one category's retention period.",
+        "description": "§17.3 makes these configuration rather than constants precisely so they can change\nwithout a deploy — but a shortened period destroys evidence, so it demands a fresh\nsign-in, a written legal basis and a reason, and it lands in the audit trail.",
+        "operationId": "patch_retention_policy",
+        "parameters": [
+          {
+            "name": "data_category",
+            "in": "path",
+            "description": "PROFILE, CONSENT, TRANSACTION, …",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRetentionPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetentionPolicy"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not change retention"
+          },
+          "404": {
+            "description": "No such category"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/store-reviews": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "검수 큐 (§11.5, STORE-002).",
+        "operationId": "list_store_reviews",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "PENDING, APPROVED, REJECTED, …",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1–100, default 20",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "next_cursor from the previous page",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_StoreReviewQueueEntry"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/store-reviews/{review_id}/decision": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "승인·보완·거절 (§11.5, STORE-002).",
+        "operationId": "decide_store_review",
+        "parameters": [
+          {
+            "name": "review_id",
+            "in": "path",
+            "description": "Review id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDecisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Decided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreReviewQueueEntry"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not decide reviews"
+          },
+          "404": {
+            "description": "No such review"
+          },
+          "422": {
+            "description": "The review is not pending"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
     "/api/coupon/v1/admin/transactions/{transaction_id}": {
       "get": {
         "tags": [
@@ -461,6 +1186,136 @@
           },
           "404": {
             "description": "No such transaction"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/users/{user_id}/revoke-sessions": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Firebase 세션 폐기 (§11.5).",
+        "operationId": "revoke_sessions",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "Subject member id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeSessionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionRevocation"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not revoke sessions"
+          },
+          "404": {
+            "description": "No such member"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/users/{user_id}/suspend": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "임시/영구 제재 (§11.5, ADMIN-002).",
+        "description": "Re-authentication is required, and a permanent sanction additionally names a second\nadministrator: §3.3's 이중 확인. The database refuses an approver who is the requester,\nso the rule holds even if this handler is bypassed.",
+        "operationId": "suspend_user",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "Subject member id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuspendUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Sanctioned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSanction"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "APPROVAL_SEPARATION_REQUIRED, or the role may not sanction"
+          },
+          "404": {
+            "description": "No such member or case"
+          },
+          "409": {
+            "description": "SANCTION_ALREADY_ACTIVE"
           }
         },
         "security": [
@@ -742,6 +1597,236 @@
         ]
       }
     },
+    "/api/coupon/v1/me/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "The consumer's inbox (§11.3, §11.6: 30초 polling).",
+        "operationId": "list_notifications",
+        "parameters": [
+          {
+            "name": "unread_only",
+            "in": "query",
+            "description": "Only notifications not yet read",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1–100, default 20",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "next_cursor from the previous page",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_Notification"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark read, mark unread, or clear (§11.3).",
+        "description": "Clearing is a view-level act: §15.1 keeps the ledger as the record of what happened, so\nan emptied inbox still leaves every coupon and every transaction exactly where it was.",
+        "operationId": "update_notifications",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "How many rows changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationUpdateResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No notification was named"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/me/push-subscriptions": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "The browsers this account has registered for web push (§15.1-2).",
+        "operationId": "list_push_subscriptions",
+        "responses": {
+          "200": {
+            "description": "Registered browsers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSubscriptionsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Register this browser's FCM token.",
+        "operationId": "register_push_subscription",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterPushSubscriptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSubscription"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed token"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/me/push-subscriptions/{subscription_id}": {
+      "delete": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Stop pushing to one browser (NOTIFY-001 특정 채널 철회).",
+        "operationId": "delete_push_subscription",
+        "parameters": [
+          {
+            "name": "subscription_id",
+            "in": "path",
+            "description": "Subscription id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushSubscriptionsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such subscription for this account"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
     "/api/coupon/v1/me/qr-tokens": {
       "post": {
         "tags": [
@@ -961,20 +2046,164 @@
         ]
       }
     },
+    "/api/coupon/v1/notifications/callbacks/{provider}": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Accept a delivery callback.",
+        "description": "Three checks, in this order, because each one narrows what the next may trust:\n\n1. the timestamp is inside the skew window — an old signed body cannot be replayed;\n2. the HMAC over `timestamp.body` verifies in constant time;\n3. the `provider_reference` names a delivery of ours on this channel.\n\nFailing 1 or 2 answers 401 without saying which: distinguishing \"your signature is\nwrong\" from \"your timestamp is stale\" tells an attacker which half to work on. Failing 3\nis a 200 with `IGNORED` — the provider did nothing wrong, and retrying will not help it.",
+        "operationId": "provider_callback",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "Provider slug, e.g. fcm or alimtalk",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Signature",
+            "in": "header",
+            "description": "Hex HMAC-SHA256 over `<timestamp>.<body>`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Signature-Timestamp",
+            "in": "header",
+            "description": "RFC 3339, within 5 minutes",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderCallbackBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallbackAck"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Signature or timestamp rejected"
+          },
+          "503": {
+            "description": "No callback secret is configured"
+          }
+        }
+      }
+    },
+    "/api/coupon/v1/owner/analytics": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "기간별 적립·리워드·캠페인·취소 지표 (§6.3, §19).",
+        "description": "Every day in the range appears in the response, including the ones the nightly batch\nhas not reached — those carry `state: PENDING` and no numbers at all, because §19 draws\nthe line between 실시간 수치 and 확정 배치 수치 and a zero would erase it.",
+        "operationId": "get_analytics",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First business day (inclusive)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last business day (inclusive)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-day and total metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyticsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The range is inverted or longer than 366 days"
+          },
+          "403": {
+            "description": "Not a store owner"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
     "/api/coupon/v1/owner/campaigns": {
       "get": {
         "tags": [
           "campaigns"
         ],
-        "summary": "My campaigns, newest first.",
+        "summary": "My campaigns, newest first, cursor-paginated (§11.1).",
         "operationId": "list_campaigns",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1–100, default 20",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "next_cursor from the previous page",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Campaigns",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CampaignsResponse"
+                  "$ref": "#/components/schemas/Page_Campaign"
                 }
               }
             }
@@ -2751,6 +3980,133 @@
           "STAMP_GRANT"
         ]
       },
+      "AdminCase": {
+        "type": "object",
+        "required": [
+          "id",
+          "case_number",
+          "case_type",
+          "status",
+          "priority",
+          "title",
+          "description",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "assignee_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "case_number": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "case_type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "internal_resolution": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Only returned to the roles §3.3 lets act; `SUPPORT` sees `null`."
+          },
+          "legal_hold_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "priority": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "public_resolution": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resolution_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resolved_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "subject_resource_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "subject_resource_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject_store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "subject_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "AdminLedgerEntry": {
         "type": "object",
         "description": "One entry of the append-only stamp ledger, as an investigator reads it.",
@@ -2968,6 +4324,67 @@
           }
         }
       },
+      "AggregationState": {
+        "type": "string",
+        "description": "Whether a day's numbers are settled (§19: 실시간 수치와 확정 배치 수치를 구분한다).",
+        "enum": [
+          "PENDING",
+          "PROVISIONAL",
+          "FINAL"
+        ]
+      },
+      "AnalyticsResponse": {
+        "type": "object",
+        "description": "The whole answer to `GET /owner/analytics`.",
+        "required": [
+          "store_id",
+          "from",
+          "to",
+          "finalised_days",
+          "pending_days",
+          "minimum_cohort_size",
+          "totals",
+          "days"
+        ],
+        "properties": {
+          "days": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyMetrics"
+            }
+          },
+          "finalised_days": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Days whose numbers are settled."
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "minimum_cohort_size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The privacy floor in force (§19)."
+          },
+          "pending_days": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Days the batch has not reached. Non-zero means the totals below are incomplete, and\nthe client is expected to say so rather than present them as the period's result."
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/DailyCounts"
+          }
+        }
+      },
       "ApproveAdjustmentRequest": {
         "type": "object",
         "description": "`POST /admin/adjustments` — approve a previewed correction and queue it (§11.5).",
@@ -3070,6 +4487,94 @@
           "SPECIFIC_USERS"
         ]
       },
+      "AuditLogEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "actor_type",
+          "action",
+          "resource_type",
+          "metadata",
+          "occurred_at",
+          "chain_intact"
+        ],
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actor_type": {
+            "type": "string"
+          },
+          "actor_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "after_hash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "before_hash": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "case_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "chain_intact": {
+            "type": "boolean",
+            "description": "Whether this entry still chains to its predecessor (§12.5 변조 탐지). `false` means\nthe row, or one before it, is not what it was when it was written."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "metadata": {},
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "request_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "resource_type": {
+            "type": "string"
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
       "Benefit": {
         "type": "object",
         "description": "The discount a coupon grants, in the form the calculator needs.",
@@ -3157,6 +4662,26 @@
           }
         }
       },
+      "CallbackAck": {
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/CallbackOutcome"
+          }
+        }
+      },
+      "CallbackOutcome": {
+        "type": "string",
+        "description": "What recording a callback did.",
+        "enum": [
+          "APPLIED",
+          "DUPLICATE",
+          "IGNORED"
+        ]
+      },
       "Campaign": {
         "type": "object",
         "description": "A campaign as both the owner app and the admin app read it.",
@@ -3180,7 +4705,6 @@
           "restore_quantity_on_revoke",
           "revoke_policy",
           "issued_count",
-          "reserved_count",
           "revoked_count",
           "remaining_quantity",
           "issue_starts_at",
@@ -3303,7 +4827,8 @@
           },
           "issued_count": {
             "type": "integer",
-            "format": "int64"
+            "format": "int64",
+            "description": "§8.4 counts PENDING, AVAILABLE, RESERVED, USED and EXPIRED instances; only\nISSUE_FAILED is excluded. There is no separate reserved figure because §13.2 issues\nand counts inside one transaction — see the Phase 4 migration for why the column is\ngone rather than permanently zero."
           },
           "minimum_order_amount": {
             "type": "integer",
@@ -3359,11 +4884,7 @@
           "remaining_quantity": {
             "type": "integer",
             "format": "int64",
-            "description": "`effective_cap - (issued + reserved)`."
-          },
-          "reserved_count": {
-            "type": "integer",
-            "format": "int64"
+            "description": "`effective_cap - issued`."
           },
           "restore_quantity_on_revoke": {
             "type": "boolean",
@@ -3425,20 +4946,6 @@
           "ENDED",
           "CANCELLED"
         ]
-      },
-      "CampaignsResponse": {
-        "type": "object",
-        "required": [
-          "campaigns"
-        ],
-        "properties": {
-          "campaigns": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Campaign"
-            }
-          }
-        }
       },
       "CancelCampaignRequest": {
         "type": "object",
@@ -4066,6 +5573,77 @@
           }
         }
       },
+      "CreateCaseRequest": {
+        "type": "object",
+        "description": "`POST /admin/cases`.",
+        "required": [
+          "case_type",
+          "title",
+          "description"
+        ],
+        "properties": {
+          "case_type": {
+            "type": "string",
+            "description": "One of `coupon.admin_case_type`: ADMIN-004's 유형 분류."
+          },
+          "description": {
+            "type": "string"
+          },
+          "due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "ADMIN-006: 처리 기한."
+          },
+          "legal_hold_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "§17.3: while this is in the future the subject's data cannot be erased."
+          },
+          "priority": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "subject_resource_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "subject_resource_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject_store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "subject_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      },
       "CreateCategoryRequest": {
         "type": "object",
         "required": [
@@ -4196,6 +5774,138 @@
           }
         }
       },
+      "DailyCounts": {
+        "type": "object",
+        "description": "§6.3's dashboard row. Gross and reversal are separate columns on purpose.",
+        "required": [
+          "stamp_earned_count",
+          "stamp_voided_count",
+          "stamp_net_count",
+          "stamp_transaction_count",
+          "reward_issued_count",
+          "reward_used_count",
+          "campaign_coupon_issued_count",
+          "campaign_coupon_used_count",
+          "campaign_coupon_revoked_count",
+          "coupon_expired_count",
+          "redemption_voided_count",
+          "discount_amount_total"
+        ],
+        "properties": {
+          "active_customer_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Distinct customers seen. Withheld below the privacy floor."
+          },
+          "campaign_coupon_issued_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "campaign_coupon_revoked_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "campaign_coupon_used_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "coupon_expired_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "discount_amount_total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "redemption_voided_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reward_issued_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reward_used_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stamp_earned_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "총 발생치: accruals recorded, before reversals."
+          },
+          "stamp_net_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "순수치."
+          },
+          "stamp_transaction_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stamp_voided_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "취소·보정으로 되돌린 수."
+          }
+        }
+      },
+      "DailyMetrics": {
+        "type": "object",
+        "description": "One business day for one store.",
+        "required": [
+          "business_day",
+          "state",
+          "suppressed"
+        ],
+        "properties": {
+          "business_day": {
+            "type": "string",
+            "format": "date"
+          },
+          "computed_through": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the figures were last recomputed."
+          },
+          "metrics": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DailyCounts",
+                "description": "`null` while [`AggregationState::Pending`], so a client cannot render a zero."
+              }
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/AggregationState"
+          },
+          "suppressed": {
+            "type": "boolean",
+            "description": "True when the cohort behind this day is below the privacy floor and the breakdown\nhas been withheld (§19 소규모 집단)."
+          }
+        }
+      },
+      "DeliveryStatus": {
+        "type": "string",
+        "description": "`coupon.notification_delivery_status` (§15.4).",
+        "enum": [
+          "PENDING",
+          "SENDING",
+          "DELIVERED",
+          "FAILED_RETRYABLE",
+          "FAILED_PERMANENT",
+          "SUPPRESSED"
+        ]
+      },
       "Discount": {
         "type": "object",
         "description": "What a coupon is worth against one order.",
@@ -4250,6 +5960,93 @@
           },
           "status": {
             "$ref": "#/components/schemas/JobStatus"
+          }
+        }
+      },
+      "ErasureRecord": {
+        "type": "object",
+        "required": [
+          "id",
+          "subject_user_id",
+          "status",
+          "requested_at",
+          "execute_after",
+          "deletion_scope",
+          "applied_scopes",
+          "reapply_count"
+        ],
+        "properties": {
+          "applied_scopes": {},
+          "blocked_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "case_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "deletion_scope": {},
+          "execute_after": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "job_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "pseudonym_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reapply_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "requested_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "subject_user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ErasuresResponse": {
+        "type": "object",
+        "required": [
+          "erasures"
+        ],
+        "properties": {
+          "erasures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ErasureRecord"
+            }
           }
         }
       },
@@ -4678,7 +6475,10 @@
           "ISSUE_CAMPAIGN",
           "REVOKE_CAMPAIGN",
           "EXPIRE_COUPONS",
-          "EXECUTE_ADJUSTMENT"
+          "EXECUTE_ADJUSTMENT",
+          "NOTIFY_EVENT",
+          "AGGREGATE_DAILY_STATS",
+          "PURGE_USER_DATA"
         ]
       },
       "LiveResponse": {
@@ -4827,6 +6627,198 @@
         ],
         "description": "One version, as the owner app sees it."
       },
+      "Notification": {
+        "type": "object",
+        "description": "One row of the consumer's inbox (§11.3 `GET /me/notifications`).",
+        "required": [
+          "id",
+          "type",
+          "purpose",
+          "priority",
+          "title",
+          "body",
+          "data",
+          "occurred_at"
+        ],
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "data": {},
+          "deep_link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "priority": {
+            "type": "string"
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/NotificationPurpose"
+          },
+          "read_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "NotificationAction": {
+        "type": "string",
+        "enum": [
+          "MARK_READ",
+          "MARK_UNREAD",
+          "DISMISS"
+        ]
+      },
+      "NotificationChannel": {
+        "type": "string",
+        "description": "Delivery channel. Mirrors `coupon.notification_channel`.",
+        "enum": [
+          "IN_APP",
+          "FCM_WEB_PUSH",
+          "KAKAO_ALIMTALK"
+        ]
+      },
+      "NotificationEvent": {
+        "type": "string",
+        "description": "The §15.2 event table.",
+        "enum": [
+          "STAMP_EARNED",
+          "REWARD_ISSUED",
+          "COUPON_ISSUED",
+          "COUPON_EXPIRING",
+          "COUPON_USED",
+          "TRANSACTION_VOIDED",
+          "STORE_SUSPENDED",
+          "STORE_CLOSED",
+          "SECURITY_ALERT"
+        ]
+      },
+      "NotificationMetrics": {
+        "type": "object",
+        "required": [
+          "pending_deliveries",
+          "retrying_deliveries",
+          "oldest_pending_age_secs",
+          "provider_failure_rate_1h",
+          "permanent_failures_1h",
+          "delivered_1h",
+          "suppressed_1h"
+        ],
+        "properties": {
+          "delivered_1h": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "oldest_pending_age_secs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds the oldest due delivery has been waiting."
+          },
+          "pending_deliveries": {
+            "type": "integer",
+            "format": "int64",
+            "description": "§18.4: notification backlog."
+          },
+          "permanent_failures_1h": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "provider_failure_rate_1h": {
+            "type": "number",
+            "format": "double",
+            "description": "§18.4: FCM/알림톡 provider 실패율, over the last hour."
+          },
+          "retrying_deliveries": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "suppressed_1h": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Suppressions are not failures — they are the consent machinery working — but a\nsudden rise means a consent projection broke, so they are reported separately rather\nthan folded into either number."
+          }
+        }
+      },
+      "NotificationPurpose": {
+        "type": "string",
+        "description": "Why a message is being sent. §15.3 turns this into a legal basis, so it is stored on\nthe delivery rather than re-derived: a later template reclassification must not rewrite\nthe basis a past send was made on.",
+        "enum": [
+          "TRANSACTIONAL",
+          "INFORMATIONAL",
+          "MARKETING",
+          "SECURITY"
+        ]
+      },
+      "NotificationUpdateResult": {
+        "type": "object",
+        "required": [
+          "updated",
+          "unread_count"
+        ],
+        "properties": {
+          "unread_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updated": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "OperationalMetrics": {
+        "type": "object",
+        "description": "Everything §18.4 names, in one response.",
+        "required": [
+          "process",
+          "queues",
+          "notifications"
+        ],
+        "properties": {
+          "notifications": {
+            "$ref": "#/components/schemas/NotificationMetrics"
+          },
+          "process": {
+            "$ref": "#/components/schemas/ProcessMetrics"
+          },
+          "queues": {
+            "$ref": "#/components/schemas/QueueMetrics"
+          }
+        }
+      },
       "OrderInput": {
         "type": "object",
         "description": "The order as the owner typed it (§11.4 적립 승인 요청 예시).",
@@ -4885,6 +6877,720 @@
           "unit_price": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "Page_AdminCase": {
+        "type": "object",
+        "description": "One page of results.",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "case_number",
+                "case_type",
+                "status",
+                "priority",
+                "title",
+                "description",
+                "created_at",
+                "updated_at",
+                "version"
+              ],
+              "properties": {
+                "assignee_user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "case_number": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "case_type": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "due_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "internal_resolution": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Only returned to the roles §3.3 lets act; `SUPPORT` sees `null`."
+                },
+                "legal_hold_until": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "priority": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "public_resolution": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resolution_type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resolved_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "subject_resource_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "subject_resource_type": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "subject_store_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "subject_user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "version": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass back as `?cursor=` to fetch the next page. `null` on the last page."
+          }
+        }
+      },
+      "Page_AuditLogEntry": {
+        "type": "object",
+        "description": "One page of results.",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "actor_type",
+                "action",
+                "resource_type",
+                "metadata",
+                "occurred_at",
+                "chain_intact"
+              ],
+              "properties": {
+                "action": {
+                  "type": "string"
+                },
+                "actor_type": {
+                  "type": "string"
+                },
+                "actor_user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "after_hash": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "before_hash": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "case_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "chain_intact": {
+                  "type": "boolean",
+                  "description": "Whether this entry still chains to its predecessor (§12.5 변조 탐지). `false` means\nthe row, or one before it, is not what it was when it was written."
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "metadata": {},
+                "occurred_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "request_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resource_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "resource_type": {
+                  "type": "string"
+                },
+                "store_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass back as `?cursor=` to fetch the next page. `null` on the last page."
+          }
+        }
+      },
+      "Page_Campaign": {
+        "type": "object",
+        "description": "One page of results.",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "A campaign as both the owner app and the admin app read it.",
+              "required": [
+                "id",
+                "store_id",
+                "status",
+                "version_no",
+                "name",
+                "customer_description",
+                "benefit",
+                "minimum_order_amount",
+                "eligible_item_ids",
+                "eligible_category_ids",
+                "excluded_item_ids",
+                "issue_mode",
+                "audience_type",
+                "audience_criteria",
+                "total_quantity",
+                "per_user_quantity",
+                "restore_quantity_on_revoke",
+                "revoke_policy",
+                "issued_count",
+                "revoked_count",
+                "remaining_quantity",
+                "issue_starts_at",
+                "issue_ends_at",
+                "allowed_weekdays",
+                "allowed_local_time_ranges",
+                "external_discount_stackable",
+                "notification_channels",
+                "issue_generation",
+                "created_at",
+                "updated_at",
+                "version"
+              ],
+              "properties": {
+                "allowed_local_time_ranges": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LocalTimeRange"
+                  }
+                },
+                "allowed_weekdays": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer",
+                    "format": "int32"
+                  }
+                },
+                "audience_criteria": {
+                  "$ref": "#/components/schemas/AudienceCriteria"
+                },
+                "audience_size": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32"
+                },
+                "audience_snapshot_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "audience_type": {
+                  "$ref": "#/components/schemas/AudienceType"
+                },
+                "benefit": {
+                  "$ref": "#/components/schemas/Benefit"
+                },
+                "cancellation_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cancelled_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "customer_description": {
+                  "type": "string"
+                },
+                "eligible_category_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "eligible_item_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "emergency_stopped_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "excluded_item_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "external_discount_stackable": {
+                  "type": "boolean"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "issue_ends_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "issue_generation": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "issue_mode": {
+                  "$ref": "#/components/schemas/IssueMode"
+                },
+                "issue_starts_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "issued_count": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "§8.4 counts PENDING, AVAILABLE, RESERVED, USED and EXPIRED instances; only\nISSUE_FAILED is excluded. There is no separate reserved figure because §13.2 issues\nand counts inside one transaction — see the Phase 4 migration for why the column is\ngone rather than permanently zero."
+                },
+                "minimum_order_amount": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "notification_channels": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "notification_message": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "paused_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "per_business_day_quantity": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int64"
+                },
+                "per_user_quantity": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "published_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "relative_validity_days": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int32"
+                },
+                "remaining_quantity": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "`effective_cap - issued`."
+                },
+                "restore_quantity_on_revoke": {
+                  "type": "boolean",
+                  "description": "Fixed at creation and never editable afterwards (§8.4)."
+                },
+                "revoke_policy": {
+                  "$ref": "#/components/schemas/RevokePolicy"
+                },
+                "revoked_count": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/CampaignStatus"
+                },
+                "store_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "total_quantity": {
+                  "$ref": "#/components/schemas/TotalQuantity"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "usable_from": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "usable_until": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "version": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "version_no": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass back as `?cursor=` to fetch the next page. `null` on the last page."
+          }
+        }
+      },
+      "Page_Notification": {
+        "type": "object",
+        "description": "One page of results.",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "One row of the consumer's inbox (§11.3 `GET /me/notifications`).",
+              "required": [
+                "id",
+                "type",
+                "purpose",
+                "priority",
+                "title",
+                "body",
+                "data",
+                "occurred_at"
+              ],
+              "properties": {
+                "body": {
+                  "type": "string"
+                },
+                "data": {},
+                "deep_link": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "expires_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "occurred_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "priority": {
+                  "type": "string"
+                },
+                "purpose": {
+                  "$ref": "#/components/schemas/NotificationPurpose"
+                },
+                "read_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "store_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass back as `?cursor=` to fetch the next page. `null` on the last page."
+          }
+        }
+      },
+      "Page_StoreReviewQueueEntry": {
+        "type": "object",
+        "description": "One page of results.",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "One row of the administrative review queue (§11.5).",
+              "required": [
+                "id",
+                "store_id",
+                "store_name",
+                "store_status",
+                "status",
+                "submission_snapshot",
+                "submitted_at",
+                "created_at"
+              ],
+              "properties": {
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "decided_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "public_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reviewer_user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/ReviewStatus"
+                },
+                "store_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "store_name": {
+                  "type": "string"
+                },
+                "store_status": {
+                  "$ref": "#/components/schemas/StoreStatus"
+                },
+                "submission_snapshot": {
+                  "description": "What the owner submitted, frozen at submission time (STORE-002)."
+                },
+                "submitted_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass back as `?cursor=` to fetch the next page. `null` on the last page."
           }
         }
       },
@@ -5177,6 +7883,52 @@
           }
         }
       },
+      "ProcessMetrics": {
+        "type": "object",
+        "required": [
+          "requests",
+          "client_errors",
+          "server_errors",
+          "error_rate",
+          "invariant_violations"
+        ],
+        "properties": {
+          "client_errors": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "error_rate": {
+            "type": "number",
+            "format": "double",
+            "description": "5xx as a fraction of all requests (§18.4 오류율)."
+          },
+          "invariant_violations": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "latency_p95_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "`null` until the process has served a request.",
+            "minimum": 0
+          },
+          "requests": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "server_errors": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "ProposedLedgerEntry": {
         "type": "object",
         "required": [
@@ -5198,6 +7950,34 @@
             "format": "int64"
           },
           "reason_code": {
+            "type": "string"
+          }
+        }
+      },
+      "ProviderCallbackBody": {
+        "type": "object",
+        "description": "What a provider posts back (§15.4).",
+        "required": [
+          "event_id",
+          "provider_reference",
+          "status"
+        ],
+        "properties": {
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "event_id": {
+            "type": "string",
+            "description": "The provider's identifier for *this callback*. Its uniqueness is what makes a\nreplay recognisable."
+          },
+          "provider_reference": {
+            "type": "string",
+            "description": "The identifier we stored when the send was accepted."
+          },
+          "status": {
             "type": "string"
           }
         }
@@ -5321,6 +8101,64 @@
           }
         ]
       },
+      "PushSubscription": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "last_seen_at",
+          "created_at"
+        ],
+        "properties": {
+          "browser_family": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "device_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "disabled_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "PushSubscriptionsResponse": {
+        "type": "object",
+        "required": [
+          "subscriptions"
+        ],
+        "properties": {
+          "subscriptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PushSubscription"
+            }
+          }
+        }
+      },
       "QrTokenResponse": {
         "type": "object",
         "required": [
@@ -5365,6 +8203,47 @@
           }
         }
       },
+      "QueueMetrics": {
+        "type": "object",
+        "required": [
+          "campaign_backlog",
+          "outbox_unpublished_age_secs",
+          "outbox_unpublished_count",
+          "dead_letters_last_hour",
+          "dead_letters_total",
+          "stalled_jobs"
+        ],
+        "properties": {
+          "campaign_backlog": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Jobs waiting or running, by §14.4 status."
+          },
+          "dead_letters_last_hour": {
+            "type": "integer",
+            "format": "int64",
+            "description": "§18.4: dead-letter 신규 발생, over the last hour."
+          },
+          "dead_letters_total": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "outbox_unpublished_age_secs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "§18.4: outbox unpublished age. Seconds since the oldest unpublished row was written;\nzero when the outbox is empty. A rising value is JOB-005 in progress."
+          },
+          "outbox_unpublished_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stalled_jobs": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Jobs that have been `RUNNING` past their visibility timeout — a worker died, or is\nwedged."
+          }
+        }
+      },
       "ReadyResponse": {
         "type": "object",
         "required": [
@@ -5400,6 +8279,25 @@
           "status": {
             "type": "string",
             "description": "`ready` or `not_ready`. `degraded` components do not change it."
+          }
+        }
+      },
+      "ReapplyResult": {
+        "type": "object",
+        "description": "What replaying the ledger did (§18.5).",
+        "required": [
+          "examined",
+          "reapplied"
+        ],
+        "properties": {
+          "examined": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reapplied": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many subjects were found alive again and re-erased. Non-zero after a restore is\nexpected; non-zero at any other time means something wrote a person back."
           }
         }
       },
@@ -5520,6 +8418,61 @@
           "VOIDED",
           "REQUIRES_ADMIN_REVIEW"
         ]
+      },
+      "RegisterPushSubscriptionRequest": {
+        "type": "object",
+        "description": "`POST /me/push-subscriptions` (§15.1-2).",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "browser_family": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "device_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "token": {
+            "type": "string",
+            "description": "The FCM registration token. Stored encrypted with a keyed lookup hash beside it, so\na duplicate registration is recognisable without the plaintext being searchable\n(§16.5)."
+          }
+        }
+      },
+      "RequestErasureRequest": {
+        "type": "object",
+        "description": "`POST /admin/privacy/erasures` (ADMIN-006 삭제).",
+        "required": [
+          "subject_user_id",
+          "case_id",
+          "reason"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "§3.3 and ADMIN-006: the case is the record of who asked, when, and by what deadline."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Categories to erase. Empty means every category the policy table marks erasable."
+          },
+          "subject_user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       },
       "Reservation": {
         "type": "object",
@@ -5654,6 +8607,78 @@
           "ARCHIVED"
         ]
       },
+      "RetentionPoliciesResponse": {
+        "type": "object",
+        "required": [
+          "policies"
+        ],
+        "properties": {
+          "policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetentionPolicy"
+            }
+          }
+        }
+      },
+      "RetentionPolicy": {
+        "type": "object",
+        "description": "One row of `retention_policies` (§17.3).",
+        "required": [
+          "data_category",
+          "retention_days",
+          "legal_basis",
+          "erasable_on_request",
+          "active",
+          "updated_at"
+        ],
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "data_category": {
+            "type": "string"
+          },
+          "erasable_on_request": {
+            "type": "boolean",
+            "description": "Whether a subject may have this category erased on request, or whether a statutory\nretention keeps it until the period runs out (§17.3, ADMIN-006 삭제)."
+          },
+          "legal_basis": {
+            "type": "string"
+          },
+          "retention_days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ReviewDecisionRequest": {
+        "type": "object",
+        "required": [
+          "decision",
+          "reason"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/ReviewStatus"
+          },
+          "public_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Shown to the owner (STORE-002 보완 요청 사유)."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Internal reviewer note. §11.5 requires a reason on every administrative change."
+          }
+        }
+      },
       "ReviewStatus": {
         "type": "string",
         "description": "`coupon.review_status`.",
@@ -5691,6 +8716,25 @@
           "KEEP_ISSUED",
           "REVOKE_UNUSED"
         ]
+      },
+      "RevokeSessionsRequest": {
+        "type": "object",
+        "description": "`POST /admin/users/:id/revoke-sessions`.",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "case_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
       },
       "RewardDefinition": {
         "type": "object",
@@ -5846,6 +8890,38 @@
           },
           "stamp_board": {
             "$ref": "#/components/schemas/StampBoard"
+          }
+        }
+      },
+      "SessionRevocation": {
+        "type": "object",
+        "required": [
+          "id",
+          "subject_user_id",
+          "valid_after",
+          "provider_result",
+          "occurred_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "provider_result": {
+            "type": "string"
+          },
+          "subject_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "valid_after": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Every token issued before this instant is refused, whatever Firebase thinks."
           }
         }
       },
@@ -6191,6 +9267,70 @@
           }
         }
       },
+      "StoreReviewQueueEntry": {
+        "type": "object",
+        "description": "One row of the administrative review queue (§11.5).",
+        "required": [
+          "id",
+          "store_id",
+          "store_name",
+          "store_status",
+          "status",
+          "submission_snapshot",
+          "submitted_at",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "public_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewer_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReviewStatus"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "store_status": {
+            "$ref": "#/components/schemas/StoreStatus"
+          },
+          "submission_snapshot": {
+            "description": "What the owner submitted, frozen at submission time (STORE-002)."
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "StoreReviewResponse": {
         "type": "object",
         "required": [
@@ -6246,6 +9386,63 @@
               "null"
             ],
             "description": "Optional note for the reviewer."
+          }
+        }
+      },
+      "SuppressionReason": {
+        "type": "string",
+        "description": "Why a channel was not used. Recorded on the delivery so \"we did not send\" is always\nanswerable (§15.4 `SUPPRESSED`).",
+        "enum": [
+          "CONSENT_MISSING",
+          "STORE_CONSENT_MISSING",
+          "NO_ACTIVE_SUBSCRIPTION",
+          "CHANNEL_NOT_PERMITTED_FOR_PURPOSE",
+          "TEMPLATE_UNAVAILABLE",
+          "EXPIRED_BEFORE_DELIVERY",
+          "RECIPIENT_INACTIVE",
+          "RECIPIENT_UNREACHABLE"
+        ]
+      },
+      "SuspendUserRequest": {
+        "type": "object",
+        "description": "`POST /admin/users/:id/suspend`.",
+        "required": [
+          "sanction_type",
+          "case_id",
+          "public_reason",
+          "internal_reason"
+        ],
+        "properties": {
+          "approved_by_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The second administrator, for a permanent sanction (§3.3 이중 확인). Must differ from\nthe requester; the database enforces it."
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "§3.3: 고위험 작업은 사건 티켓을 요구한다."
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Required for `TEMPORARY`, refused for `PERMANENT` — a permanent sanction with an end\ndate is a temporary one under the wrong label (ADMIN-002)."
+          },
+          "internal_reason": {
+            "type": "string"
+          },
+          "public_reason": {
+            "type": "string"
+          },
+          "sanction_type": {
+            "type": "string",
+            "description": "`TEMPORARY` or `PERMANENT`."
           }
         }
       },
@@ -6502,6 +9699,71 @@
           }
         }
       },
+      "UpdateCaseRequest": {
+        "type": "object",
+        "description": "`PATCH /admin/cases/:id`.",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "assignee_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "due_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "internal_resolution": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal_hold_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "priority": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "public_resolution": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ADMIN-002: 공개 가능한 사유와 내부 사유를 분리한다."
+          },
+          "reason": {
+            "type": "string"
+          },
+          "resolution_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "UpdateCategoryRequest": {
         "type": "object",
         "properties": {
@@ -6600,6 +9862,26 @@
           }
         }
       },
+      "UpdateNotificationsRequest": {
+        "type": "object",
+        "description": "`PATCH /me/notifications` (§11.3).",
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/NotificationAction"
+          },
+          "all": {
+            "type": "boolean"
+          },
+          "notification_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Ids to act on. Empty with `all: true` means \"everything currently unread\"."
+          }
+        }
+      },
       "UpdatePolicyRequest": {
         "type": "object",
         "properties": {
@@ -6661,6 +9943,34 @@
             ],
             "format": "int64",
             "description": "Expected `version`; may also be supplied as `If-Match`."
+          }
+        }
+      },
+      "UpdateRetentionPolicyRequest": {
+        "type": "object",
+        "description": "`PATCH /admin/retention-policies/:category`.",
+        "required": [
+          "retention_days",
+          "legal_basis",
+          "reason"
+        ],
+        "properties": {
+          "erasable_on_request": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "legal_basis": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "§11.5 requires a reason on every administrative change."
+          },
+          "retention_days": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -6782,6 +10092,71 @@
           "version": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "UserSanction": {
+        "type": "object",
+        "required": [
+          "id",
+          "subject_user_id",
+          "case_id",
+          "sanction_type",
+          "status",
+          "public_reason",
+          "requested_by_user_id",
+          "effective_from"
+        ],
+        "properties": {
+          "approved_by_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "effective_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lifted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "public_reason": {
+            "type": "string"
+          },
+          "requested_by_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sanction_type": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "subject_user_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -7078,7 +10453,15 @@
     },
     {
       "name": "admin",
-      "description": "거래 탐색, 보정, 캠페인 긴급 중단, 작업 큐 (§11.5)"
+      "description": "거래 탐색, 보정, 캠페인 긴급 중단, 작업 큐, 민원·제재·감사 (§11.5)"
+    },
+    {
+      "name": "notifications",
+      "description": "앱 내 알림, Web Push 구독, 제공자 콜백 (§15)"
+    },
+    {
+      "name": "analytics",
+      "description": "점주 기간별 지표와 개인정보 최소 기준 (§6.3, §19)"
     }
   ]
 }

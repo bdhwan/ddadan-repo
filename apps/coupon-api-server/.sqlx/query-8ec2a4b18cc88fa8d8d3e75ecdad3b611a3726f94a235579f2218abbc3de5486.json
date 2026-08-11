@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.user_session_revocations\n                (subject_user_id, case_id, requested_by_user_id, reason, valid_after,\n                 provider_result)\n            VALUES ($1, $2, $3, $4, $5, 'PENDING')\n            RETURNING id, subject_user_id, valid_after, provider_result, occurred_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "subject_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "valid_after",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "provider_result",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "8ec2a4b18cc88fa8d8d3e75ecdad3b611a3726f94a235579f2218abbc3de5486"
+}

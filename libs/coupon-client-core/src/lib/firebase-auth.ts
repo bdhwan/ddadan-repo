@@ -5,7 +5,15 @@ import {
   makeEnvironmentProviders,
 } from "@angular/core";
 import { FirebaseApp, FirebaseOptions, initializeApp } from "firebase/app";
-import { Auth, getAuth, User } from "firebase/auth";
+import {
+  Auth,
+  EmailAuthProvider,
+  getAuth,
+  reauthenticateWithCredential,
+  sendPasswordResetEmail,
+  signOut,
+  User,
+} from "firebase/auth";
 
 export const COUPON_FIREBASE_OPTIONS = new InjectionToken<FirebaseOptions>(
   "COUPON_FIREBASE_OPTIONS",
@@ -30,5 +38,29 @@ export class AuthSessionService {
 
   async getIdToken(forceRefresh = false): Promise<string | null> {
     return this.auth.currentUser?.getIdToken(forceRefresh) ?? null;
+  }
+
+  async reauthenticateWithPassword(password: string): Promise<void> {
+    const user = this.auth.currentUser;
+    if (!user?.email) {
+      throw new Error("EMAIL_REAUTHENTICATION_UNAVAILABLE");
+    }
+    await reauthenticateWithCredential(
+      user,
+      EmailAuthProvider.credential(user.email, password),
+    );
+    await user.getIdToken(true);
+  }
+
+  async sendPasswordReset(): Promise<void> {
+    const email = this.auth.currentUser?.email;
+    if (!email) {
+      throw new Error("PASSWORD_RESET_UNAVAILABLE");
+    }
+    await sendPasswordResetEmail(this.auth, email);
+  }
+
+  async signOut(): Promise<void> {
+    await signOut(this.auth);
   }
 }

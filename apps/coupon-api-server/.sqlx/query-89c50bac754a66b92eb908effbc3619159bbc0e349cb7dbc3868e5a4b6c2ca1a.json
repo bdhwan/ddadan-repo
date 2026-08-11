@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT timezone, business_day_cutoff::text AS \"cutoff!\"\n            FROM coupon.stores WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "timezone",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "cutoff!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "89c50bac754a66b92eb908effbc3619159bbc0e349cb7dbc3868e5a4b6c2ca1a"
+}

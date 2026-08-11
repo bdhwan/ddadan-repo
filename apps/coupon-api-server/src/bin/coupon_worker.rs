@@ -7,7 +7,11 @@
 //! * **poll** — claim and run whatever the registry says is due. It is both the JOB-005
 //!   fallback when Redis is unavailable and the recovery path for a message that was
 //!   published and then lost.
-//! * **schedule** — register the recurring expiry shard (§14.6 시간 shard).
+//! * **notify** — turn committed domain events into notifications and queue their sends
+//!   (§15.1). Separate from the job relay because the two answer different questions: one
+//!   publishes a job id to Redis, the other creates the record a customer will read.
+//! * **schedule** — register the recurring expiry shard and the nightly per-store
+//!   aggregation (§14.6 시간 shard, store+business day).
 //!
 //! Redis, when configured, delivers messages promptly through Apalis so a job does not
 //! wait for the next poll tick. When it is not, everything above still works: PostgreSQL
@@ -38,6 +42,15 @@ const POLL_INTERVAL: Duration = Duration::from_secs(5);
 const RELAY_INTERVAL: Duration = Duration::from_secs(5);
 /// §18.1 allows five minutes for expiry state to catch up.
 const SWEEP_INTERVAL: Duration = Duration::from_secs(300);
+/// How often committed domain events are turned into notifications. Short, because §18.1
+/// measures 적립/사용 승인 p95 excluding external delivery but a customer still expects the
+/// receipt in their app within seconds.
+const NOTIFY_INTERVAL: Duration = Duration::from_secs(2);
+/// How often the per-store daily rollup is scheduled (§19, §14.6).
+const AGGREGATE_INTERVAL: Duration = Duration::from_secs(900);
+/// How many stores one aggregation pass may enqueue. Bounded so a first run over a large
+/// tenant base does not fill the queue in one tick.
+const AGGREGATE_FANOUT: i64 = 200;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -107,6 +120,8 @@ async fn main() -> anyhow::Result<()> {
     let mut relay = tokio::time::interval(RELAY_INTERVAL);
     let mut poll = tokio::time::interval(POLL_INTERVAL);
     let mut sweep = tokio::time::interval(SWEEP_INTERVAL);
+    let mut notify = tokio::time::interval(NOTIFY_INTERVAL);
+    let mut aggregate = tokio::time::interval(AGGREGATE_INTERVAL);
 
     loop {
         tokio::select! {
@@ -127,7 +142,18 @@ async fn main() -> anyhow::Result<()> {
                     Err(error) => tracing::error!(%error, "job poll failed"),
                 }
             }
-            _ = sweep.tick() => schedule_expiry(&state).await,
+            _ = notify.tick() => {
+                match runtime.relay_notifications().await {
+                    Ok(0) => {}
+                    Ok(count) => tracing::info!(count, "notifications.relayed"),
+                    Err(error) => tracing::error!(%error, "notification relay failed"),
+                }
+            }
+            _ = sweep.tick() => {
+                schedule_expiry(&state).await;
+                expire_sanctions(&state).await;
+            }
+            _ = aggregate.tick() => schedule_aggregation(&state).await,
             _ = shutdown_signal() => break,
         }
     }
@@ -183,6 +209,73 @@ async fn schedule_expiry(state: &AppState) {
             }
         }
         Err(error) => tracing::error!(%error, "could not register the expiry sweep"),
+    }
+}
+
+/// Queue the per-store daily rollup (§14.6 store+business day, §19).
+///
+/// Both yesterday and today are scheduled: today's run produces the 잠정치 an owner watches
+/// during trading, and yesterday's is the one that will find the day closed and mark it
+/// 확정. The active-key unique index makes a repeat within the same tick a no-op.
+async fn schedule_aggregation(state: &AppState) {
+    let today = chrono::Utc::now().date_naive();
+    let Some(yesterday) = today.pred_opt() else {
+        return;
+    };
+
+    for business_day in [yesterday, today] {
+        let stores = match state
+            .analytics
+            .stores_needing_aggregation(&state.pool, business_day, AGGREGATE_FANOUT)
+            .await
+        {
+            Ok(stores) => stores,
+            Err(error) => {
+                tracing::error!(%error, "could not list stores needing aggregation");
+                continue;
+            }
+        };
+
+        for store_id in stores {
+            let spec = JobSpec::new(
+                JobKey::aggregate_daily_stats(store_id, business_day),
+                serde_json::json!({ "store_id": store_id, "business_day": business_day }),
+            )
+            .store(store_id)
+            .resource(store_id);
+
+            let mut tx = match state.pool.begin().await {
+                Ok(tx) => tx,
+                Err(error) => {
+                    tracing::error!(%error, "could not open a transaction to schedule aggregation");
+                    return;
+                }
+            };
+
+            match state.jobs.enqueue(&mut tx, &spec).await {
+                Ok(_) => {
+                    if let Err(error) = tx.commit().await {
+                        tracing::error!(%error, %store_id, "could not schedule the daily rollup");
+                    }
+                }
+                Err(error) => {
+                    tracing::error!(%error, %store_id, "could not register the daily rollup")
+                }
+            }
+        }
+    }
+}
+
+/// ADMIN-002: 임시 정지는 만료 시 자동 복구 후보가 된다.
+async fn expire_sanctions(state: &AppState) {
+    match state
+        .operations
+        .expire_due_sanctions(&state.pool, chrono::Utc::now())
+        .await
+    {
+        Ok(0) => {}
+        Ok(count) => tracing::info!(count, "admin.sanctions_expired"),
+        Err(error) => tracing::error!(%error, "could not expire due sanctions"),
     }
 }
 

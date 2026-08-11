@@ -124,6 +124,40 @@ pub struct Config {
     #[serde(default = "default_campaign_claim_rate_limit")]
     pub rate_limit_campaign_claim_per_min: u32,
 
+    /// Shared secret for provider delivery callbacks (§15.4). Without it the callback
+    /// endpoint refuses everything, because an unauthenticated status change would let a
+    /// stranger mark every message delivered.
+    #[serde(default)]
+    pub notification_callback_secret: Option<String>,
+
+    /// Where FCM Web Push sends go. Absent outside production means the recording stub
+    /// (§15.1) — a local run with no Google project still exercises the whole pipeline.
+    #[serde(default)]
+    pub fcm_endpoint: Option<String>,
+    #[serde(default)]
+    pub fcm_authorization: Option<String>,
+
+    /// The 알림톡 대행사 endpoint. §15.1 keeps this behind a provider interface precisely
+    /// because it is the value most likely to change.
+    #[serde(default)]
+    pub alimtalk_endpoint: Option<String>,
+    #[serde(default)]
+    pub alimtalk_authorization: Option<String>,
+
+    /// §19: 세그먼트가 기준 인원 미만이면 상세 분해를 숨긴다.
+    #[serde(default = "default_analytics_min_cohort")]
+    pub analytics_min_cohort_size: i64,
+
+    /// How long an erasure request waits before it runs, so a mistaken or coerced request
+    /// can still be withdrawn (§17.3, ADMIN-006).
+    #[serde(default = "default_deletion_grace_days")]
+    pub privacy_deletion_grace_days: i64,
+
+    /// How many days before a coupon expires the `COUPON_EXPIRING` notice goes out
+    /// (§15.2, §14.6 만료 처리).
+    #[serde(default = "default_expiring_lead_days")]
+    pub coupon_expiring_lead_days: i64,
+
     #[serde(default = "default_log_format")]
     pub log_format: LogFormat,
 
@@ -269,6 +303,22 @@ fn default_redemption_void_window_minutes() -> i64 {
     10
 }
 
+/// §19 leaves the threshold to policy; five is the smallest cohort at which a single
+/// customer's behaviour is not readable off a per-day figure.
+fn default_analytics_min_cohort() -> i64 {
+    5
+}
+
+fn default_deletion_grace_days() -> i64 {
+    7
+}
+
+/// §6.2 puts 만료 임박 at seven days for stamps; three is the coupon equivalent and is the
+/// value §23.2 asks to confirm with the template review.
+fn default_expiring_lead_days() -> i64 {
+    3
+}
+
 fn default_log_format() -> LogFormat {
     LogFormat::Json
 }
@@ -344,6 +394,19 @@ impl Config {
                     "COUPON_QR_SIGNING_KEY is required in production".to_owned(),
                 ));
             }
+            // Without an endpoint the recording stub would answer "delivered" for every
+            // send, which is worse than not sending: the operations view would show a
+            // healthy channel while nobody receives anything (§18.4).
+            if self.fcm_endpoint.is_none() {
+                return Err(ConfigError::Invalid(
+                    "COUPON_FCM_ENDPOINT is required in production".to_owned(),
+                ));
+            }
+            if self.notification_callback_secret.is_none() {
+                return Err(ConfigError::Invalid(
+                    "COUPON_NOTIFICATION_CALLBACK_SECRET is required in production".to_owned(),
+                ));
+            }
         }
 
         // §16.2 fixes the token lifetime at 60 seconds. Allow it to be tuned for a slow
@@ -394,6 +457,20 @@ impl Config {
         chrono::Duration::minutes(self.admin_preview_ttl_minutes.clamp(1, 24 * 60))
     }
 
+    /// Clamped: a threshold of zero would defeat the rule, and one above a hundred would
+    /// hide a whole shop's dashboard.
+    pub fn min_cohort_size(&self) -> i64 {
+        self.analytics_min_cohort_size.clamp(1, 100)
+    }
+
+    pub fn deletion_grace(&self) -> chrono::Duration {
+        chrono::Duration::days(self.privacy_deletion_grace_days.clamp(0, 90))
+    }
+
+    pub fn coupon_expiring_lead(&self) -> chrono::Duration {
+        chrono::Duration::days(self.coupon_expiring_lead_days.clamp(1, 30))
+    }
+
     /// Expected `iss` for Firebase ID tokens.
     pub fn firebase_issuer(&self) -> Option<String> {
         self.firebase_project_id
@@ -442,6 +519,14 @@ mod tests {
             rate_limit_qr_resolve_failure_per_min: default_qr_resolve_failure_rate_limit(),
             rate_limit_stamp_approval_per_min: default_stamp_approval_rate_limit(),
             rate_limit_campaign_claim_per_min: default_campaign_claim_rate_limit(),
+            notification_callback_secret: None,
+            fcm_endpoint: None,
+            fcm_authorization: None,
+            alimtalk_endpoint: None,
+            alimtalk_authorization: None,
+            analytics_min_cohort_size: default_analytics_min_cohort(),
+            privacy_deletion_grace_days: default_deletion_grace_days(),
+            coupon_expiring_lead_days: default_expiring_lead_days(),
             log_format: LogFormat::Json,
             log_filter: default_log_filter(),
         }
@@ -543,7 +628,49 @@ mod tests {
         assert!(error.to_string().contains("COUPON_QR_SIGNING_KEY"));
 
         config.qr_signing_key = Some("seed".to_owned());
+        config.fcm_endpoint = Some("https://push.example/send".to_owned());
+        config.notification_callback_secret = Some("callback-secret".to_owned());
         config.validate().expect("a configured key satisfies it");
+    }
+
+    #[test]
+    fn production_will_not_boot_with_a_stubbed_notification_channel() {
+        // §18.4 alerts on provider 실패율. A stub that answers "delivered" for everything
+        // would make that metric report a healthy channel while nothing is delivered.
+        let mut config = base_config();
+        config.env = Environment::Production;
+        config.allowed_origins = CommaList(vec!["https://app.example".to_owned()]);
+        config.data_encryption_key = Some("a".repeat(44));
+        config.lookup_hash_secret = Some("secret".to_owned());
+        config.redis_url = Some("redis://localhost:6379".to_owned());
+        config.qr_signing_key = Some("seed".to_owned());
+
+        let error = config.validate().expect_err("must demand a push endpoint");
+        assert!(error.to_string().contains("COUPON_FCM_ENDPOINT"));
+
+        config.fcm_endpoint = Some("https://push.example/send".to_owned());
+        let error = config.validate().expect_err("must demand a callback secret");
+        assert!(
+            error
+                .to_string()
+                .contains("COUPON_NOTIFICATION_CALLBACK_SECRET")
+        );
+
+        config.notification_callback_secret = Some("callback-secret".to_owned());
+        config.validate().expect("both configured satisfies it");
+    }
+
+    #[test]
+    fn the_privacy_thresholds_are_clamped_into_a_usable_range() {
+        let mut config = base_config();
+
+        config.analytics_min_cohort_size = 0;
+        assert_eq!(config.min_cohort_size(), 1, "zero would defeat the rule");
+        config.analytics_min_cohort_size = 10_000;
+        assert_eq!(config.min_cohort_size(), 100);
+
+        config.coupon_expiring_lead_days = 0;
+        assert_eq!(config.coupon_expiring_lead().num_days(), 1);
     }
 
     #[test]

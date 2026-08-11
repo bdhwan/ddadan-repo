@@ -9,12 +9,14 @@ use validator::Validate;
 
 use crate::auth::extractors::{CurrentUser, RecentlyAuthenticated, StoreOwner};
 use crate::campaigns::{
-    Campaign, CampaignsResponse, CancelCampaignRequest, ClaimedCoupon, CreateCampaignRequest,
-    PauseCampaignRequest, PublishEstimate, PublishedCampaign, UpdateCampaignRequest,
+    Campaign, CancelCampaignRequest, ClaimedCoupon, CreateCampaignRequest, PauseCampaignRequest,
+    PublishEstimate, PublishedCampaign, UpdateCampaignRequest,
 };
 use crate::error::{ApiError, ApiResult, ErrorCode};
 use crate::http::concurrency;
 use crate::http::middleware::idempotency::IDEMPOTENCY_KEY_HEADER;
+use crate::http::pagination::{Page, PageQuery};
+use crate::http::query::Query;
 use crate::http::rate_limit::Bucket;
 use crate::http::response::{ApiMutation, ApiOk, TransactionId};
 use crate::state::AppState;
@@ -40,24 +42,31 @@ pub fn campaign_claim_router() -> Router<AppState> {
     Router::new().route("/campaigns/{campaign_id}/claims", post(claim_campaign))
 }
 
-/// My campaigns, newest first.
+/// My campaigns, newest first, cursor-paginated (§11.1).
 #[utoipa::path(
     get,
     path = "/api/coupon/v1/owner/campaigns",
     tag = "campaigns",
-    responses((status = 200, description = "Campaigns", body = CampaignsResponse)),
+    params(
+        ("limit" = Option<u32>, Query, description = "1–100, default 20"),
+        ("cursor" = Option<String>, Query, description = "next_cursor from the previous page"),
+    ),
+    responses((status = 200, description = "Campaigns", body = Page<Campaign>)),
     security(("firebase" = [])),
 )]
 pub async fn list_campaigns(
     State(state): State<AppState>,
     StoreOwner(user): StoreOwner,
-) -> ApiResult<ApiOk<CampaignsResponse>> {
+    Query(page): Query<PageQuery>,
+) -> ApiResult<ApiOk<Page<Campaign>>> {
     let store = state
         .stores
         .owned_store(&state.pool, user.account.user_id)
         .await?;
 
-    Ok(ApiOk(state.campaigns.list(&state.pool, store.id).await?))
+    Ok(ApiOk(
+        state.campaigns.list(&state.pool, store.id, &page).await?,
+    ))
 }
 
 /// One campaign.

@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT MAX(legal_hold_until)\n            FROM coupon.admin_cases\n            WHERE subject_user_id = $1 AND legal_hold_until > clock_timestamp()\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "max",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "aae8c51f37a1fe56208e4d88cc13b28ed03b4296eaf82330e8c7ad09e9062ddb"
+}

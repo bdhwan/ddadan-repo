@@ -34,10 +34,12 @@ pub mod campaigns;
 pub mod jobs;
 pub mod redemptions;
 
-// Later-phase modules: names and boundaries are reserved now so that cross-module
-// wiring does not have to be reshuffled when the phase lands.
+// Phase 4 domain modules: notification delivery across three channels, the operational
+// surface (cases, sanctions, audit search), per-store analytics, and retention and erasure
+// (§15, §11.5, §19, §17.3).
 pub mod analytics;
 pub mod notifications;
+pub mod privacy;
 
 /// Migrations are applied out-of-band (`sqlx migrate run`), never by the application at
 /// boot. This embeds them only so `/health/ready` can compare the expected head version

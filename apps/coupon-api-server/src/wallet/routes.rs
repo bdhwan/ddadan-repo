@@ -1,6 +1,8 @@
 //! `/me/wallet/*` (§11.3, §6.2).
 
-use axum::extract::{Path, Query, State};
+use axum::extract::{Path, State};
+
+use crate::http::query::Query;
 use axum::routing::get;
 use axum::Router;
 use serde::Deserialize;
@@ -28,6 +30,7 @@ pub struct WalletCouponQuery {
     pub status: Option<WalletFilter>,
     pub store_id: Option<Uuid>,
     /// 1–100. Defaults to 20 (§11.1).
+    #[serde(default, deserialize_with = "crate::http::pagination::page_size")]
     pub limit: Option<u32>,
     /// `next_cursor` from the previous page.
     pub cursor: Option<String>,

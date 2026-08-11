@@ -236,10 +236,13 @@ pub struct Campaign {
     /// Fixed at creation and never editable afterwards (§8.4).
     pub restore_quantity_on_revoke: bool,
     pub revoke_policy: RevokePolicy,
+    /// §8.4 counts PENDING, AVAILABLE, RESERVED, USED and EXPIRED instances; only
+    /// ISSUE_FAILED is excluded. There is no separate reserved figure because §13.2 issues
+    /// and counts inside one transaction — see the Phase 4 migration for why the column is
+    /// gone rather than permanently zero.
     pub issued_count: i64,
-    pub reserved_count: i64,
     pub revoked_count: i64,
-    /// `effective_cap - (issued + reserved)`.
+    /// `effective_cap - issued`.
     pub remaining_quantity: i64,
     pub issue_starts_at: DateTime<Utc>,
     pub issue_ends_at: DateTime<Utc>,
@@ -260,11 +263,6 @@ pub struct Campaign {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub version: i64,
-}
-
-#[derive(Debug, Clone, Serialize, ToSchema)]
-pub struct CampaignsResponse {
-    pub campaigns: Vec<Campaign>,
 }
 
 /// The campaign draft form (CAMPAIGN-001), in the order the wizard collects it:
@@ -448,11 +446,26 @@ impl CampaignService {
         }
     }
 
-    /// `GET /owner/campaigns`.
-    pub async fn list(&self, pool: &PgPool, store_id: Uuid) -> ApiResult<CampaignsResponse> {
-        Ok(CampaignsResponse {
-            campaigns: load(pool, store_id, None).await?,
-        })
+    /// `GET /owner/campaigns`, cursor-paginated (§11.1: 기본 20, 최대 100).
+    ///
+    /// A shop that has run campaigns for a year has hundreds of them, and the unpaginated
+    /// list Phase 3 shipped would return every one on every dashboard load.
+    pub async fn list(
+        &self,
+        pool: &PgPool,
+        store_id: Uuid,
+        page: &crate::http::pagination::PageQuery,
+    ) -> ApiResult<crate::http::pagination::Page<Campaign>> {
+        let cursor = page.cursor()?;
+        let rows = load_page(pool, store_id, cursor.as_ref(), page.fetch_limit()).await?;
+
+        Ok(crate::http::pagination::Page::from_rows(
+            rows,
+            page.limit(),
+            |campaign| {
+                crate::http::pagination::Cursor::new(campaign.created_at, campaign.id)
+            },
+        ))
     }
 
     /// One campaign, scoped to its store so an id from another shop reads as absent
@@ -596,7 +609,7 @@ impl CampaignService {
         // CAMPAIGN-008: 시작 후 증량은 가능하지만 이미 발급·예약된 수량 미만으로 낮출 수 없다.
         if let Some(total) = request.total_quantity {
             total.validate()?;
-            let committed = current.issued_count + current.reserved_count;
+            let committed = current.issued_count;
             if total.effective_cap() < committed {
                 return Err(ApiError::with_message(
                     ErrorCode::QuantityBelowIssued,
@@ -1320,11 +1333,11 @@ impl CampaignService {
 
         // Step 4. All three limits, all against numbers read under a lock (§12.6-4/5).
         let cap = campaign.total_quantity.effective_cap();
-        if campaign.issued_count + campaign.reserved_count >= cap {
+        if campaign.issued_count >= cap {
             return Err(ApiError::new(ErrorCode::CampaignSoldOut));
         }
         if let Some(daily) = campaign.per_business_day_quantity
-            && counter.issued_count + counter.reserved_count >= daily
+            && counter.issued_count >= daily
         {
             return Err(ApiError::with_message(
                 ErrorCode::CampaignSoldOut,
@@ -1381,7 +1394,7 @@ impl CampaignService {
             remaining_quantity: if campaign.total_quantity.is_unlimited() {
                 None
             } else {
-                Some(cap - (campaign.issued_count + campaign.reserved_count + 1))
+                Some(cap - (campaign.issued_count + 1))
             },
         };
 
@@ -1419,8 +1432,7 @@ impl CampaignService {
                 issue_mode::text AS "issue_mode!", audience_type, audience_criteria,
                 audience_size, audience_snapshot_at, total_quantity, unlimited_total_cap,
                 per_user_quantity, per_business_day_quantity, restore_quantity_on_revoke,
-                revoke_policy, global_issued_count, global_reserved_count,
-                global_revoked_count, issue_starts_at, issue_ends_at, usable_from,
+                revoke_policy, global_issued_count, global_revoked_count, issue_starts_at, issue_ends_at, usable_from,
                 usable_until, relative_validity_days, allowed_weekdays,
                 allowed_local_time_ranges, external_discount_stackable,
                 notification_channels, notification_message, published_at, paused_at,
@@ -1460,7 +1472,7 @@ impl CampaignService {
 
         let row = sqlx::query!(
             r#"
-            SELECT reserved_count, issued_count, revoked_count
+            SELECT issued_count, revoked_count
             FROM coupon.campaign_counters
             WHERE campaign_id = $1 AND business_day = $2
             FOR UPDATE
@@ -1473,7 +1485,6 @@ impl CampaignService {
 
         Ok(CampaignCounter {
             business_day,
-            reserved_count: row.reserved_count,
             issued_count: row.issued_count,
             revoked_count: row.revoked_count,
         })
@@ -1636,8 +1647,11 @@ impl CampaignService {
             Uuid::new_v4(),
             serde_json::json!({
                 "store_id": store.id,
+                "store_name": store.name,
                 "user_id": user_id,
                 "campaign_id": campaign.id,
+                "campaign_name": campaign.name,
+                "benefit": campaign.customer_description,
                 "expires_at": expires_at,
             }),
         )
@@ -1799,7 +1813,6 @@ impl CampaignService {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CampaignCounter {
     pub business_day: NaiveDate,
-    pub reserved_count: i64,
     pub issued_count: i64,
     pub revoked_count: i64,
 }
@@ -1899,12 +1912,7 @@ fn remaining(campaign: &Campaign) -> Option<i64> {
     if campaign.total_quantity.is_unlimited() {
         None
     } else {
-        Some(
-            (campaign.total_quantity.effective_cap()
-                - campaign.issued_count
-                - campaign.reserved_count)
-                .max(0),
-        )
+        Some((campaign.total_quantity.effective_cap() - campaign.issued_count).max(0))
     }
 }
 
@@ -2011,6 +2019,53 @@ fn map_issuance_conflict(error: sqlx::Error) -> ApiError {
 /// The two shapes — "the list" and "one of them" — share a query so the forty-odd columns
 /// are written once rather than drifting apart. `FOR UPDATE` cannot be folded in the same
 /// way, so [`CampaignService::lock`] carries the only other copy.
+/// One page of a store's campaigns, newest first, keyed on `(created_at, id)` (§11.1).
+///
+/// A separate query rather than a parameter on [`load`] because the ordering and the
+/// keyset predicate are what make it a page; folding both shapes into one statement would
+/// make the single-campaign lookup carry paging clauses it never uses.
+async fn load_page<'e, E>(
+    executor: E,
+    store_id: Uuid,
+    cursor: Option<&crate::http::pagination::Cursor>,
+    limit: i64,
+) -> ApiResult<Vec<Campaign>>
+where
+    E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+{
+    let rows = sqlx::query_as!(
+        CampaignRow,
+        r#"
+        SELECT
+            id, store_id, status::text AS "status!", version_no, name, customer_description,
+            benefit_type::text AS "benefit_type!", fixed_amount, percentage,
+            maximum_discount_amount, free_item_ids, minimum_order_amount, eligible_item_ids,
+            eligible_category_ids, excluded_item_ids, issue_mode::text AS "issue_mode!",
+            audience_type, audience_criteria, audience_size, audience_snapshot_at,
+            total_quantity, unlimited_total_cap, per_user_quantity,
+            per_business_day_quantity, restore_quantity_on_revoke, revoke_policy,
+            global_issued_count, global_revoked_count, issue_starts_at, issue_ends_at,
+            usable_from, usable_until, relative_validity_days, allowed_weekdays,
+            allowed_local_time_ranges, external_discount_stackable, notification_channels,
+            notification_message, published_at, paused_at, cancelled_at, cancellation_reason,
+            emergency_stopped_at, issue_generation, created_at, updated_at, version
+        FROM coupon.campaigns
+        WHERE store_id = $1
+          AND ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))
+        ORDER BY created_at DESC, id DESC
+        LIMIT $4
+        "#,
+        store_id,
+        cursor.map(|cursor| cursor.created_at),
+        cursor.map(|cursor| cursor.id),
+        limit,
+    )
+    .fetch_all(executor)
+    .await?;
+
+    Ok(rows.into_iter().map(Campaign::from).collect())
+}
+
 async fn load<'e, E>(
     executor: E,
     store_id: Uuid,
@@ -2030,8 +2085,7 @@ where
             audience_type, audience_criteria, audience_size, audience_snapshot_at,
             total_quantity, unlimited_total_cap, per_user_quantity,
             per_business_day_quantity, restore_quantity_on_revoke, revoke_policy,
-            global_issued_count, global_reserved_count, global_revoked_count,
-            issue_starts_at, issue_ends_at, usable_from, usable_until,
+            global_issued_count, global_revoked_count, issue_starts_at, issue_ends_at, usable_from, usable_until,
             relative_validity_days, allowed_weekdays, allowed_local_time_ranges,
             external_discount_stackable, notification_channels, notification_message,
             published_at, paused_at, cancelled_at, cancellation_reason,
@@ -2077,7 +2131,6 @@ struct CampaignRow {
     restore_quantity_on_revoke: bool,
     revoke_policy: String,
     global_issued_count: i64,
-    global_reserved_count: i64,
     global_revoked_count: i64,
     issue_starts_at: DateTime<Utc>,
     issue_ends_at: DateTime<Utc>,
@@ -2103,10 +2156,7 @@ struct CampaignRow {
 impl From<CampaignRow> for Campaign {
     fn from(row: CampaignRow) -> Self {
         let total_quantity = TotalQuantity::from_columns(row.total_quantity, row.unlimited_total_cap);
-        let remaining_quantity = (total_quantity.effective_cap()
-            - row.global_issued_count
-            - row.global_reserved_count)
-            .max(0);
+        let remaining_quantity = (total_quantity.effective_cap() - row.global_issued_count).max(0);
 
         Campaign {
             id: row.id,
@@ -2137,7 +2187,6 @@ impl From<CampaignRow> for Campaign {
             restore_quantity_on_revoke: row.restore_quantity_on_revoke,
             revoke_policy: RevokePolicy::from_db(&row.revoke_policy),
             issued_count: row.global_issued_count,
-            reserved_count: row.global_reserved_count,
             revoked_count: row.global_revoked_count,
             remaining_quantity,
             issue_starts_at: row.issue_starts_at,
@@ -2204,7 +2253,6 @@ pub(crate) mod tests_support {
             restore_quantity_on_revoke: false,
             revoke_policy: RevokePolicy::KeepIssued,
             issued_count: 0,
-            reserved_count: 0,
             revoked_count: 0,
             remaining_quantity: 100,
             issue_starts_at: at("2026-08-01T00:00:00Z"),
@@ -2542,8 +2590,7 @@ mod tests {
         assert_eq!(remaining(&campaign), None);
 
         campaign.total_quantity = TotalQuantity::Limited { quantity: 10 };
-        campaign.issued_count = 4;
-        campaign.reserved_count = 1;
+        campaign.issued_count = 5;
         assert_eq!(remaining(&campaign), Some(5));
 
         // Never negative, even if the counters somehow overshoot.
