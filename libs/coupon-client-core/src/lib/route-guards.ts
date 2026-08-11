@@ -1,8 +1,8 @@
-import { inject, Injectable, signal } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
-import type { StoreReviewStatus, UserRole } from '@coupon/contracts';
+import { inject, Injectable, signal } from "@angular/core";
+import { CanActivateFn, Router } from "@angular/router";
+import type { StoreReviewStatus, UserRole } from "@coupon/contracts";
 
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class CouponAccessState {
   readonly requiredTermsAccepted = signal(false);
   readonly roles = signal<ReadonlySet<UserRole>>(new Set());
@@ -23,22 +23,30 @@ export class CouponAccessState {
 
 export const termsConsentGuard: CanActivateFn = () => {
   const access = inject(CouponAccessState);
-  return access.requiredTermsAccepted() || inject(Router).createUrlTree(['/terms']);
+  return (
+    access.requiredTermsAccepted() || inject(Router).createUrlTree(["/terms"])
+  );
 };
 
 export const roleGuard: CanActivateFn = (route) => {
-  const requiredRole = route.data['role'] as UserRole | undefined;
+  const requiredRole = route.data["role"] as UserRole | undefined;
   if (!requiredRole || inject(CouponAccessState).roles().has(requiredRole)) {
     return true;
   }
-  return inject(Router).createUrlTree(['/login'], { queryParams: { reason: 'role' } });
+  return inject(Router).createUrlTree(["/login"], {
+    queryParams: { reason: "role" },
+  });
 };
 
 export const storeStatusGuard: CanActivateFn = (route) => {
-  const allowed = (route.data['storeStatuses'] as readonly StoreReviewStatus[] | undefined) ?? ['APPROVED'];
+  const allowed = (route.data["storeStatuses"] as
+    | readonly StoreReviewStatus[]
+    | undefined) ?? ["APPROVED"];
   const status = inject(CouponAccessState).storeStatus();
   if (status && allowed.includes(status)) {
     return true;
   }
-  return inject(Router).createUrlTree(['/onboarding/store'], { queryParams: { status: status ?? 'missing' } });
+  return inject(Router).createUrlTree(["/onboarding/store"], {
+    queryParams: { status: status ?? "missing" },
+  });
 };

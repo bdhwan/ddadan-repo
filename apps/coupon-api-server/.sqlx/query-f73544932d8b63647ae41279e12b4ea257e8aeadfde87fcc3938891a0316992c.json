@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, case_id, status::text AS \"status!\", adjustment_type, target_snapshot,\n                   preview_snapshot, preview_expires_at, requested_by_user_id\n            FROM coupon.admin_adjustments\n            WHERE id = $1\n            FOR UPDATE\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "case_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "adjustment_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "target_snapshot",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 5,
+        "name": "preview_snapshot",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "preview_expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "requested_by_user_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f73544932d8b63647ae41279e12b4ea257e8aeadfde87fcc3938891a0316992c"
+}

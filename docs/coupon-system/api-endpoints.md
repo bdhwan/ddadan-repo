@@ -1,7 +1,7 @@
 # 쿠폰 시스템 엔드포인트 목록 (구현 체크리스트)
 
-> Phase 1(기반)과 Phase 2(도장 핵심) 서버측이 완료됐다. 상태의 기준은 `apps/coupon-api-server/openapi.json` 이다.
-> 이 파일은 구현 진행 상황 체크리스트다. 엔드포인트를 구현하면 상태를 `구현완료` 로 바꾼다.
+> Phase 1(기반)·Phase 2(도장 핵심) 경로는 `apps/coupon-api-server/openapi.json` 에 반영되어 `구현완료`다. Phase 3(캠페인·사용·관리자 확장) 경로는 아직 openapi `paths` 에 없으므로 `미구현`이다.
+> 상태의 유일한 기준은 `apps/coupon-api-server/openapi.json` 의 `paths` 이다. openapi에 없으면 `구현완료`로 표시하지 않는다.
 > 원본: `product-spec.md` §11.2 ~ §11.5
 
 ## 공통 규약

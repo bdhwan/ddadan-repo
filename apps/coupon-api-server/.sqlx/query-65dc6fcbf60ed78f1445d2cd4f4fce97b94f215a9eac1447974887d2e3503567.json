@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, gross_amount, eligible_amount, discount_amount, external_order_ref,\n                   status::text AS \"status!\", confirmed_at, approved_by_user_id\n            FROM coupon.redemption_transactions\n            WHERE reservation_id = $1\n            FOR UPDATE\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "gross_amount",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "eligible_amount",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "discount_amount",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "external_order_ref",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "confirmed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "approved_by_user_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "65dc6fcbf60ed78f1445d2cd4f4fce97b94f215a9eac1447974887d2e3503567"
+}

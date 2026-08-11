@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, unique_key, job_type, generation, status::text AS \"status!\",\n                   payload, store_id, resource_id\n            FROM coupon.job_registry\n            WHERE id = $1\n            FOR UPDATE\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "unique_key",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "job_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "generation",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "payload",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 6,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "resource_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "881bb445876eb75840505765d05e75a5abd63a3a11ca1d2076eac3fa315f531a"
+}

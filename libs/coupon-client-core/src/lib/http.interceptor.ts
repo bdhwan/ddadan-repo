@@ -6,15 +6,15 @@ import {
   HttpHandlerFn,
   HttpInterceptorFn,
   HttpRequest,
-} from '@angular/common/http';
-import { inject } from '@angular/core';
-import { catchError, from, Observable, switchMap, tap, throwError } from 'rxjs';
-import { AuthSessionService } from './firebase-auth';
-import { CouponErrorMapper } from './client-error';
-import { CouponTelemetryService } from './telemetry';
+} from "@angular/common/http";
+import { inject } from "@angular/core";
+import { catchError, from, Observable, switchMap, tap, throwError } from "rxjs";
+import { AuthSessionService } from "./firebase-auth";
+import { CouponErrorMapper } from "./client-error";
+import { CouponTelemetryService } from "./telemetry";
 
 const TOKEN_REFRESH_ATTEMPTED = new HttpContextToken<boolean>(() => false);
-const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 export const couponHttpInterceptor: HttpInterceptorFn = (request, next) => {
   const auth = inject(AuthSessionService);
@@ -34,8 +34,8 @@ export function interceptCouponRequest(
   request: HttpRequest<unknown>,
   next: HttpHandlerFn,
   auth: CouponTokenProvider,
-  errors: Pick<CouponErrorMapper, 'from'>,
-  telemetry: Pick<CouponTelemetryService, 'recordRequest'>,
+  errors: Pick<CouponErrorMapper, "from">,
+  telemetry: Pick<CouponTelemetryService, "recordRequest">,
 ): Observable<HttpEvent<unknown>> {
   let preparedRequest = request;
   return from(auth.getIdToken()).pipe(
@@ -58,7 +58,7 @@ export function interceptCouponRequest(
           switchMap((token) => {
             const retry = prepareRequest(
               preparedRequest.clone({
-                headers: preparedRequest.headers.delete('Authorization'),
+                headers: preparedRequest.headers.delete("Authorization"),
                 context: request.context.set(TOKEN_REFRESH_ATTEMPTED, true),
               }),
               token,
@@ -77,13 +77,16 @@ export function interceptCouponRequest(
   );
 }
 
-function prepareRequest(request: HttpRequest<unknown>, idToken: string | null): HttpRequest<unknown> {
+function prepareRequest(
+  request: HttpRequest<unknown>,
+  idToken: string | null,
+): HttpRequest<unknown> {
   let headers = request.headers;
-  if (idToken && !headers.has('Authorization')) {
-    headers = headers.set('Authorization', `Bearer ${idToken}`);
+  if (idToken && !headers.has("Authorization")) {
+    headers = headers.set("Authorization", `Bearer ${idToken}`);
   }
-  if (MUTATION_METHODS.has(request.method) && !headers.has('Idempotency-Key')) {
-    headers = headers.set('Idempotency-Key', createUuid());
+  if (MUTATION_METHODS.has(request.method) && !headers.has("Idempotency-Key")) {
+    headers = headers.set("Idempotency-Key", createUuid());
   }
   return request.clone({ headers });
 }
@@ -91,13 +94,18 @@ function prepareRequest(request: HttpRequest<unknown>, idToken: string | null): 
 function recordErrorResponse(
   error: unknown,
   request: HttpRequest<unknown>,
-  telemetry: Pick<CouponTelemetryService, 'recordRequest'>,
+  telemetry: Pick<CouponTelemetryService, "recordRequest">,
 ): void {
-  if (!(error instanceof HttpErrorResponse) || typeof error.error !== 'object' || error.error === null) {
+  if (
+    !(error instanceof HttpErrorResponse) ||
+    typeof error.error !== "object" ||
+    error.error === null
+  ) {
     return;
   }
-  const requestId = (error.error as { error?: { request_id?: unknown } }).error?.request_id;
-  if (typeof requestId === 'string') {
+  const requestId = (error.error as { error?: { request_id?: unknown } }).error
+    ?.request_id;
+  if (typeof requestId === "string") {
     telemetry.recordRequest({
       request_id: requestId,
       method: request.method,
@@ -110,13 +118,17 @@ function recordErrorResponse(
 function recordResponse(
   event: HttpEvent<unknown>,
   request: HttpRequest<unknown>,
-  telemetry: Pick<CouponTelemetryService, 'recordRequest'>,
+  telemetry: Pick<CouponTelemetryService, "recordRequest">,
 ): void {
-  if (event.type !== HttpEventType.Response || typeof event.body !== 'object' || event.body === null) {
+  if (
+    event.type !== HttpEventType.Response ||
+    typeof event.body !== "object" ||
+    event.body === null
+  ) {
     return;
   }
   const requestId = (event.body as { request_id?: unknown }).request_id;
-  if (typeof requestId === 'string') {
+  if (typeof requestId === "string") {
     telemetry.recordRequest({
       request_id: requestId,
       method: request.method,
@@ -127,12 +139,18 @@ function recordResponse(
 }
 
 function createUuid(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
-    const random = Math.floor(Math.random() * 16);
-    const value = character === 'x' ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+    /[xy]/g,
+    (character) => {
+      const random = Math.floor(Math.random() * 16);
+      const value = character === "x" ? random : (random & 0x3) | 0x8;
+      return value.toString(16);
+    },
+  );
 }

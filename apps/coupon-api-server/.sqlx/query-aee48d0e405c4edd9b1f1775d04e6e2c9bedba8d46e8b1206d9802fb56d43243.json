@@ -1,0 +1,160 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, unique_key, job_type, status::text AS \"status!\", generation,\n                   attempt_count, max_attempts, processed_count, succeeded_count,\n                   failed_count, store_id, resource_id, scheduled_at, next_attempt_at,\n                   started_at, heartbeat_at, finished_at, last_error_code,\n                   last_error_message, created_at, payload, checkpoint, retry_of_job_id,\n                   retry_reason\n            FROM coupon.job_registry\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "unique_key",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "job_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "generation",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "attempt_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "max_attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "processed_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "succeeded_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "failed_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 11,
+        "name": "resource_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 12,
+        "name": "scheduled_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "next_attempt_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "heartbeat_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 16,
+        "name": "finished_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 17,
+        "name": "last_error_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 18,
+        "name": "last_error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 20,
+        "name": "payload",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 21,
+        "name": "checkpoint",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 22,
+        "name": "retry_of_job_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 23,
+        "name": "retry_reason",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "aee48d0e405c4edd9b1f1775d04e6e2c9bedba8d46e8b1206d9802fb56d43243"
+}

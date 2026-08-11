@@ -10,15 +10,18 @@ use sqlx::PgPool;
 use crate::admin::AdminService;
 use crate::audit::AuditService;
 use crate::auth::AuthService;
+use crate::campaigns::CampaignService;
 use crate::catalog::CatalogService;
 use crate::config::Config;
 use crate::consents::ConsentService;
 use crate::crypto::{LookupHash, Sealer};
 use crate::error::ApiResult;
 use crate::http::rate_limit::RateLimiter;
+use crate::jobs::JobService;
 use crate::loyalty::{PolicyService, StampService};
 use crate::notifications::NotificationPreferenceService;
 use crate::qr::QrService;
+use crate::redemptions::RedemptionService;
 use crate::stores::StoreService;
 use crate::users::UserService;
 use crate::wallet::WalletService;
@@ -49,6 +52,11 @@ pub struct AppState {
     pub wallet: Arc<WalletService>,
     pub admin: Arc<AdminService>,
     pub rate_limiter: Arc<RateLimiter>,
+    // Phase 3: discount campaigns, redemption, and the job queue that bulk issuance
+    // cannot work without (§14).
+    pub jobs: Arc<JobService>,
+    pub campaigns: Arc<CampaignService>,
+    pub redemptions: Arc<RedemptionService>,
 }
 
 impl AppState {
@@ -87,15 +95,39 @@ impl AppState {
             config.stamp_void_window(),
         ));
 
+        let jobs = Arc::new(JobService::new());
+        let campaigns = Arc::new(CampaignService::new(
+            stores.clone(),
+            catalog.clone(),
+            audit.clone(),
+            jobs.clone(),
+        ));
+        let redemptions = Arc::new(RedemptionService::new(
+            stores.clone(),
+            catalog.clone(),
+            qr.clone(),
+            audit.clone(),
+            config.redemption_reservation_ttl(),
+            config.redemption_void_window(),
+        ));
+
         Ok(Self {
             auth: Arc::new(AuthService::new(config.clone())),
             consents: Arc::new(ConsentService::new(
                 lookup_hash,
                 notification_preferences.clone(),
             )),
-            admin: Arc::new(AdminService::new(audit.clone(), config.admin_preview_ttl())),
+            admin: Arc::new(AdminService::new(
+                audit.clone(),
+                jobs.clone(),
+                loyalty_stamps.clone(),
+                config.admin_preview_ttl(),
+            )),
             rate_limiter: Arc::new(RateLimiter::new(redis.clone())),
             wallet: Arc::new(WalletService::new()),
+            jobs,
+            campaigns,
+            redemptions,
             audit,
             catalog,
             qr,

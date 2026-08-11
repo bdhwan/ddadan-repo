@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.job_registry\n            SET status = $2::text::coupon.job_status,\n                next_attempt_at = $3,\n                finished_at = CASE WHEN $2 = 'DEAD_LETTER' THEN $4 ELSE NULL::timestamptz END,\n                dead_lettered_at = CASE WHEN $2 = 'DEAD_LETTER' THEN $4 ELSE dead_lettered_at END,\n                heartbeat_at = $4,\n                checkpoint = $5,\n                processed_count = $6,\n                succeeded_count = $7,\n                failed_count = $8,\n                last_error_code = $9,\n                last_error_message = $10,\n                locked_by = NULL\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Jsonb",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Varchar",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ca235c75747c9d62008751912637d86a6df4d599d0b966a4c032e336683e75b0"
+}

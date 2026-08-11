@@ -2,18 +2,19 @@
 
 > 원본: [scenarios.md §20](./scenarios.md#20-mvp-인수-시나리오)
 > 출시 전 이 10개를 자동화 또는 운영 승인 테스트로 모두 통과해야 한다.
+> `자동검증` 근거는 `apps/coupon-api-server/tests/` 에 실재하는 테스트 이름만 적는다. 확실하지 않으면 `미검증`이다.
 
 | 번호 | 시나리오 | 검증 방법 | 상태 |
 |---|---|---|---|
 | 1 | 소비자가 카카오로 가입하고 여러 상점을 관심 등록한 뒤 한 지갑에서 조회한다. | 미정 | 미검증 |
 | 2 | 점주가 상점을 개설하고 승인받아 10회 방문 도장 정책을 활성화한다. | 미정 | 미검증 |
-| 3 | 점주가 소비자의 회전형 QR을 스캔해 도장을 10번째 적립하고 리워드가 한 번만 발급된다. | 미정 | 자동검증(서버): `reaching_the_goal_issues_a_reward_in_the_same_transaction`, `one_qr_scanned_a_hundred_times_at_once_produces_one_ledger_entry` |
+| 3 | 점주가 소비자의 회전형 QR을 스캔해 도장을 10번째 적립하고 리워드가 한 번만 발급된다. | 서버 통합 테스트 | 자동검증(서버): `reaching_the_goal_issues_a_reward_in_the_same_transaction`, `one_qr_scanned_a_hundred_times_at_once_produces_one_ledger_entry` |
 | 4 | 소비자가 리워드를 사용하고 네트워크 응답 유실 뒤 재시도해도 사용은 한 번만 기록된다. | 미정 | 미검증 |
 | 5 | 점주가 수량 1개의 선착순 할인 캠페인을 열고 동시 요청 중 한 명만 받는다. | 미정 | 미검증 |
 | 6 | 만료 시각과 사용 승인이 경합해도 만료된 쿠폰이 사용되지 않는다. | 미정 | 미검증 |
 | 7 | 같은 캠페인 발급 작업을 여러 API·워커가 처리해도 동일 작업은 동시에 하나만 실행되고 고객별 발급도 한 번뿐이다. | 미정 | 미검증 |
 | 8 | FCM·알림톡이 실패해도 쿠폰은 지갑에 존재하고 재시도·실패 상태가 운영 화면에 나타난다. | 미정 | 미검증 |
-| 9 | 점주가 잘못 적립한 거래를 취소하고 관련 리워드 상태에 맞게 원장과 잔액이 보정된다. | 미정 | 자동검증(서버): `reversing_an_accrual_takes_back_the_reward_and_restores_the_stamps` |
+| 9 | 점주가 잘못 적립한 거래를 취소하고 관련 리워드 상태에 맞게 원장과 잔액이 보정된다. | 서버 통합 테스트 | 자동검증(서버): `reversing_an_accrual_takes_back_the_reward_and_restores_the_stamps` |
 | 10 | 시스템 관리자가 민원 증거를 조회해 보정하고 모든 행위가 변경 불가능한 감사 로그에 남는다. | 미정 | 미검증 |
 
 ## 실기기 검증

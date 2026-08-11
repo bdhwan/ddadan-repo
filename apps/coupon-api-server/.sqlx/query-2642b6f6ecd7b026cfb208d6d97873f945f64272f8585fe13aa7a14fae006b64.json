@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT status::text AS \"status!\", attempt_count, generation, checkpoint\n            FROM coupon.job_registry\n            WHERE id = $1\n            FOR UPDATE\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "attempt_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "generation",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "checkpoint",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "2642b6f6ecd7b026cfb208d6d97873f945f64272f8585fe13aa7a14fae006b64"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.redemption_reservations\n            SET status = 'EXPIRED', completed_at = $2\n            WHERE id = $1 AND status = 'ACTIVE'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "644a532291117726bec0bd04303cac003ac3ce5e60a03bd453424c9517dd413a"
+}

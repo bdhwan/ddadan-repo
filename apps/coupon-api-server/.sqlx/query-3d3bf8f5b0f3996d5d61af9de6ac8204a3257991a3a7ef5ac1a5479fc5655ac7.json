@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                COUNT(*) AS \"count!\",\n                MAX(issuance_ordinal) AS \"max_ordinal?\",\n                (ARRAY_AGG(id ORDER BY created_at DESC))[1] AS \"latest?\"\n            FROM coupon.coupon_instances\n            WHERE campaign_id = $1 AND user_id = $2 AND status <> 'ISSUE_FAILED'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "max_ordinal?",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 2,
+        "name": "latest?",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "3d3bf8f5b0f3996d5d61af9de6ac8204a3257991a3a7ef5ac1a5479fc5655ac7"
+}

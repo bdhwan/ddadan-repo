@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.stamp_transactions\n            SET status = 'VOIDED', voided_at = $2, voided_by_user_id = $3, void_reason = $4\n            WHERE id = $1 AND status <> 'VOIDED'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6ddfc6910e9d23b68cc022d62cf27f6c7fb7a17cd35d89bfb624275e86ffcb34"
+}

@@ -100,6 +100,14 @@ pub struct Config {
     #[serde(default = "default_stamp_void_window_hours")]
     pub stamp_void_window_hours: i64,
 
+    /// How long a coupon stays `RESERVED` while the owner confirms (§13.3, §23.1: 2분).
+    #[serde(default = "default_redemption_reservation_ttl_secs")]
+    pub redemption_reservation_ttl_secs: i64,
+
+    /// Owner self-service window for undoing a use (§8.6: 사용 취소 10분).
+    #[serde(default = "default_redemption_void_window_minutes")]
+    pub redemption_void_window_minutes: i64,
+
     /// How long an administrative adjustment preview stays executable before it must be
     /// taken again (§13.4).
     #[serde(default = "default_admin_preview_ttl_minutes")]
@@ -113,6 +121,8 @@ pub struct Config {
     pub rate_limit_qr_resolve_failure_per_min: u32,
     #[serde(default = "default_stamp_approval_rate_limit")]
     pub rate_limit_stamp_approval_per_min: u32,
+    #[serde(default = "default_campaign_claim_rate_limit")]
+    pub rate_limit_campaign_claim_per_min: u32,
 
     #[serde(default = "default_log_format")]
     pub log_format: LogFormat,
@@ -244,6 +254,21 @@ fn default_stamp_approval_rate_limit() -> u32 {
     30
 }
 
+/// §16.4: 선착순 받기 5회/분.
+fn default_campaign_claim_rate_limit() -> u32 {
+    5
+}
+
+/// §23.1: 사용 예약 2분.
+fn default_redemption_reservation_ttl_secs() -> i64 {
+    120
+}
+
+/// §8.6: 사용 취소 10분.
+fn default_redemption_void_window_minutes() -> i64 {
+    10
+}
+
 fn default_log_format() -> LogFormat {
     LogFormat::Json
 }
@@ -355,6 +380,16 @@ impl Config {
         chrono::Duration::hours(self.stamp_void_window_hours)
     }
 
+    /// Clamped so a misconfiguration cannot hold a customer's coupon hostage for an hour,
+    /// nor make the reservation so short the owner cannot read the screen.
+    pub fn redemption_reservation_ttl(&self) -> chrono::Duration {
+        chrono::Duration::seconds(self.redemption_reservation_ttl_secs.clamp(30, 900))
+    }
+
+    pub fn redemption_void_window(&self) -> chrono::Duration {
+        chrono::Duration::minutes(self.redemption_void_window_minutes.clamp(1, 24 * 60))
+    }
+
     pub fn admin_preview_ttl(&self) -> chrono::Duration {
         chrono::Duration::minutes(self.admin_preview_ttl_minutes.clamp(1, 24 * 60))
     }
@@ -400,10 +435,13 @@ mod tests {
             qr_signing_key: None,
             qr_token_ttl_secs: default_qr_token_ttl_secs(),
             stamp_void_window_hours: default_stamp_void_window_hours(),
+            redemption_reservation_ttl_secs: default_redemption_reservation_ttl_secs(),
+            redemption_void_window_minutes: default_redemption_void_window_minutes(),
             admin_preview_ttl_minutes: default_admin_preview_ttl_minutes(),
             rate_limit_qr_issue_per_min: default_qr_issue_rate_limit(),
             rate_limit_qr_resolve_failure_per_min: default_qr_resolve_failure_rate_limit(),
             rate_limit_stamp_approval_per_min: default_stamp_approval_rate_limit(),
+            rate_limit_campaign_claim_per_min: default_campaign_claim_rate_limit(),
             log_format: LogFormat::Json,
             log_filter: default_log_filter(),
         }

@@ -24,6 +24,8 @@ use validator::Validate;
 
 use crate::audit::{ActorType, AuditEntry, AuditService};
 use crate::error::{ApiError, ApiResult, ErrorCode};
+use crate::jobs::{JobKey, JobService, JobSpec};
+use crate::loyalty::StampService;
 use crate::loyalty::stamps::{LotBalance, available_stamps};
 
 pub use routes::admin_router;
@@ -162,14 +164,49 @@ pub struct ProposedLedgerEntry {
     pub reason_code: String,
 }
 
+/// `POST /admin/adjustments` — approve a previewed correction and queue it (§11.5).
+#[derive(Debug, Clone, Deserialize, ToSchema, Validate)]
+pub struct ApproveAdjustmentRequest {
+    /// The preview to execute. §13.4 requires the execution to be of a specific snapshot,
+    /// not of a freshly recomputed plan.
+    pub adjustment_id: Uuid,
+    #[validate(length(min = 1, max = 1000, message = "승인 사유를 입력해 주세요."))]
+    pub approval_reason: String,
+}
+
+/// The queued correction.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct ApprovedAdjustment {
+    pub adjustment_id: Uuid,
+    pub case_id: Uuid,
+    pub status: String,
+    pub requested_by_user_id: Uuid,
+    pub approved_by_user_id: Uuid,
+    pub approved_at: DateTime<Utc>,
+    /// ADMIN-003: 대량 보정은 동기 API 가 아니라 검토 가능한 큐 작업으로 실행한다.
+    pub execution_job_id: Uuid,
+}
+
 pub struct AdminService {
     audit: Arc<AuditService>,
+    jobs: Arc<JobService>,
+    stamps: Arc<StampService>,
     preview_ttl: chrono::Duration,
 }
 
 impl AdminService {
-    pub fn new(audit: Arc<AuditService>, preview_ttl: chrono::Duration) -> Self {
-        Self { audit, preview_ttl }
+    pub fn new(
+        audit: Arc<AuditService>,
+        jobs: Arc<JobService>,
+        stamps: Arc<StampService>,
+        preview_ttl: chrono::Duration,
+    ) -> Self {
+        Self {
+            audit,
+            jobs,
+            stamps,
+            preview_ttl,
+        }
     }
 
     /// `GET /admin/transactions/:id`.
@@ -531,6 +568,344 @@ impl AdminService {
         })
     }
 
+    /// `POST /admin/adjustments` — approve a preview and queue its execution (§11.5,
+    /// ADMIN-003).
+    ///
+    /// Three rules meet here, and all three are refusals rather than warnings:
+    ///
+    /// * §3.3 — 원장 보정은 요청자와 승인자가 달라야 한다. The database carries the same
+    ///   rule as `ck_admin_adjustment_separation`; this is the copy that can explain it.
+    /// * §13.4 — a preview past its expiry, or one whose observed versions have moved,
+    ///   must be taken again rather than executed against a world that has changed.
+    /// * ADMIN-003 — the execution itself is a queue job, so it is reviewable, resumable
+    ///   and attributable rather than a synchronous write nobody can audit afterwards.
+    pub async fn approve_adjustment(
+        &self,
+        pool: &PgPool,
+        approver_user_id: Uuid,
+        request: &ApproveAdjustmentRequest,
+    ) -> ApiResult<ApprovedAdjustment> {
+        let mut tx = pool.begin().await?;
+        let now = crate::qr::transaction_now(&mut tx).await?;
+
+        let adjustment = sqlx::query!(
+            r#"
+            SELECT id, case_id, status::text AS "status!", adjustment_type, target_snapshot,
+                   preview_snapshot, preview_expires_at, requested_by_user_id
+            FROM coupon.admin_adjustments
+            WHERE id = $1
+            FOR UPDATE
+            "#,
+            request.adjustment_id,
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| ApiError::with_message(ErrorCode::NotFound, "보정 내역을 찾을 수 없습니다."))?;
+
+        if adjustment.status != "DRAFT" && adjustment.status != "PENDING_APPROVAL" {
+            return Err(ApiError::with_message(
+                ErrorCode::InvalidStateTransition,
+                "이미 승인되었거나 종료된 보정입니다.",
+            ));
+        }
+
+        // §3.3. Checked before anything else because it is the rule that most needs to be
+        // impossible to work around by retrying.
+        if adjustment.requested_by_user_id == approver_user_id {
+            return Err(ApiError::new(ErrorCode::ApprovalSeparationRequired));
+        }
+
+        if now >= adjustment.preview_expires_at {
+            return Err(ApiError::new(ErrorCode::PreviewExpired));
+        }
+
+        let blockers = adjustment
+            .preview_snapshot
+            .get("blockers")
+            .and_then(serde_json::Value::as_array)
+            .map(|list| list.len())
+            .unwrap_or(0);
+        if blockers > 0 {
+            return Err(ApiError::with_message(
+                ErrorCode::UnprocessableRequest,
+                "실행할 수 없는 보정입니다. 미리보기를 다시 확인해 주세요.",
+            ));
+        }
+
+        // §13.4: 실행 시 version 이 달라졌으면 다시 preview 한다.
+        self.ensure_versions_unchanged(&mut tx, &adjustment.preview_snapshot)
+            .await?;
+
+        let spec = JobSpec::new(
+            JobKey::execute_adjustment(adjustment.case_id, adjustment.id, 1),
+            serde_json::json!({
+                "adjustment_id": adjustment.id,
+                "case_id": adjustment.case_id,
+                "adjustment_type": adjustment.adjustment_type,
+            }),
+        )
+        .resource(adjustment.id)
+        .requested_by(approver_user_id);
+
+        let job = self.jobs.enqueue(&mut tx, &spec).await?;
+
+        sqlx::query!(
+            r#"
+            UPDATE coupon.admin_adjustments
+            SET status = 'APPROVED', approved_by_user_id = $2, approved_at = $3,
+                approval_reason = $4, execution_job_id = $5
+            WHERE id = $1
+            "#,
+            adjustment.id,
+            approver_user_id,
+            now,
+            request.approval_reason.trim(),
+            job.job_id,
+        )
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| match &error {
+            // `ck_admin_adjustment_separation`, in case the check above were ever removed.
+            sqlx::Error::Database(db) if db.code().as_deref() == Some("23514") => {
+                ApiError::new(ErrorCode::ApprovalSeparationRequired).internal(db.to_string())
+            }
+            _ => ApiError::from(error),
+        })?;
+
+        self.audit
+            .record(
+                &mut tx,
+                AuditEntry::new(
+                    ActorType::SystemAdmin,
+                    "admin_adjustment.approved",
+                    "admin_adjustment",
+                )
+                .actor(approver_user_id)
+                .resource(adjustment.id)
+                .case(adjustment.case_id)
+                .reason(request.approval_reason.clone())
+                .metadata(serde_json::json!({
+                    "requested_by_user_id": adjustment.requested_by_user_id,
+                    "execution_job_id": job.job_id,
+                })),
+            )
+            .await?;
+
+        tx.commit().await?;
+
+        tracing::info!(
+            adjustment_id = %adjustment.id,
+            job_id = %job.job_id,
+            "admin.adjustment_approved"
+        );
+
+        Ok(ApprovedAdjustment {
+            adjustment_id: adjustment.id,
+            case_id: adjustment.case_id,
+            status: "APPROVED".to_owned(),
+            requested_by_user_id: adjustment.requested_by_user_id,
+            approved_by_user_id: approver_user_id,
+            approved_at: now,
+            execution_job_id: job.job_id,
+        })
+    }
+
+    /// Apply an approved correction. Called only from the queue worker (ADMIN-003).
+    ///
+    /// Returns how many ledger events it appended. Nothing is ever rewritten: §13.4 and
+    /// product principle 2 make a correction a new event, and that is what lets an
+    /// investigator later see both what happened and what was done about it.
+    pub async fn execute_adjustment(
+        &self,
+        pool: &PgPool,
+        adjustment_id: Uuid,
+        job_id: Uuid,
+    ) -> ApiResult<i64> {
+        let mut tx = pool.begin().await?;
+        let now = crate::qr::transaction_now(&mut tx).await?;
+
+        let adjustment = sqlx::query!(
+            r#"
+            SELECT id, case_id, status::text AS "status!", adjustment_type, target_snapshot,
+                   preview_snapshot, approved_by_user_id
+            FROM coupon.admin_adjustments
+            WHERE id = $1
+            FOR UPDATE
+            "#,
+            adjustment_id,
+        )
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| ApiError::with_message(ErrorCode::NotFound, "보정 내역을 찾을 수 없습니다."))?;
+
+        match adjustment.status.as_str() {
+            "APPROVED" | "EXECUTING" => {}
+            // Re-running a finished correction must be a no-op, not a second correction.
+            "SUCCEEDED" => {
+                tx.commit().await?;
+                return Ok(0);
+            }
+            other => {
+                return Err(ApiError::with_message(
+                    ErrorCode::InvalidStateTransition,
+                    "승인되지 않은 보정은 실행할 수 없습니다.",
+                )
+                .internal(format!("adjustment is {other}")));
+            }
+        }
+
+        let approver = adjustment.approved_by_user_id.ok_or_else(|| {
+            ApiError::new(ErrorCode::ApprovalSeparationRequired)
+                .internal("an approved adjustment has no approver")
+        })?;
+
+        // The world may have moved between approval and execution too.
+        self.ensure_versions_unchanged(&mut tx, &adjustment.preview_snapshot)
+            .await?;
+
+        let target: AdjustmentTarget =
+            serde_json::from_value(adjustment.target_snapshot.clone()).map_err(|error| {
+                ApiError::new(ErrorCode::UnprocessableRequest)
+                    .internal(format!("malformed adjustment target: {error}"))
+            })?;
+
+        let applied = match adjustment.adjustment_type.as_str() {
+            "STAMP_TRANSACTION_VOID" => {
+                let transaction_id = target.transaction_id.ok_or_else(|| {
+                    ApiError::new(ErrorCode::UnprocessableRequest)
+                        .internal("a void adjustment names no transaction")
+                })?;
+                self.stamps
+                    .admin_void_transaction(&mut tx, transaction_id, approver, adjustment.id, now)
+                    .await?
+            }
+            "STAMP_GRANT" => {
+                let (store_id, user_id, quantity) =
+                    match (target.store_id, target.user_id, target.quantity) {
+                        (Some(store), Some(user), Some(quantity)) => (store, user, quantity),
+                        _ => {
+                            return Err(ApiError::new(ErrorCode::UnprocessableRequest)
+                                .internal("a grant adjustment is missing its target"));
+                        }
+                    };
+                self.stamps
+                    .admin_grant_stamps(
+                        &mut tx,
+                        store_id,
+                        user_id,
+                        quantity,
+                        approver,
+                        adjustment.id,
+                        now,
+                    )
+                    .await?
+            }
+            other => {
+                return Err(ApiError::new(ErrorCode::UnprocessableRequest)
+                    .internal(format!("unknown adjustment type {other}")));
+            }
+        };
+
+        sqlx::query!(
+            r#"
+            UPDATE coupon.admin_adjustments
+            SET status = 'SUCCEEDED', executed_at = $2, execution_job_id = $3,
+                execution_result = $4
+            WHERE id = $1
+            "#,
+            adjustment.id,
+            now,
+            job_id,
+            serde_json::json!({ "ledger_events_appended": applied, "executed_at": now }),
+        )
+        .execute(&mut *tx)
+        .await?;
+
+        self.audit
+            .record(
+                &mut tx,
+                AuditEntry::new(
+                    ActorType::SystemAdmin,
+                    "admin_adjustment.executed",
+                    "admin_adjustment",
+                )
+                .actor(approver)
+                .resource(adjustment.id)
+                .case(adjustment.case_id)
+                .metadata(serde_json::json!({
+                    "job_id": job_id,
+                    "ledger_events_appended": applied,
+                })),
+            )
+            .await?;
+
+        tx.commit().await?;
+
+        tracing::info!(
+            adjustment_id = %adjustment.id,
+            applied,
+            "admin.adjustment_executed"
+        );
+
+        Ok(applied)
+    }
+
+    /// §13.4: 실행 시 version 이 달라졌으면 다시 preview 한다.
+    ///
+    /// Compared row by row rather than as one digest, so an unrelated change elsewhere
+    /// does not force an administrator to redo a preview that is still accurate.
+    async fn ensure_versions_unchanged(
+        &self,
+        tx: &mut crate::db::Tx<'_>,
+        preview_snapshot: &serde_json::Value,
+    ) -> ApiResult<()> {
+        let observed = preview_snapshot
+            .get("observed_versions")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
+
+        for (table, rows) in observed.as_object().into_iter().flatten() {
+            let Some(rows) = rows.as_object() else {
+                continue;
+            };
+
+            for (id, expected) in rows {
+                let Ok(id) = Uuid::parse_str(id) else {
+                    continue;
+                };
+                let expected = expected.as_i64().unwrap_or_default();
+
+                let current = match table.as_str() {
+                    "stamp_transactions" => sqlx::query_scalar!(
+                        "SELECT version FROM coupon.stamp_transactions WHERE id = $1",
+                        id,
+                    )
+                    .fetch_optional(&mut **tx)
+                    .await?,
+                    "coupon_instances" => sqlx::query_scalar!(
+                        "SELECT version FROM coupon.coupon_instances WHERE id = $1",
+                        id,
+                    )
+                    .fetch_optional(&mut **tx)
+                    .await?,
+                    _ => continue,
+                };
+
+                if current != Some(expected) {
+                    return Err(ApiError::with_message(
+                        ErrorCode::PreviewExpired,
+                        "보정 대상이 변경되었습니다. 미리보기를 다시 실행해 주세요.",
+                    )
+                    .internal(format!(
+                        "{table}.{id} moved from {expected} to {current:?}"
+                    )));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     async fn plan_transaction_void(
         &self,
         tx: &mut crate::db::Tx<'_>,
@@ -719,6 +1094,19 @@ impl AdminService {
             blockers: Vec::new(),
         })
     }
+}
+
+/// The `target_snapshot` the preview froze, read back at execution time.
+#[derive(Debug, Clone, Deserialize)]
+struct AdjustmentTarget {
+    #[serde(default)]
+    transaction_id: Option<Uuid>,
+    #[serde(default)]
+    store_id: Option<Uuid>,
+    #[serde(default)]
+    user_id: Option<Uuid>,
+    #[serde(default)]
+    quantity: Option<i64>,
 }
 
 struct AdjustmentPlan {

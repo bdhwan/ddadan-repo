@@ -1,7 +1,7 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component } from "@angular/core";
 
 @Component({
-  selector: 'coupon-card',
+  selector: "coupon-card",
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<ng-content />`,
   styles: `

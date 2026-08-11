@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.campaign_counters\n            SET issued_count = issued_count + $3\n            WHERE campaign_id = $1 AND business_day = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d4d2f2bf76ca4a5e0310abbd000b5a7e0027418bcb13040eb9b91f5e5f602134"
+}

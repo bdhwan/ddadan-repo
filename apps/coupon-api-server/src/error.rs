@@ -39,6 +39,8 @@ pub enum ErrorCode {
 
     // 403 — the store itself may not act.
     StoreNotActive,
+    /// §3.3: 원장 대량 보정은 요청자와 승인자가 달라야 한다.
+    ApprovalSeparationRequired,
 
     // 404 — absent, or not owned by the caller.
     NotFound,
@@ -48,6 +50,8 @@ pub enum ErrorCode {
     LoyaltyPolicyNotFound,
     TransactionNotFound,
     CouponNotFound,
+    CampaignNotFound,
+    ReservationNotFound,
 
     // 409 — state, version and quantity contention.
     Conflict,
@@ -63,6 +67,16 @@ pub enum ErrorCode {
     DuplicateTransactionSuspected,
     PolicyAlreadyScheduled,
     PreviewExpired,
+    /// CAMPAIGN-004: the last coupon went to somebody else.
+    CampaignSoldOut,
+    /// §15: the losing side of two reservations of the same coupon.
+    CouponNotAvailable,
+    /// REDEEM-002: the two minutes ran out before the owner confirmed.
+    ReservationExpired,
+    /// REDEEM-002: 같은 점주 세션은 동시에 하나의 사용 예약만 가질 수 있다.
+    ReservationAlreadyActive,
+    /// §5.4: 주문 1건에 혜택 1개.
+    OrderAlreadyDiscounted,
 
     // 422 — well-formed but the business rule says no.
     UnprocessableRequest,
@@ -78,6 +92,22 @@ pub enum ErrorCode {
     DailyLimitExceeded,
     VoidWindowExpired,
     RequiresAdminReview,
+    /// CAMPAIGN-006: 중지 중 선착순 요청.
+    CampaignPaused,
+    /// The campaign is not in a state that issues coupons at all.
+    CampaignNotIssuing,
+    /// CAMPAIGN-008: 이미 발급된 인스턴스에 소급하는 수정은 거부한다.
+    CampaignNotEditable,
+    /// CAMPAIGN-008: 이미 발급·예약된 수량 미만으로 낮출 수 없다.
+    QuantityBelowIssued,
+    /// The consumer is not in the campaign's audience.
+    AudienceNotEligible,
+    /// REDEEM-003: 아직 사용 시작 전.
+    CouponNotYetUsable,
+    /// REDEEM-003: 사용 종료 이후.
+    CouponExpired,
+    /// REDEEM-003: 사용 가능 요일·시간대 아님.
+    CouponOutsideUsageWindow,
 
     // 429 / 503.
     RateLimited,
@@ -113,6 +143,9 @@ impl ErrorCode {
             ErrorCode::LoyaltyPolicyNotFound => "LOYALTY_POLICY_NOT_FOUND",
             ErrorCode::TransactionNotFound => "TRANSACTION_NOT_FOUND",
             ErrorCode::CouponNotFound => "COUPON_NOT_FOUND",
+            ErrorCode::CampaignNotFound => "CAMPAIGN_NOT_FOUND",
+            ErrorCode::ReservationNotFound => "RESERVATION_NOT_FOUND",
+            ErrorCode::ApprovalSeparationRequired => "APPROVAL_SEPARATION_REQUIRED",
             ErrorCode::Conflict => "CONFLICT",
             ErrorCode::VersionConflict => "VERSION_CONFLICT",
             ErrorCode::IdempotencyKeyReused => "IDEMPOTENCY_KEY_REUSED",
@@ -124,6 +157,11 @@ impl ErrorCode {
             ErrorCode::DuplicateTransactionSuspected => "DUPLICATE_TRANSACTION_SUSPECTED",
             ErrorCode::PolicyAlreadyScheduled => "POLICY_ALREADY_SCHEDULED",
             ErrorCode::PreviewExpired => "PREVIEW_EXPIRED",
+            ErrorCode::CampaignSoldOut => "CAMPAIGN_SOLD_OUT",
+            ErrorCode::CouponNotAvailable => "COUPON_NOT_AVAILABLE",
+            ErrorCode::ReservationExpired => "RESERVATION_EXPIRED",
+            ErrorCode::ReservationAlreadyActive => "RESERVATION_ALREADY_ACTIVE",
+            ErrorCode::OrderAlreadyDiscounted => "ORDER_ALREADY_DISCOUNTED",
             ErrorCode::UnprocessableRequest => "UNPROCESSABLE_REQUEST",
             ErrorCode::StoreNotReadyForReview => "STORE_NOT_READY_FOR_REVIEW",
             ErrorCode::InvalidStateTransition => "INVALID_STATE_TRANSITION",
@@ -136,6 +174,14 @@ impl ErrorCode {
             ErrorCode::DailyLimitExceeded => "DAILY_LIMIT_EXCEEDED",
             ErrorCode::VoidWindowExpired => "VOID_WINDOW_EXPIRED",
             ErrorCode::RequiresAdminReview => "REQUIRES_ADMIN_REVIEW",
+            ErrorCode::CampaignPaused => "CAMPAIGN_PAUSED",
+            ErrorCode::CampaignNotIssuing => "CAMPAIGN_NOT_ISSUING",
+            ErrorCode::CampaignNotEditable => "CAMPAIGN_NOT_EDITABLE",
+            ErrorCode::QuantityBelowIssued => "QUANTITY_BELOW_ISSUED",
+            ErrorCode::AudienceNotEligible => "AUDIENCE_NOT_ELIGIBLE",
+            ErrorCode::CouponNotYetUsable => "COUPON_NOT_YET_USABLE",
+            ErrorCode::CouponExpired => "COUPON_EXPIRED",
+            ErrorCode::CouponOutsideUsageWindow => "COUPON_OUTSIDE_USAGE_WINDOW",
             ErrorCode::RateLimited => "RATE_LIMITED",
             ErrorCode::ServiceUnavailable => "SERVICE_UNAVAILABLE",
             ErrorCode::DependencyUnavailable => "DEPENDENCY_UNAVAILABLE",
@@ -166,7 +212,8 @@ impl ErrorCode {
             | ErrorCode::ConsentRequired
             | ErrorCode::ReauthenticationRequired
             | ErrorCode::OriginNotAllowed
-            | ErrorCode::StoreNotActive => StatusCode::FORBIDDEN,
+            | ErrorCode::StoreNotActive
+            | ErrorCode::ApprovalSeparationRequired => StatusCode::FORBIDDEN,
 
             // 404: absent, or present but not owned by the caller — indistinguishable on
             // purpose, so ownership cannot be probed.
@@ -176,7 +223,9 @@ impl ErrorCode {
             | ErrorCode::CatalogItemNotFound
             | ErrorCode::LoyaltyPolicyNotFound
             | ErrorCode::TransactionNotFound
-            | ErrorCode::CouponNotFound => StatusCode::NOT_FOUND,
+            | ErrorCode::CouponNotFound
+            | ErrorCode::CampaignNotFound
+            | ErrorCode::ReservationNotFound => StatusCode::NOT_FOUND,
 
             // 409: state, version or quantity contention.
             ErrorCode::Conflict
@@ -189,7 +238,12 @@ impl ErrorCode {
             | ErrorCode::QrAlreadyUsed
             | ErrorCode::DuplicateTransactionSuspected
             | ErrorCode::PolicyAlreadyScheduled
-            | ErrorCode::PreviewExpired => StatusCode::CONFLICT,
+            | ErrorCode::PreviewExpired
+            | ErrorCode::CampaignSoldOut
+            | ErrorCode::CouponNotAvailable
+            | ErrorCode::ReservationExpired
+            | ErrorCode::ReservationAlreadyActive
+            | ErrorCode::OrderAlreadyDiscounted => StatusCode::CONFLICT,
 
             // 422: shape is fine, the business condition is not met.
             ErrorCode::UnprocessableRequest
@@ -203,7 +257,15 @@ impl ErrorCode {
             | ErrorCode::ItemNotEligible
             | ErrorCode::DailyLimitExceeded
             | ErrorCode::VoidWindowExpired
-            | ErrorCode::RequiresAdminReview => StatusCode::UNPROCESSABLE_ENTITY,
+            | ErrorCode::RequiresAdminReview
+            | ErrorCode::CampaignPaused
+            | ErrorCode::CampaignNotIssuing
+            | ErrorCode::CampaignNotEditable
+            | ErrorCode::QuantityBelowIssued
+            | ErrorCode::AudienceNotEligible
+            | ErrorCode::CouponNotYetUsable
+            | ErrorCode::CouponExpired
+            | ErrorCode::CouponOutsideUsageWindow => StatusCode::UNPROCESSABLE_ENTITY,
 
             ErrorCode::RateLimited => StatusCode::TOO_MANY_REQUESTS,
 
@@ -252,6 +314,11 @@ impl ErrorCode {
             ErrorCode::LoyaltyPolicyNotFound => "도장 정책을 찾을 수 없습니다.",
             ErrorCode::TransactionNotFound => "거래를 찾을 수 없습니다.",
             ErrorCode::CouponNotFound => "쿠폰을 찾을 수 없습니다.",
+            ErrorCode::CampaignNotFound => "캠페인을 찾을 수 없습니다.",
+            ErrorCode::ReservationNotFound => "사용 예약을 찾을 수 없습니다.",
+            ErrorCode::ApprovalSeparationRequired => {
+                "요청자와 승인자가 같을 수 없습니다. 다른 관리자의 승인이 필요합니다."
+            }
             ErrorCode::Conflict => "현재 상태에서는 처리할 수 없습니다.",
             ErrorCode::VersionConflict => {
                 "다른 곳에서 먼저 수정되었습니다. 새로고침 후 다시 시도해 주세요."
@@ -271,6 +338,17 @@ impl ErrorCode {
             }
             ErrorCode::PolicyAlreadyScheduled => "이미 예약된 다음 버전이 있습니다.",
             ErrorCode::PreviewExpired => "미리보기가 만료되었습니다. 다시 조회해 주세요.",
+            ErrorCode::CampaignSoldOut => "준비된 쿠폰이 모두 소진되었습니다.",
+            ErrorCode::CouponNotAvailable => "현재 사용할 수 없는 쿠폰입니다.",
+            ErrorCode::ReservationExpired => {
+                "예약 시간이 지났습니다. 쿠폰을 다시 확인해 주세요."
+            }
+            ErrorCode::ReservationAlreadyActive => {
+                "진행 중인 사용 예약이 있습니다. 먼저 마무리해 주세요."
+            }
+            ErrorCode::OrderAlreadyDiscounted => {
+                "이 주문에는 이미 혜택이 사용되었습니다. 주문 1건에 혜택 1개만 사용할 수 있습니다."
+            }
             ErrorCode::UnprocessableRequest => "요청 조건을 충족하지 않습니다.",
             ErrorCode::StoreNotReadyForReview => "검수 제출에 필요한 정보가 아직 부족합니다.",
             ErrorCode::InvalidStateTransition => "현재 상태에서는 변경할 수 없습니다.",
@@ -288,6 +366,20 @@ impl ErrorCode {
             ErrorCode::VoidWindowExpired => "취소 가능 시간이 지났습니다.",
             ErrorCode::RequiresAdminReview => {
                 "점주가 직접 처리할 수 없는 거래입니다. 고객센터 문의가 필요합니다."
+            }
+            ErrorCode::CampaignPaused => "지금은 쿠폰을 받을 수 없습니다. 잠시 후 다시 확인해 주세요.",
+            ErrorCode::CampaignNotIssuing => "지금은 발급 중인 캠페인이 아닙니다.",
+            ErrorCode::CampaignNotEditable => {
+                "이미 발급된 쿠폰에 영향을 주는 항목은 수정할 수 없습니다. 새 캠페인을 만들어 주세요."
+            }
+            ErrorCode::QuantityBelowIssued => {
+                "이미 발급·예약된 수량보다 적게 줄일 수 없습니다."
+            }
+            ErrorCode::AudienceNotEligible => "이 캠페인의 대상이 아닙니다.",
+            ErrorCode::CouponNotYetUsable => "아직 사용 시작 전인 쿠폰입니다.",
+            ErrorCode::CouponExpired => "사용 기간이 지난 쿠폰입니다.",
+            ErrorCode::CouponOutsideUsageWindow => {
+                "지금은 사용할 수 없는 쿠폰입니다. 사용 가능한 요일·시간을 확인해 주세요."
             }
             ErrorCode::RateLimited => "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
             ErrorCode::ServiceUnavailable => "일시적인 오류입니다. 잠시 후 다시 시도해 주세요.",
@@ -506,6 +598,9 @@ mod tests {
             (ErrorCode::LoyaltyPolicyNotFound, 404),
             (ErrorCode::TransactionNotFound, 404),
             (ErrorCode::CouponNotFound, 404),
+            (ErrorCode::CampaignNotFound, 404),
+            (ErrorCode::ReservationNotFound, 404),
+            (ErrorCode::ApprovalSeparationRequired, 403),
             (ErrorCode::Conflict, 409),
             (ErrorCode::VersionConflict, 409),
             (ErrorCode::IdempotencyKeyReused, 409),
@@ -517,6 +612,13 @@ mod tests {
             (ErrorCode::DuplicateTransactionSuspected, 409),
             (ErrorCode::PolicyAlreadyScheduled, 409),
             (ErrorCode::PreviewExpired, 409),
+            // §15 동시성 결정표 fixes these three: the loser of a claim, of a reservation,
+            // and of a confirm-versus-expiry race each get a 409 with its own code.
+            (ErrorCode::CampaignSoldOut, 409),
+            (ErrorCode::CouponNotAvailable, 409),
+            (ErrorCode::ReservationExpired, 409),
+            (ErrorCode::ReservationAlreadyActive, 409),
+            (ErrorCode::OrderAlreadyDiscounted, 409),
             (ErrorCode::UnprocessableRequest, 422),
             (ErrorCode::StoreNotReadyForReview, 422),
             (ErrorCode::InvalidStateTransition, 422),
@@ -529,6 +631,14 @@ mod tests {
             (ErrorCode::DailyLimitExceeded, 422),
             (ErrorCode::VoidWindowExpired, 422),
             (ErrorCode::RequiresAdminReview, 422),
+            (ErrorCode::CampaignPaused, 422),
+            (ErrorCode::CampaignNotIssuing, 422),
+            (ErrorCode::CampaignNotEditable, 422),
+            (ErrorCode::QuantityBelowIssued, 422),
+            (ErrorCode::AudienceNotEligible, 422),
+            (ErrorCode::CouponNotYetUsable, 422),
+            (ErrorCode::CouponExpired, 422),
+            (ErrorCode::CouponOutsideUsageWindow, 422),
             (ErrorCode::RateLimited, 429),
             (ErrorCode::ServiceUnavailable, 503),
             (ErrorCode::DependencyUnavailable, 503),

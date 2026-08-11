@@ -16,6 +16,60 @@
     }
   ],
   "paths": {
+    "/api/coupon/v1/admin/adjustments": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Approve a previewed correction and queue it (§11.5, ADMIN-003).",
+        "description": "Re-authentication is required: ADMIN-001 groups 원장 보정 with the actions that demand\nit, and §3.3 additionally requires the approver to be somebody other than the person\nwho asked — which is why this endpoint exists at all rather than the preview simply\nexecuting itself.",
+        "operationId": "approve_adjustment",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApproveAdjustmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Approved and queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovedAdjustment"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "APPROVAL_SEPARATION_REQUIRED, or the role may not approve"
+          },
+          "409": {
+            "description": "The preview expired or its targets moved"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
     "/api/coupon/v1/admin/adjustments/preview": {
       "post": {
         "tags": [
@@ -70,6 +124,307 @@
         ]
       }
     },
+    "/api/coupon/v1/admin/campaigns/{campaign_id}/emergency-stop": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Stop a campaign issuing, immediately (§11.5, ADMIN-005).",
+        "operationId": "emergency_stop_campaign",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Campaign id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Stopped",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not stop a campaign"
+          },
+          "404": {
+            "description": "No such campaign"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/campaigns/{campaign_id}/revoke-job": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Queue a bulk revocation (§11.5, ADMIN-005).",
+        "description": "Unused coupons only. ADMIN-005 keeps `USED` ones in the statistics and attaches them\nto the case instead of rewriting history.",
+        "operationId": "revoke_campaign_coupons",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Campaign id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeJobRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Revocation queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnqueuedJob"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not revoke"
+          },
+          "404": {
+            "description": "No such campaign"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/jobs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "The queue dashboard (§11.5 작업·시도·체크포인트).",
+        "operationId": "list_jobs",
+        "parameters": [
+          {
+            "name": "job_type",
+            "in": "query",
+            "description": "Filter by job type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Filter by status",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/JobStatus"
+            }
+          },
+          {
+            "name": "store_id",
+            "in": "query",
+            "description": "Filter by store",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "resource_id",
+            "in": "query",
+            "description": "Filter by campaign or adjustment",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Jobs, newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobSummary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "One job with every attempt it made.",
+        "operationId": "get_job",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "description": "Job id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Job, checkpoint and attempts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/jobs/{job_id}/retry": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Reprocess a dead-lettered job (§11.5, §14.7).",
+        "description": "The reason is mandatory and the reprocess runs at a **new generation**, so the failed\nrun keeps its own attempt history and this one is separately attributable.",
+        "operationId": "retry_job",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "description": "Job id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReasonRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Queued at a new generation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnqueuedJob"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not reprocess jobs"
+          },
+          "422": {
+            "description": "Only a dead-lettered job can be reprocessed"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
     "/api/coupon/v1/admin/transactions/{transaction_id}": {
       "get": {
         "tags": [
@@ -106,6 +461,63 @@
           },
           "404": {
             "description": "No such transaction"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/campaigns/{campaign_id}/claims": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "선착순 쿠폰 받기 (§11.3, CAMPAIGN-004).",
+        "description": "The rate limit runs *before* the transaction, not after: SEC-003 wants a bot slowed\ndown before it can take stock, and is explicit that a legitimate customer must never\nhave a coupon revoked after the fact.",
+        "operationId": "claim_campaign",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Campaign id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Claimed, or the coupon already held",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimedCoupon"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "CAMPAIGN_SOLD_OUT"
+          },
+          "422": {
+            "description": "Not eligible, or the campaign is not issuing"
+          },
+          "429": {
+            "description": "Too many attempts"
           }
         },
         "security": [
@@ -540,6 +952,453 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/campaigns": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "My campaigns, newest first.",
+        "operationId": "list_campaigns",
+        "responses": {
+          "200": {
+            "description": "Campaigns",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Draft a campaign (CAMPAIGN-001).",
+        "operationId": "create_campaign",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Draft created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A benefit, quantity or schedule value is out of range"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/campaigns/{campaign_id}": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "One campaign.",
+        "operationId": "get_campaign",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Campaign id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Campaign",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such campaign in this store"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Edit a draft, or the forward-looking fields of a published campaign (CAMPAIGN-008).",
+        "operationId": "patch_campaign",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Campaign id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Expected version",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The edit would apply retroactively to issued coupons"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/campaigns/{campaign_id}/cancel": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Cancel, naming what happens to coupons already issued (CAMPAIGN-007).",
+        "operationId": "cancel_campaign",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Campaign id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelCampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Already ended or cancelled"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/campaigns/{campaign_id}/estimate": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "대상 예상 인원과 최대 발급 비용 (CAMPAIGN-002), before the confirmation modal.",
+        "operationId": "estimate_campaign",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Campaign id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What publishing would commit to",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishEstimate"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/campaigns/{campaign_id}/pause": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Stop new issuance, keeping what customers already hold (CAMPAIGN-006).",
+        "operationId": "pause_campaign",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Campaign id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PauseCampaignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Paused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not a campaign that can be paused"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/campaigns/{campaign_id}/publish": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Publish, and register the issuing job (§11.4, CAMPAIGN-003).",
+        "description": "[`RecentlyAuthenticated`] rather than [`StoreOwner`]: CAMPAIGN-002 classes publishing\nas 고위험 작업 requiring re-authentication, and this is the same treatment §9.3 gives\nwithdrawal and business-identity edits.",
+        "operationId": "publish_campaign",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Campaign id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Published",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishedCampaign"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Re-authentication is required for this action"
+          },
+          "422": {
+            "description": "A publication rule is not satisfied"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/campaigns/{campaign_id}/resume": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Continue from the checkpoint (CAMPAIGN-006).",
+        "operationId": "resume_campaign",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "description": "Campaign id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Campaign"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not a paused campaign, or the issuing period has ended"
           }
         },
         "security": [
@@ -1058,6 +1917,191 @@
           },
           "409": {
             "description": "Another version is already scheduled"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/redemptions/preview": {
+      "post": {
+        "tags": [
+          "redemptions"
+        ],
+        "summary": "Check the coupon against the order and hold it for two minutes (§13.3).",
+        "operationId": "preview_redemption",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReservationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Reserved, with the expected discount",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reservation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such coupon for this customer in this store"
+          },
+          "409": {
+            "description": "COUPON_NOT_AVAILABLE or RESERVATION_ALREADY_ACTIVE"
+          },
+          "422": {
+            "description": "A usage condition is not met"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/redemptions/{reservation_id}/cancel": {
+      "post": {
+        "tags": [
+          "redemptions"
+        ],
+        "summary": "Release the hold, or undo the use within ten minutes (REDEEM-002, REDEEM-004).",
+        "operationId": "cancel_redemption",
+        "parameters": [
+          {
+            "name": "reservation_id",
+            "in": "path",
+            "description": "The reservation to release or undo",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelRedemptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Released or voided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Redemption"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such reservation in this store"
+          },
+          "422": {
+            "description": "Past the ten-minute window, or already settled"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/redemptions/{reservation_id}/confirm": {
+      "post": {
+        "tags": [
+          "redemptions"
+        ],
+        "summary": "Approve the use (§13.3 승인, REDEEM-001 step 6–7).",
+        "operationId": "confirm_redemption",
+        "parameters": [
+          {
+            "name": "reservation_id",
+            "in": "path",
+            "description": "The reservation to approve",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRedemptionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Redemption"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A different owner or session made this reservation"
+          },
+          "409": {
+            "description": "RESERVATION_EXPIRED, or the order changed since the preview"
+          },
+          "422": {
+            "description": "A usage condition is no longer met"
           }
         },
         "security": [
@@ -1924,6 +2968,152 @@
           }
         }
       },
+      "ApproveAdjustmentRequest": {
+        "type": "object",
+        "description": "`POST /admin/adjustments` — approve a previewed correction and queue it (§11.5).",
+        "required": [
+          "adjustment_id",
+          "approval_reason"
+        ],
+        "properties": {
+          "adjustment_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The preview to execute. §13.4 requires the execution to be of a specific snapshot,\nnot of a freshly recomputed plan."
+          },
+          "approval_reason": {
+            "type": "string"
+          }
+        }
+      },
+      "ApprovedAdjustment": {
+        "type": "object",
+        "description": "The queued correction.",
+        "required": [
+          "adjustment_id",
+          "case_id",
+          "status",
+          "requested_by_user_id",
+          "approved_by_user_id",
+          "approved_at",
+          "execution_job_id"
+        ],
+        "properties": {
+          "adjustment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approved_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "approved_by_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "execution_job_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ADMIN-003: 대량 보정은 동기 API 가 아니라 검토 가능한 큐 작업으로 실행한다."
+          },
+          "requested_by_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "AudienceCriteria": {
+        "type": "object",
+        "description": "The parameters an audience type needs. Unused fields for a given type are ignored.",
+        "properties": {
+          "minimum_stamps": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "`STAMP_THRESHOLD`: the minimum currently-held stamp count."
+          },
+          "recent_visit_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "`RECENT_VISITORS`: how far back \"recent\" reaches."
+          },
+          "user_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "`SPECIFIC_USERS`."
+          }
+        }
+      },
+      "AudienceType": {
+        "type": "string",
+        "description": "Who a campaign is for (CAMPAIGN-001 대상).",
+        "enum": [
+          "ALL_CUSTOMERS",
+          "FAVORITE_CUSTOMERS",
+          "RECENT_VISITORS",
+          "STAMP_THRESHOLD",
+          "SPECIFIC_USERS"
+        ]
+      },
+      "Benefit": {
+        "type": "object",
+        "description": "The discount a coupon grants, in the form the calculator needs.",
+        "required": [
+          "benefit_type"
+        ],
+        "properties": {
+          "benefit_type": {
+            "$ref": "#/components/schemas/BenefitType"
+          },
+          "fixed_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "정액 할인액."
+          },
+          "free_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "무료 품목 대상. One or more catalogue ids."
+          },
+          "maximum_discount_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Required by 정률 (§8.2)."
+          },
+          "percentage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "1–100."
+          }
+        }
+      },
       "BenefitType": {
         "type": "string",
         "description": "`coupon.benefit_type`.",
@@ -1964,6 +3154,319 @@
           },
           "representative_name": {
             "type": "string"
+          }
+        }
+      },
+      "Campaign": {
+        "type": "object",
+        "description": "A campaign as both the owner app and the admin app read it.",
+        "required": [
+          "id",
+          "store_id",
+          "status",
+          "version_no",
+          "name",
+          "customer_description",
+          "benefit",
+          "minimum_order_amount",
+          "eligible_item_ids",
+          "eligible_category_ids",
+          "excluded_item_ids",
+          "issue_mode",
+          "audience_type",
+          "audience_criteria",
+          "total_quantity",
+          "per_user_quantity",
+          "restore_quantity_on_revoke",
+          "revoke_policy",
+          "issued_count",
+          "reserved_count",
+          "revoked_count",
+          "remaining_quantity",
+          "issue_starts_at",
+          "issue_ends_at",
+          "allowed_weekdays",
+          "allowed_local_time_ranges",
+          "external_discount_stackable",
+          "notification_channels",
+          "issue_generation",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "allowed_local_time_ranges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocalTimeRange"
+            }
+          },
+          "allowed_weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "audience_criteria": {
+            "$ref": "#/components/schemas/AudienceCriteria"
+          },
+          "audience_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "audience_snapshot_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "audience_type": {
+            "$ref": "#/components/schemas/AudienceType"
+          },
+          "benefit": {
+            "$ref": "#/components/schemas/Benefit"
+          },
+          "cancellation_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cancelled_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_description": {
+            "type": "string"
+          },
+          "eligible_category_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "eligible_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "emergency_stopped_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "excluded_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "external_discount_stackable": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issue_ends_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue_generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "issue_mode": {
+            "$ref": "#/components/schemas/IssueMode"
+          },
+          "issue_starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issued_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "minimum_order_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "notification_channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notification_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paused_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "per_business_day_quantity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "per_user_quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "published_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "relative_validity_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "remaining_quantity": {
+            "type": "integer",
+            "format": "int64",
+            "description": "`effective_cap - (issued + reserved)`."
+          },
+          "reserved_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "restore_quantity_on_revoke": {
+            "type": "boolean",
+            "description": "Fixed at creation and never editable afterwards (§8.4)."
+          },
+          "revoke_policy": {
+            "$ref": "#/components/schemas/RevokePolicy"
+          },
+          "revoked_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CampaignStatus"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "total_quantity": {
+            "$ref": "#/components/schemas/TotalQuantity"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usable_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "usable_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version_no": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "CampaignStatus": {
+        "type": "string",
+        "description": "`coupon.campaign_status` (§4.4).",
+        "enum": [
+          "DRAFT",
+          "SCHEDULED",
+          "ISSUING",
+          "PAUSED",
+          "ENDED",
+          "CANCELLED"
+        ]
+      },
+      "CampaignsResponse": {
+        "type": "object",
+        "required": [
+          "campaigns"
+        ],
+        "properties": {
+          "campaigns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Campaign"
+            }
+          }
+        }
+      },
+      "CancelCampaignRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revoke_policy": {
+            "$ref": "#/components/schemas/RevokePolicy",
+            "description": "CAMPAIGN-007: 발급 후 취소는 회수 정책을 명시한다."
+          }
+        }
+      },
+      "CancelRedemptionRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "restore_coupon": {
+            "type": "boolean",
+            "description": "REDEEM-004: 원 캠페인이 아직 유효하고 쿠폰 만료 전이면 `AVAILABLE` 복원을\n선택할 수 있다."
           }
         }
       },
@@ -2098,6 +3601,56 @@
           }
         }
       },
+      "ClaimedCoupon": {
+        "type": "object",
+        "description": "The answer to `POST /campaigns/:id/claims` (§11.3).",
+        "required": [
+          "coupon_id",
+          "campaign_id",
+          "store_id",
+          "title",
+          "usable_from",
+          "expires_at",
+          "already_claimed"
+        ],
+        "properties": {
+          "already_claimed": {
+            "type": "boolean",
+            "description": "True when this call returned a coupon the customer already had. §11.3 requires a\nrepeat request to answer with the existing coupon id rather than an error."
+          },
+          "campaign_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "coupon_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "remaining_quantity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "What is left after this claim, or `None` while the campaign is unlimited."
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "title": {
+            "type": "string"
+          },
+          "usable_from": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ComponentHealth": {
         "type": "object",
         "required": [
@@ -2113,6 +3666,22 @@
           "status": {
             "type": "string",
             "description": "`ok`, `degraded`, `disabled` or `down`."
+          }
+        }
+      },
+      "ConfirmRedemptionRequest": {
+        "type": "object",
+        "required": [
+          "order",
+          "owner_session_id"
+        ],
+        "properties": {
+          "order": {
+            "$ref": "#/components/schemas/OrderInput",
+            "description": "Echoed so a mismatch between what the owner saw and what they are approving is\ncaught rather than silently reconciled (§13.3-2 주문 hash)."
+          },
+          "owner_session_id": {
+            "type": "string"
           }
         }
       },
@@ -2256,6 +3825,69 @@
           }
         }
       },
+      "CouponConditions": {
+        "type": "object",
+        "description": "Everything a coupon carries about *how* it may be spent, frozen at issuance (§8.5).",
+        "required": [
+          "benefit"
+        ],
+        "properties": {
+          "allowed_local_time_ranges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocalTimeRange"
+            }
+          },
+          "allowed_weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "description": "`0` is Sunday. Empty means every day (§8.5, CAMPAIGN-001)."
+          },
+          "benefit": {
+            "$ref": "#/components/schemas/Benefit"
+          },
+          "eligible_category_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "eligible_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excluded_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "external_discount_stackable": {
+            "type": "boolean",
+            "description": "Whether the store said its own in-house discounts may be combined (§5.4). The\nsystem cannot verify an external discount, so this is shown, not enforced."
+          },
+          "minimum_order_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "schema_version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "The store's zone at issuance. A later zone change does not move an absolute\nexpiry (§5.2), but the weekday/hour window is a local-time concept and needs one."
+          }
+        }
+      },
       "CouponStatus": {
         "type": "string",
         "description": "`coupon.coupon_status`.",
@@ -2298,6 +3930,139 @@
           },
           "to_status": {
             "$ref": "#/components/schemas/CouponStatus"
+          }
+        }
+      },
+      "CreateCampaignRequest": {
+        "type": "object",
+        "description": "The campaign draft form (CAMPAIGN-001), in the order the wizard collects it:\n혜택 → 사용 조건 → 대상 → 수량 → 일정 → 알림.",
+        "required": [
+          "name",
+          "customer_description",
+          "benefit",
+          "issue_mode",
+          "total_quantity",
+          "issue_starts_at",
+          "issue_ends_at"
+        ],
+        "properties": {
+          "allowed_local_time_ranges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocalTimeRange"
+            }
+          },
+          "allowed_weekdays": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "audience_criteria": {
+            "$ref": "#/components/schemas/AudienceCriteria"
+          },
+          "audience_type": {
+            "$ref": "#/components/schemas/AudienceType"
+          },
+          "benefit": {
+            "$ref": "#/components/schemas/Benefit"
+          },
+          "customer_description": {
+            "type": "string"
+          },
+          "eligible_category_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "eligible_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excluded_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "external_discount_stackable": {
+            "type": "boolean"
+          },
+          "issue_ends_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue_mode": {
+            "$ref": "#/components/schemas/IssueMode"
+          },
+          "issue_starts_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "minimum_order_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "notification_channels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "notification_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "per_business_day_quantity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "per_user_quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "relative_validity_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "restore_quantity_on_revoke": {
+            "type": "boolean",
+            "description": "§8.4: fixed on the campaign, default false. Not editable afterwards."
+          },
+          "total_quantity": {
+            "$ref": "#/components/schemas/TotalQuantity"
+          },
+          "usable_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "usable_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -2431,6 +4196,63 @@
           }
         }
       },
+      "Discount": {
+        "type": "object",
+        "description": "What a coupon is worth against one order.",
+        "required": [
+          "eligible_amount",
+          "discount_amount"
+        ],
+        "properties": {
+          "discount_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eligible_amount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The part of the order the benefit applies to, after item restrictions (§8.3)."
+          },
+          "free_item": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FreeItemAward",
+                "description": "Set only for 무료 품목."
+              }
+            ]
+          }
+        }
+      },
+      "EnqueuedJob": {
+        "type": "object",
+        "description": "The outcome of registering a job (§14.5 steps 1–2, JOB-001).",
+        "required": [
+          "job_id",
+          "status",
+          "generation",
+          "deduplicated"
+        ],
+        "properties": {
+          "deduplicated": {
+            "type": "boolean",
+            "description": "True when this call found an existing job rather than creating one. The caller\nmust not treat that as an error: JOB-001 says the second registration returns the\nfirst job's id."
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        }
+      },
       "ErrorBody": {
         "type": "object",
         "description": "Wire shape of a failure. Matches the example in §11.1 exactly.",
@@ -2493,6 +4315,38 @@
           }
         }
       },
+      "FreeItemAward": {
+        "type": "object",
+        "description": "The item a 무료 품목 coupon actually gave away.",
+        "required": [
+          "name_snapshot",
+          "unit_price"
+        ],
+        "properties": {
+          "catalog_item_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "name_snapshot": {
+            "type": "string"
+          },
+          "unit_price": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "IssueMode": {
+        "type": "string",
+        "description": "`coupon.issue_mode`.",
+        "enum": [
+          "DIRECT",
+          "FIRST_COME"
+        ]
+      },
       "IssuedReward": {
         "type": "object",
         "required": [
@@ -2523,6 +4377,310 @@
           }
         }
       },
+      "JobAttempt": {
+        "type": "object",
+        "description": "One try, with why it ended (§14.7).",
+        "required": [
+          "id",
+          "attempt_no",
+          "generation",
+          "worker_id",
+          "status",
+          "started_at",
+          "processed_count",
+          "succeeded_count",
+          "failed_count",
+          "checkpoint"
+        ],
+        "properties": {
+          "attempt_no": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "checkpoint": {},
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "failed_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "next_attempt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "processed_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "retryable": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "succeeded_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "worker_id": {
+            "type": "string"
+          }
+        }
+      },
+      "JobDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/JobSummary"
+          },
+          {
+            "type": "object",
+            "required": [
+              "payload",
+              "checkpoint",
+              "attempts"
+            ],
+            "properties": {
+              "attempts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/JobAttempt"
+                }
+              },
+              "checkpoint": {},
+              "payload": {},
+              "retry_of_job_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid"
+              },
+              "retry_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "JobQuery": {
+        "type": "object",
+        "description": "Filters for `GET /admin/jobs`.",
+        "properties": {
+          "job_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JobStatus"
+              }
+            ]
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "JobStatus": {
+        "type": "string",
+        "description": "`coupon.job_status` (§14.4).",
+        "enum": [
+          "PENDING_OUTBOX",
+          "QUEUED",
+          "RUNNING",
+          "RETRY_WAIT",
+          "PAUSE_REQUESTED",
+          "PAUSED",
+          "SUCCEEDED",
+          "DEAD_LETTER",
+          "CANCELLED"
+        ]
+      },
+      "JobSummary": {
+        "type": "object",
+        "description": "A job as the admin queue view lists it (§11.5 `GET /admin/jobs`).",
+        "required": [
+          "id",
+          "unique_key",
+          "job_type",
+          "status",
+          "generation",
+          "attempt_count",
+          "max_attempts",
+          "processed_count",
+          "succeeded_count",
+          "failed_count",
+          "scheduled_at",
+          "created_at"
+        ],
+        "properties": {
+          "attempt_count": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failed_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "heartbeat_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "job_type": {
+            "type": "string"
+          },
+          "last_error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max_attempts": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "next_attempt_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "processed_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "resource_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "succeeded_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unique_key": {
+            "type": "string"
+          }
+        }
+      },
+      "JobType": {
+        "type": "string",
+        "description": "The `{job_type}` component of a unique key (§14.3), and the operational policy each\nkind of work carries (§14.6).",
+        "enum": [
+          "BUILD_CAMPAIGN_AUDIENCE",
+          "ISSUE_CAMPAIGN",
+          "REVOKE_CAMPAIGN",
+          "EXPIRE_COUPONS",
+          "EXECUTE_ADJUSTMENT"
+        ]
+      },
       "LiveResponse": {
         "type": "object",
         "required": [
@@ -2535,6 +4693,24 @@
           },
           "version": {
             "type": "string"
+          }
+        }
+      },
+      "LocalTimeRange": {
+        "type": "object",
+        "description": "One `HH:MM`–`HH:MM` window a coupon may be used in, in the store's local time.",
+        "required": [
+          "start",
+          "end"
+        ],
+        "properties": {
+          "end": {
+            "type": "string",
+            "description": "`HH:MM`, exclusive — the same `[start, end)` rule as every other period (§5.2)."
+          },
+          "start": {
+            "type": "string",
+            "description": "`HH:MM`, inclusive."
           }
         }
       },
@@ -2837,6 +5013,17 @@
           }
         }
       },
+      "PauseCampaignRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "PolicyRules": {
         "type": "object",
         "description": "Everything a draft or an active version says about earning a stamp.",
@@ -3064,6 +5251,37 @@
           }
         }
       },
+      "PublishEstimate": {
+        "type": "object",
+        "description": "What publishing would cost, shown before the confirmation modal (CAMPAIGN-002).",
+        "required": [
+          "audience_size",
+          "maximum_issued_quantity",
+          "estimated_notification_count"
+        ],
+        "properties": {
+          "audience_size": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "estimated_notification_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maximum_discount_cost": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "maximum_issued_quantity": {
+            "type": "integer",
+            "format": "int64",
+            "description": "최대 발급 비용의 참고값 — the ceiling, not a prediction."
+          }
+        }
+      },
       "PublishPolicyRequest": {
         "type": "object",
         "properties": {
@@ -3076,6 +5294,32 @@
             "description": "When the version takes over. Absent or in the past means immediately."
           }
         }
+      },
+      "PublishedCampaign": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Campaign"
+          },
+          {
+            "type": "object",
+            "required": [
+              "estimate"
+            ],
+            "properties": {
+              "estimate": {
+                "$ref": "#/components/schemas/PublishEstimate"
+              },
+              "job_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "The issuing job, for `DIRECT` campaigns. `None` for 선착순."
+              }
+            }
+          }
+        ]
       },
       "QrTokenResponse": {
         "type": "object",
@@ -3159,6 +5403,248 @@
           }
         }
       },
+      "ReasonRequest": {
+        "type": "object",
+        "description": "The reason §11.5 requires on every administrative action.",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "Redemption": {
+        "type": "object",
+        "description": "The completed use (§13.3 승인 4–5).",
+        "required": [
+          "redemption_id",
+          "reservation_id",
+          "coupon_id",
+          "store_id",
+          "status",
+          "gross_amount",
+          "eligible_amount",
+          "discount_amount",
+          "payable_amount",
+          "confirmed_at",
+          "coupon_restored",
+          "coupon_status"
+        ],
+        "properties": {
+          "confirmed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "coupon_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "coupon_restored": {
+            "type": "boolean",
+            "description": "Whether cancelling put the coupon back in the wallet (REDEEM-004)."
+          },
+          "coupon_status": {
+            "$ref": "#/components/schemas/CouponStatus"
+          },
+          "discount_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eligible_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "external_order_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "free_item": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FreeItemAward"
+              }
+            ]
+          },
+          "gross_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "payable_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "redemption_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reservation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RedemptionStatus"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "voidable_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Until when the owner may still undo this themselves — 사용 취소 10분 (§8.6)."
+          },
+          "voided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "RedemptionStatus": {
+        "type": "string",
+        "description": "`coupon.redemption_status`.",
+        "enum": [
+          "CONFIRMED",
+          "VOIDED",
+          "REQUIRES_ADMIN_REVIEW"
+        ]
+      },
+      "Reservation": {
+        "type": "object",
+        "description": "What the owner is shown before approving (§13.3 예약 4).",
+        "required": [
+          "reservation_id",
+          "coupon_id",
+          "store_id",
+          "status",
+          "coupon_title",
+          "gross_amount",
+          "eligible_amount",
+          "expected_discount_amount",
+          "payable_amount",
+          "external_discount_stackable",
+          "reserved_at",
+          "expires_at"
+        ],
+        "properties": {
+          "coupon_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "coupon_title": {
+            "type": "string"
+          },
+          "eligible_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expected_discount_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Two minutes (§23.1)."
+          },
+          "external_discount_stackable": {
+            "type": "boolean",
+            "description": "Whether the store said its own discounts may be combined. Shown to the owner\nbecause §5.4 says the system cannot verify an external discount."
+          },
+          "free_item": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FreeItemAward"
+              }
+            ]
+          },
+          "gross_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "payable_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reservation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reserved_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReservationStatus"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ReservationRequest": {
+        "type": "object",
+        "description": "`POST /owner/redemptions/preview` (§11.4, §13.3).",
+        "required": [
+          "coupon_id",
+          "owner_session_id",
+          "order"
+        ],
+        "properties": {
+          "coupon_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Which coupon the customer chose (REDEEM-001 step 2)."
+          },
+          "fallback_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order": {
+            "$ref": "#/components/schemas/OrderInput"
+          },
+          "owner_session_id": {
+            "type": "string",
+            "description": "The till session. REDEEM-002 allows one active reservation per owner session, so\ntwo tills in one shop can serve two customers but one till cannot start two sales."
+          },
+          "qr_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The customer's rotating QR, exactly as the accrual path takes it (§16.2)."
+          }
+        }
+      },
+      "ReservationStatus": {
+        "type": "string",
+        "description": "`coupon.reservation_status`.",
+        "enum": [
+          "ACTIVE",
+          "CONFIRMED",
+          "CANCELLED",
+          "EXPIRED",
+          "REVOKED"
+        ]
+      },
       "ResourceStatus": {
         "type": "string",
         "description": "`coupon.resource_status`.",
@@ -3177,6 +5663,33 @@
           "CHANGES_REQUESTED",
           "REJECTED",
           "CANCELLED"
+        ]
+      },
+      "RevokeJobRequest": {
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "case_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The case this revocation belongs to. It is also the job key's operation version, so\ntwo revocations of one campaign need two cases to authorise them (§14.3)."
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "RevokePolicy": {
+        "type": "string",
+        "description": "What cancelling does to coupons already in wallets (CAMPAIGN-007).",
+        "enum": [
+          "KEEP_ISSUED",
+          "REVOKE_UNUSED"
         ]
       },
       "RewardDefinition": {
@@ -3760,6 +6273,235 @@
           }
         }
       },
+      "TotalQuantity": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "quantity",
+              "mode"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "LIMITED"
+                ]
+              },
+              "quantity": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "operational_cap",
+              "mode"
+            ],
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "UNLIMITED"
+                ]
+              },
+              "operational_cap": {
+                "type": "integer",
+                "format": "int64"
+              }
+            }
+          }
+        ],
+        "description": "§8.4's two total-quantity expressions, kept apart on the wire.\n\nThe alternative — a nullable number where `null` means unlimited — is exactly what\n§8.4 warns against, because \"no ceiling named\" and \"no ceiling at all\" then look the\nsame to every reader."
+      },
+      "UpdateCampaignRequest": {
+        "type": "object",
+        "description": "A draft edit, or one of the few post-publication changes CAMPAIGN-008 allows.",
+        "properties": {
+          "allowed_local_time_ranges": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/LocalTimeRange"
+            }
+          },
+          "allowed_weekdays": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "audience_criteria": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AudienceCriteria"
+              }
+            ]
+          },
+          "audience_type": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AudienceType"
+              }
+            ]
+          },
+          "benefit": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Benefit"
+              }
+            ]
+          },
+          "customer_description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eligible_category_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "eligible_item_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excluded_item_ids": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "issue_ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "issue_mode": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/IssueMode"
+              }
+            ]
+          },
+          "issue_starts_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "minimum_order_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notification_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "per_business_day_quantity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "per_user_quantity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "relative_validity_days": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "total_quantity": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/TotalQuantity"
+              }
+            ]
+          },
+          "usable_from": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "usable_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "UpdateCategoryRequest": {
         "type": "object",
         "properties": {
@@ -4327,8 +7069,16 @@
       "description": "소비자 지갑: 도장판과 리워드 쿠폰 (§6.2)"
     },
     {
+      "name": "campaigns",
+      "description": "할인 캠페인 작성·게시·선착순 발급 (§8.2, §11.4, §13.2)"
+    },
+    {
+      "name": "redemptions",
+      "description": "쿠폰 사용 예약·승인·취소 (§13.3, §8.6)"
+    },
+    {
       "name": "admin",
-      "description": "거래 탐색과 보정 미리보기 (§11.5)"
+      "description": "거래 탐색, 보정, 캠페인 긴급 중단, 작업 큐 (§11.5)"
     }
   ]
 }

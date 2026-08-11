@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE coupon.redemption_reservations\n                    SET status = 'REVOKED', completed_at = $2,\n                        cancelled_reason = 'CAMPAIGN_REVOKED'\n                    WHERE coupon_id = $1 AND status = 'ACTIVE'\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6b1c292d87f063656b5d4a7a4f55393590e97a3f46707cf202e279e536a9a3d2"
+}

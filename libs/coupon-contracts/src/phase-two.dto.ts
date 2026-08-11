@@ -1,4 +1,9 @@
-import type { Currency, MoneyDto, Rfc3339Timestamp, Uuid } from './phase-one.dto';
+import type {
+  Currency,
+  MoneyDto,
+  Rfc3339Timestamp,
+  Uuid,
+} from "./phase-one.dto";
 
 export interface VersionedDto {
   version: number;
@@ -6,15 +11,19 @@ export interface VersionedDto {
 }
 
 export type CouponWalletStatus =
-  | 'PENDING'
-  | 'AVAILABLE'
-  | 'RESERVED'
-  | 'USED'
-  | 'EXPIRED'
-  | 'REVOKED'
-  | 'VOIDED';
+  | "PENDING"
+  | "AVAILABLE"
+  | "RESERVED"
+  | "USED"
+  | "EXPIRED"
+  | "REVOKED"
+  | "VOIDED";
 
-export type CouponBenefitType = 'FIXED' | 'PERCENTAGE' | 'FREE_ITEM' | 'STAMP_REWARD';
+export type CouponBenefitType =
+  | "FIXED"
+  | "PERCENTAGE"
+  | "FREE_ITEM"
+  | "STAMP_REWARD";
 
 export interface WalletCouponDto extends VersionedDto {
   id: Uuid;
@@ -51,7 +60,7 @@ export interface WalletStampBoardDto extends VersionedDto {
   goal_stamps: number;
   earliest_stamp_expires_at: Rfc3339Timestamp | null;
   reward_description: string;
-  policy_status: 'ACTIVE' | 'ENDED';
+  policy_status: "ACTIVE" | "ENDED";
 }
 
 export interface WalletStampListResponseDto extends VersionedDto {
@@ -72,7 +81,7 @@ export interface QrTokenResponseDto {
 
 export interface ConsumerNotificationDto extends VersionedDto {
   id: Uuid;
-  category: 'TRANSACTION' | 'BENEFIT' | 'SECURITY' | 'OPERATIONS';
+  category: "TRANSACTION" | "BENEFIT" | "SECURITY" | "OPERATIONS";
   title: string;
   body: string;
   read_at: Rfc3339Timestamp | null;
@@ -149,7 +158,12 @@ export interface StampTransactionResponseDto {
   request_id: string;
 }
 
-export type LoyaltyPolicyStatus = 'DRAFT' | 'SCHEDULED' | 'ACTIVE' | 'PAUSED' | 'ENDED';
+export type LoyaltyPolicyStatus =
+  | "DRAFT"
+  | "SCHEDULED"
+  | "ACTIVE"
+  | "PAUSED"
+  | "ENDED";
 
 export interface LoyaltyPolicyDto extends VersionedDto {
   id: Uuid;
@@ -216,7 +230,7 @@ export interface SaveCatalogItemRequestDto {
 
 export interface OwnerDashboardMetricDto {
   value: number | null;
-  aggregation_status: 'READY' | 'PENDING';
+  aggregation_status: "READY" | "PENDING";
 }
 
 export interface OwnerDashboardResponseDto extends VersionedDto {
@@ -224,15 +238,15 @@ export interface OwnerDashboardResponseDto extends VersionedDto {
   redeemed: OwnerDashboardMetricDto;
   voided: OwnerDashboardMetricDto;
   active_campaign_count: number;
-  queue_health: 'HEALTHY' | 'DELAYED' | 'ERROR';
-  delivery_health: 'HEALTHY' | 'DELAYED' | 'ERROR';
+  queue_health: "HEALTHY" | "DELAYED" | "ERROR";
+  delivery_health: "HEALTHY" | "DELAYED" | "ERROR";
   request_id: string;
 }
 
 export interface OwnerCampaignProgressDto extends VersionedDto {
   id: Uuid;
   name: string;
-  status: 'DRAFT' | 'SCHEDULED' | 'ISSUING' | 'PAUSED' | 'ENDED' | 'CANCELLED';
+  status: "DRAFT" | "SCHEDULED" | "ISSUING" | "PAUSED" | "ENDED" | "CANCELLED";
   snapshot_target_count: number | null;
   processed_count: number;
   issued_count: number;
@@ -244,7 +258,7 @@ export interface OwnerCampaignProgressListResponseDto extends VersionedDto {
   request_id: string;
 }
 
-export type AdminLedgerKind = 'EARN' | 'REDEEM' | 'VOID' | 'ADJUSTMENT';
+export type AdminLedgerKind = "EARN" | "REDEEM" | "VOID" | "ADJUSTMENT";
 
 export interface AdminLedgerEntryDto {
   id: Uuid;

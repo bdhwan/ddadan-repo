@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.campaigns\n            SET status = 'CANCELLED', cancelled_at = $2, cancellation_reason = $3,\n                revoke_policy = $4\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9946c0dbc62bd5551e358ca27741d0688c73bf5cc9acdbe079101f28e68b1d7c"
+}

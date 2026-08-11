@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.job_registry\n            SET status = 'QUEUED', locked_by = NULL, next_attempt_at = $1\n            WHERE status = 'RUNNING'\n              AND heartbeat_at IS NOT NULL\n              AND heartbeat_at < $1::timestamptz - make_interval(secs => visibility_timeout_secs)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "60f0c622dedb55209fcf5caf6f92562bc238f347a321ed4e9ad800fe7f5c9b4d"
+}

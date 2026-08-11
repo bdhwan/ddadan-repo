@@ -91,7 +91,12 @@ impl CouponStatus {
             (Available, Reserved | Used | Expired | Revoked | Voided) => true,
             // A reservation either completes, lapses back, or is taken away.
             (Reserved, Available | Used | Expired | Revoked | Voided) => true,
-            // Everything else is terminal. A spent or expired coupon does not come back.
+            // REDEEM-004: a use the owner undoes inside their ten minutes either restores
+            // the coupon — the campaign is still valid and it has not expired — or settles
+            // it as `VOIDED`. This is the one way out of `USED`, and it exists because the
+            // alternative is a customer losing a coupon to an owner's mis-tap.
+            (Used, Available | Voided) => true,
+            // Everything else is terminal. An expired or revoked coupon does not come back.
             _ => false,
         }
     }
@@ -688,7 +693,6 @@ mod tests {
     fn terminal_statuses_are_terminal() {
         // The combinations that would let a spent benefit be spent twice.
         for from in [
-            CouponStatus::Used,
             CouponStatus::Expired,
             CouponStatus::Revoked,
             CouponStatus::Voided,
@@ -706,6 +710,19 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_used_coupon_moves_only_where_redeem_004_allows() {
+        // The owner's ten-minute undo either restores the coupon or settles it as voided.
+        assert!(CouponStatus::Used.can_transition_to(CouponStatus::Available));
+        assert!(CouponStatus::Used.can_transition_to(CouponStatus::Voided));
+
+        // But it is never spent again, and never goes back to being held.
+        assert!(!CouponStatus::Used.can_transition_to(CouponStatus::Used));
+        assert!(!CouponStatus::Used.can_transition_to(CouponStatus::Reserved));
+        assert!(!CouponStatus::Used.can_transition_to(CouponStatus::Pending));
+        assert!(!CouponStatus::Used.can_transition_to(CouponStatus::Expired));
     }
 
     #[test]

@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.campaign_audience_members\n            SET status = $3, processed_at = clock_timestamp(), coupon_id = $4,\n                error_code = $5, issued_job_id = $6\n            WHERE campaign_id = $1 AND user_id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Uuid",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1f4275d0a3e9365108469e490e714067d11b1a3eaeab34c1661f2ce96c163a12"
+}

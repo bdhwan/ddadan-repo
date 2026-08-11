@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.job_registry\n                (unique_key, job_type, generation, status, payload, max_attempts,\n                 scheduled_at, lock_key, store_id, resource_id, visibility_timeout_secs,\n                 requested_by_user_id, retry_of_job_id, retry_reason)\n            VALUES ($1, $2, $3, 'PENDING_OUTBOX', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Jsonb",
+        "Int4",
+        "Timestamptz",
+        "Int8",
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "acece7661947dbf801046cd6c8f71a422dbb5b453420ec4a2d669523179436ab"
+}

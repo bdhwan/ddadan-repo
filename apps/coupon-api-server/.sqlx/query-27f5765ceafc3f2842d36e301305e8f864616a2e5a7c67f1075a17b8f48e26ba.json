@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.campaigns\n            SET name = COALESCE($3, name),\n                customer_description = COALESCE($4, customer_description),\n                benefit_type = $5::text::coupon.benefit_type,\n                fixed_amount = $6,\n                percentage = $7,\n                maximum_discount_amount = $8,\n                free_item_ids = $9,\n                minimum_order_amount = COALESCE($10, minimum_order_amount),\n                eligible_item_ids = COALESCE($11, eligible_item_ids),\n                eligible_category_ids = COALESCE($12, eligible_category_ids),\n                excluded_item_ids = COALESCE($13, excluded_item_ids),\n                issue_mode = COALESCE($14::text::coupon.issue_mode, issue_mode),\n                audience_type = COALESCE($15, audience_type),\n                audience_criteria = COALESCE($16, audience_criteria),\n                total_quantity = $17,\n                unlimited_total_cap = $18,\n                per_user_quantity = COALESCE($19, per_user_quantity),\n                per_business_day_quantity = COALESCE($20, per_business_day_quantity),\n                issue_starts_at = $21,\n                issue_ends_at = $22,\n                usable_from = $23,\n                usable_until = $24,\n                relative_validity_days = $25,\n                allowed_weekdays = COALESCE($26, allowed_weekdays),\n                allowed_local_time_ranges = COALESCE($27, allowed_local_time_ranges),\n                notification_message = COALESCE($28, notification_message),\n                version_no = version_no + 1\n            WHERE id = $1 AND store_id = $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Text",
+        "Int8",
+        "Int2",
+        "Int8",
+        "UuidArray",
+        "Int8",
+        "UuidArray",
+        "UuidArray",
+        "UuidArray",
+        "Text",
+        "Varchar",
+        "Jsonb",
+        "Int8",
+        "Int8",
+        "Int2",
+        "Int8",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Int2",
+        "Int2Array",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "27f5765ceafc3f2842d36e301305e8f864616a2e5a7c67f1075a17b8f48e26ba"
+}

@@ -1,8 +1,15 @@
-import { inject, Injectable, InjectionToken, makeEnvironmentProviders } from '@angular/core';
-import { FirebaseApp, FirebaseOptions, initializeApp } from 'firebase/app';
-import { Auth, getAuth, User } from 'firebase/auth';
+import {
+  inject,
+  Injectable,
+  InjectionToken,
+  makeEnvironmentProviders,
+} from "@angular/core";
+import { FirebaseApp, FirebaseOptions, initializeApp } from "firebase/app";
+import { Auth, getAuth, User } from "firebase/auth";
 
-export const COUPON_FIREBASE_OPTIONS = new InjectionToken<FirebaseOptions>('COUPON_FIREBASE_OPTIONS');
+export const COUPON_FIREBASE_OPTIONS = new InjectionToken<FirebaseOptions>(
+  "COUPON_FIREBASE_OPTIONS",
+);
 
 export function provideCouponClientCore(firebaseOptions: FirebaseOptions) {
   return makeEnvironmentProviders([

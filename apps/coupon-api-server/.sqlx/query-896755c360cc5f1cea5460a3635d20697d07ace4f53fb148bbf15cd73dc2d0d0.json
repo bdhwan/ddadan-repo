@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.campaigns\n            SET status = $2::text::coupon.campaign_status, paused_at = NULL\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "896755c360cc5f1cea5460a3635d20697d07ace4f53fb148bbf15cd73dc2d0d0"
+}

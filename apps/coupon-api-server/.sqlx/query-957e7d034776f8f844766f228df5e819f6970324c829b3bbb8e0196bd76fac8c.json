@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT b.lot_id AS \"lot_id!\", b.balance AS \"balance!\",\n                   b.original_quantity AS \"original_quantity!\"\n            FROM coupon.stamp_lot_balances b\n            WHERE b.source_transaction_id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "lot_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "balance!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "original_quantity!",
+        "type_info": "Int2"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "957e7d034776f8f844766f228df5e819f6970324c829b3bbb8e0196bd76fac8c"
+}

@@ -1,7 +1,7 @@
 /** RFC 3339 timestamp, serialized as a string at the HTTP boundary. */
 export type Rfc3339Timestamp = string;
 export type Uuid = string;
-export type Currency = 'KRW';
+export type Currency = "KRW";
 
 export interface FieldErrorDto {
   field: string;
@@ -50,7 +50,7 @@ export interface MeProfileDto {
   email: string | null;
   display_name: string;
   email_verified: boolean;
-  status: 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWAL_PENDING' | 'WITHDRAWN';
+  status: "ACTIVE" | "SUSPENDED" | "WITHDRAWAL_PENDING" | "WITHDRAWN";
   created_at: Rfc3339Timestamp;
   updated_at: Rfc3339Timestamp;
   version: number;
@@ -61,22 +61,22 @@ export interface UpdateMeRequestDto {
   version: number;
 }
 
-export type UserRole = 'CONSUMER' | 'STORE_OWNER' | 'SYSTEM_ADMIN';
+export type UserRole = "CONSUMER" | "STORE_OWNER" | "SYSTEM_ADMIN";
 
 export interface MeRolesResponseDto {
   roles: Array<{
     role: UserRole;
     store_id: Uuid | null;
-    status: 'ACTIVE' | 'PENDING' | 'SUSPENDED';
+    status: "ACTIVE" | "PENDING" | "SUSPENDED";
   }>;
   request_id: string;
 }
 
 export type ConsentPurpose =
-  | 'TERMS_OF_SERVICE'
-  | 'PRIVACY_POLICY'
-  | 'MARKETING_PUSH'
-  | 'MARKETING_KAKAO';
+  | "TERMS_OF_SERVICE"
+  | "PRIVACY_POLICY"
+  | "MARKETING_PUSH"
+  | "MARKETING_KAKAO";
 
 export interface ConsentDto {
   purpose: ConsentPurpose;
@@ -91,16 +91,16 @@ export interface MeConsentsResponseDto {
 }
 
 export interface UpdateMeConsentsRequestDto {
-  consents: Array<Pick<ConsentDto, 'purpose' | 'granted' | 'version'>>;
+  consents: Array<Pick<ConsentDto, "purpose" | "granted" | "version">>;
 }
 
 export type StoreReviewStatus =
-  | 'DRAFT'
-  | 'IN_REVIEW'
-  | 'CHANGES_REQUESTED'
-  | 'APPROVED'
-  | 'REJECTED'
-  | 'SUSPENDED';
+  | "DRAFT"
+  | "IN_REVIEW"
+  | "CHANGES_REQUESTED"
+  | "APPROVED"
+  | "REJECTED"
+  | "SUSPENDED";
 
 export interface BusinessHoursDto {
   day_of_week: 0 | 1 | 2 | 3 | 4 | 5 | 6;
@@ -117,7 +117,7 @@ export interface OwnerStoreDto {
   business_registration_number_masked: string | null;
   representative_name_masked: string | null;
   address: string | null;
-  timezone: 'Asia/Seoul';
+  timezone: "Asia/Seoul";
   business_hours: BusinessHoursDto[];
   review_status: StoreReviewStatus;
   review_reason: string | null;
@@ -133,7 +133,7 @@ export interface SaveOwnerStoreRequestDto {
   business_registration_number?: string;
   representative_name?: string;
   address?: string | null;
-  timezone?: 'Asia/Seoul';
+  timezone?: "Asia/Seoul";
   business_hours?: BusinessHoursDto[];
   accepted_terms_version?: string;
   version?: number;

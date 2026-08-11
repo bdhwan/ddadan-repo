@@ -28,13 +28,16 @@ pub mod loyalty;
 pub mod qr;
 pub mod wallet;
 
+// Phase 3 domain modules: discount campaigns, coupon redemption, and the asynchronous
+// job queue that bulk issuance depends on (§14).
+pub mod campaigns;
+pub mod jobs;
+pub mod redemptions;
+
 // Later-phase modules: names and boundaries are reserved now so that cross-module
 // wiring does not have to be reshuffled when the phase lands.
 pub mod analytics;
-pub mod campaigns;
-pub mod jobs;
 pub mod notifications;
-pub mod redemptions;
 
 /// Migrations are applied out-of-band (`sqlx migrate run`), never by the application at
 /// boot. This embeds them only so `/health/ready` can compare the expected head version

@@ -32,6 +32,9 @@ pub enum Bucket {
     QrResolveFailure,
     /// Accrual approval, keyed by store and owner.
     StampApproval,
+    /// §16.4 선착순 받기, keyed by user and campaign. SEC-003 wants a bot to hit a wall
+    /// here rather than for a legitimate winner to have their coupon taken back later.
+    CampaignClaim,
 }
 
 impl Bucket {
@@ -40,6 +43,7 @@ impl Bucket {
             Bucket::QrIssue => "qr_issue",
             Bucket::QrResolveFailure => "qr_resolve_failure",
             Bucket::StampApproval => "stamp_approval",
+            Bucket::CampaignClaim => "campaign_claim",
         }
     }
 }

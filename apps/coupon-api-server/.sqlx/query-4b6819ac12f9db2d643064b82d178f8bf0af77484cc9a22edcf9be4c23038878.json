@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.campaigns\n            SET status = 'PAUSED',\n                paused_at = $2,\n                emergency_stopped_at = $2,\n                emergency_stopped_by_user_id = $3\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4b6819ac12f9db2d643064b82d178f8bf0af77484cc9a22edcf9be4c23038878"
+}

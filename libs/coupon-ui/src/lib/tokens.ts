@@ -5,16 +5,16 @@ export const couponBreakpoints = {
 } as const;
 
 export const couponSpacing = {
-  xs: '0.25rem',
-  sm: '0.5rem',
-  md: '1rem',
-  lg: '1.5rem',
-  xl: '2rem',
+  xs: "0.25rem",
+  sm: "0.5rem",
+  md: "1rem",
+  lg: "1.5rem",
+  xl: "2rem",
 } as const;
 
 export const couponRadius = {
-  sm: '0.5rem',
-  md: '0.875rem',
-  lg: '1.25rem',
-  pill: '999px',
+  sm: "0.5rem",
+  md: "0.875rem",
+  lg: "1.25rem",
+  pill: "999px",
 } as const;

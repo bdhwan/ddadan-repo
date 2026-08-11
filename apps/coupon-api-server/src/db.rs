@@ -63,8 +63,8 @@ mod tests {
     fn the_binary_knows_which_migration_it_expects() {
         assert_eq!(
             expected_migration_version(),
-            Some(20260811000200),
-            "embedded migrations must include the phase 2 loyalty core"
+            Some(20260812000300),
+            "embedded migrations must include the phase 3 campaign, redemption and job core"
         );
     }
 }

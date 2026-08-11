@@ -955,6 +955,254 @@ impl StampService {
         })
     }
 
+    /// Reverse an accrual on an administrator's authority (ADMIN-003, §13.4).
+    ///
+    /// The owner's own reversal ([`StampService::void`]) refuses anything it cannot undo
+    /// safely and hands it to an administrator. This is the other side of that door — it
+    /// runs past the owner's 24-hour window and past a spent reward — but it is still not
+    /// an edit: every change is a new ledger event, and a lot is never driven below zero
+    /// (§12.6-3, enforced by `trg_stamp_ledger_balance` regardless of what is asked here).
+    ///
+    /// Returns the number of ledger events appended.
+    pub async fn admin_void_transaction(
+        &self,
+        tx: &mut Tx<'_>,
+        transaction_id: Uuid,
+        admin_user_id: Uuid,
+        adjustment_id: Uuid,
+        now: DateTime<Utc>,
+    ) -> ApiResult<i64> {
+        let original = sqlx::query!(
+            r#"
+            SELECT id, store_id, user_id, status::text AS "status!"
+            FROM coupon.stamp_transactions
+            WHERE id = $1
+            FOR UPDATE
+            "#,
+            transaction_id,
+        )
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or_else(|| ApiError::new(ErrorCode::TransactionNotFound))?;
+
+        if StampTransactionStatus::from_db(&original.status) == StampTransactionStatus::Voided {
+            // Already reversed. Re-running the job must not reverse it twice.
+            return Ok(0);
+        }
+
+        let consumed = sqlx::query!(
+            r#"
+            SELECT lot_id, quantity_delta, reward_coupon_id
+            FROM coupon.stamp_ledger
+            WHERE source_stamp_transaction_id = $1 AND event_type = 'CONSUME_FOR_REWARD'
+            ORDER BY occurred_at, id
+            "#,
+            transaction_id,
+        )
+        .fetch_all(&mut **tx)
+        .await?;
+
+        let mut appended = 0i64;
+
+        for row in &consumed {
+            self.append_ledger_as(
+                tx,
+                "SYSTEM_ADMIN",
+                row.lot_id,
+                "ADMIN_ADJUSTMENT",
+                i64::from(-row.quantity_delta),
+                Some(transaction_id),
+                None,
+                Some(admin_user_id),
+                "ADMIN_ADJUSTMENT_RESTORE",
+                serde_json::json!({ "adjustment_id": adjustment_id }),
+            )
+            .await?;
+            appended += 1;
+        }
+
+        // Rewards this accrual produced. An unused one is taken back; a spent one is left
+        // alone and recorded — the customer already had the benefit, and clawing it back
+        // would be a second, separate decision.
+        let mut reward_ids: Vec<Uuid> = consumed
+            .iter()
+            .filter_map(|row| row.reward_coupon_id)
+            .collect();
+        reward_ids.sort_unstable();
+        reward_ids.dedup();
+
+        for reward_id in &reward_ids {
+            let changed = sqlx::query!(
+                r#"
+                UPDATE coupon.coupon_instances
+                SET status = 'REVOKED', revoked_at = $2, revocation_reason = $3
+                WHERE id = $1 AND status IN ('AVAILABLE', 'RESERVED')
+                "#,
+                reward_id,
+                now,
+                "관리자 보정으로 회수됨",
+            )
+            .execute(&mut **tx)
+            .await?;
+
+            if changed.rows_affected() == 1 {
+                sqlx::query!(
+                    r#"
+                    INSERT INTO coupon.coupon_status_events
+                        (coupon_id, from_status, to_status, actor_type, actor_user_id,
+                         reason_code, transaction_id, metadata, occurred_at)
+                    SELECT $1,
+                           (SELECT to_status FROM coupon.coupon_status_events
+                            WHERE coupon_id = $1 ORDER BY occurred_at DESC, id DESC LIMIT 1),
+                           'REVOKED', 'SYSTEM_ADMIN', $2, 'ADMIN_ADJUSTMENT', $3, $4, $5
+                    "#,
+                    reward_id,
+                    admin_user_id,
+                    transaction_id,
+                    serde_json::json!({ "adjustment_id": adjustment_id }),
+                    now,
+                )
+                .execute(&mut **tx)
+                .await?;
+            }
+        }
+
+        // Now the accrual itself.
+        let lot = sqlx::query!(
+            r#"
+            SELECT b.lot_id AS "lot_id!", b.balance AS "balance!",
+                   b.original_quantity AS "original_quantity!"
+            FROM coupon.stamp_lot_balances b
+            WHERE b.source_transaction_id = $1
+            "#,
+            transaction_id,
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+
+        if let Some(lot) = lot {
+            // Take back only what is still there. Removing more would drive the lot
+            // negative, which §12.6-3 forbids and the trigger would refuse anyway — and
+            // an administrator's correction should not fail on arithmetic we can do here.
+            let removable = i64::from(lot.original_quantity).min(lot.balance);
+            if removable > 0 {
+                self.append_ledger_as(
+                    tx,
+                    "SYSTEM_ADMIN",
+                    lot.lot_id,
+                    "ADMIN_ADJUSTMENT",
+                    -removable,
+                    Some(transaction_id),
+                    None,
+                    Some(admin_user_id),
+                    "ADMIN_TRANSACTION_VOID",
+                    serde_json::json!({
+                        "adjustment_id": adjustment_id,
+                        "requested": lot.original_quantity,
+                        "removed": removable,
+                    }),
+                )
+                .await?;
+                appended += 1;
+            }
+        }
+
+        sqlx::query!(
+            r#"
+            UPDATE coupon.stamp_transactions
+            SET status = 'VOIDED', voided_at = $2, voided_by_user_id = $3, void_reason = $4
+            WHERE id = $1 AND status <> 'VOIDED'
+            "#,
+            transaction_id,
+            now,
+            admin_user_id,
+            "관리자 보정",
+        )
+        .execute(&mut **tx)
+        .await?;
+
+        Ok(appended)
+    }
+
+    /// Put stamps on a customer's board without an accrual behind them (ADMIN-004 도장
+    /// 보정).
+    ///
+    /// A grant creates a *new* lot rather than editing an existing one, which is what
+    /// keeps the ledger reconstructible: the correction is visible as its own event with
+    /// its own expiry rather than hidden inside somebody else's earlier accrual.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn admin_grant_stamps(
+        &self,
+        tx: &mut Tx<'_>,
+        store_id: Uuid,
+        user_id: Uuid,
+        quantity: i64,
+        admin_user_id: Uuid,
+        adjustment_id: Uuid,
+        now: DateTime<Utc>,
+    ) -> ApiResult<i64> {
+        if quantity <= 0 {
+            return Err(ApiError::with_message(
+                ErrorCode::ValidationFailed,
+                "보정 수량은 1개 이상이어야 합니다.",
+            ));
+        }
+
+        // Re-running the job must not grant twice. The ledger event carries the
+        // adjustment id, so "has this correction already been applied" is a question the
+        // ledger itself answers.
+        let already = sqlx::query_scalar!(
+            r#"
+            SELECT id FROM coupon.stamp_ledger
+            WHERE reason_code = 'ADMIN_STAMP_GRANT'
+              AND metadata ->> 'adjustment_id' = $1
+            LIMIT 1
+            "#,
+            adjustment_id.to_string(),
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+
+        if already.is_some() {
+            return Ok(0);
+        }
+
+        let policy = self.policies.active_for_accrual(tx, store_id, now).await?;
+
+        let lot_id = sqlx::query_scalar!(
+            r#"
+            INSERT INTO coupon.stamp_lots
+                (store_id, user_id, policy_id, original_quantity, earned_at, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING id
+            "#,
+            store_id,
+            user_id,
+            policy.id,
+            i16::try_from(quantity).unwrap_or(i16::MAX),
+            now,
+            now + policy.rules.stamp_validity(),
+        )
+        .fetch_one(&mut **tx)
+        .await?;
+
+        self.append_ledger_as(
+            tx,
+            "SYSTEM_ADMIN",
+            lot_id,
+            "ADMIN_ADJUSTMENT",
+            quantity,
+            None,
+            None,
+            Some(admin_user_id),
+            "ADMIN_STAMP_GRANT",
+            serde_json::json!({ "adjustment_id": adjustment_id }),
+        )
+        .await?;
+
+        Ok(1)
+    }
+
     /// Write `EXPIRE` rows for lots whose moment has passed (STAMP-006, §18.1).
     ///
     /// Housekeeping only. Every read already treats an expired lot as spent, so a late
@@ -1567,6 +1815,37 @@ impl StampService {
             "SYSTEM"
         };
 
+        self.append_ledger_as(
+            tx,
+            actor_type,
+            lot_id,
+            event_type,
+            quantity_delta,
+            source_transaction_id,
+            reward_coupon_id,
+            actor_user_id,
+            reason_code,
+            metadata,
+        )
+        .await
+    }
+
+    /// The same, for an actor the owner-or-system guess would get wrong — an
+    /// administrator applying a correction (ADMIN-003) is neither.
+    #[allow(clippy::too_many_arguments)]
+    async fn append_ledger_as(
+        &self,
+        tx: &mut Tx<'_>,
+        actor_type: &str,
+        lot_id: Uuid,
+        event_type: &str,
+        quantity_delta: i64,
+        source_transaction_id: Option<Uuid>,
+        reward_coupon_id: Option<Uuid>,
+        actor_user_id: Option<Uuid>,
+        reason_code: &str,
+        metadata: serde_json::Value,
+    ) -> ApiResult<()> {
         let delta = i16::try_from(quantity_delta).map_err(|_| {
             ApiError::new(ErrorCode::UnprocessableRequest)
                 .internal(format!("ledger delta {quantity_delta} does not fit"))

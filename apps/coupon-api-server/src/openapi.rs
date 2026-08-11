@@ -59,6 +59,25 @@ pub const SPEC_FILE: &str = "openapi.json";
         crate::wallet::routes::get_coupon,
         crate::admin::routes::get_transaction,
         crate::admin::routes::preview_adjustment,
+        crate::campaigns::routes::list_campaigns,
+        crate::campaigns::routes::get_campaign,
+        crate::campaigns::routes::create_campaign,
+        crate::campaigns::routes::patch_campaign,
+        crate::campaigns::routes::estimate_campaign,
+        crate::campaigns::routes::publish_campaign,
+        crate::campaigns::routes::pause_campaign,
+        crate::campaigns::routes::resume_campaign,
+        crate::campaigns::routes::cancel_campaign,
+        crate::campaigns::routes::claim_campaign,
+        crate::redemptions::routes::preview_redemption,
+        crate::redemptions::routes::confirm_redemption,
+        crate::redemptions::routes::cancel_redemption,
+        crate::admin::routes::approve_adjustment,
+        crate::admin::routes::emergency_stop_campaign,
+        crate::admin::routes::revoke_campaign_coupons,
+        crate::admin::routes::list_jobs,
+        crate::admin::routes::get_job,
+        crate::admin::routes::retry_job,
     ),
     components(schemas(
         crate::error::ErrorEnvelope,
@@ -137,6 +156,44 @@ pub const SPEC_FILE: &str = "openapi.json";
         crate::admin::AdjustmentPreviewRequest,
         crate::admin::AdjustmentPreview,
         crate::admin::ProposedLedgerEntry,
+        crate::admin::ApproveAdjustmentRequest,
+        crate::admin::ApprovedAdjustment,
+        crate::admin::routes::ReasonRequest,
+        crate::admin::routes::RevokeJobRequest,
+        crate::campaigns::Campaign,
+        crate::campaigns::CampaignsResponse,
+        crate::campaigns::CampaignStatus,
+        crate::campaigns::IssueMode,
+        crate::campaigns::RevokePolicy,
+        crate::campaigns::TotalQuantity,
+        crate::campaigns::AudienceType,
+        crate::campaigns::AudienceCriteria,
+        crate::campaigns::CreateCampaignRequest,
+        crate::campaigns::UpdateCampaignRequest,
+        crate::campaigns::CancelCampaignRequest,
+        crate::campaigns::PauseCampaignRequest,
+        crate::campaigns::PublishEstimate,
+        crate::campaigns::PublishedCampaign,
+        crate::campaigns::ClaimedCoupon,
+        crate::redemptions::Benefit,
+        crate::redemptions::CouponConditions,
+        crate::redemptions::LocalTimeRange,
+        crate::redemptions::Discount,
+        crate::redemptions::FreeItemAward,
+        crate::redemptions::Reservation,
+        crate::redemptions::ReservationRequest,
+        crate::redemptions::ReservationStatus,
+        crate::redemptions::Redemption,
+        crate::redemptions::RedemptionStatus,
+        crate::redemptions::ConfirmRedemptionRequest,
+        crate::redemptions::CancelRedemptionRequest,
+        crate::jobs::JobStatus,
+        crate::jobs::JobType,
+        crate::jobs::JobQuery,
+        crate::jobs::JobSummary,
+        crate::jobs::JobDetail,
+        crate::jobs::JobAttempt,
+        crate::jobs::EnqueuedJob,
     )),
     modifiers(&SecurityAddon),
     tags(
@@ -148,7 +205,9 @@ pub const SPEC_FILE: &str = "openapi.json";
         (name = "loyalty", description = "도장 정책 버전, 스캔, 적립 원장 (§8.1, §13.1)"),
         (name = "qr", description = "회전형 QR 발급 (§16.2)"),
         (name = "wallet", description = "소비자 지갑: 도장판과 리워드 쿠폰 (§6.2)"),
-        (name = "admin", description = "거래 탐색과 보정 미리보기 (§11.5)"),
+        (name = "campaigns", description = "할인 캠페인 작성·게시·선착순 발급 (§8.2, §11.4, §13.2)"),
+        (name = "redemptions", description = "쿠폰 사용 예약·승인·취소 (§13.3, §8.6)"),
+        (name = "admin", description = "거래 탐색, 보정, 캠페인 긴급 중단, 작업 큐 (§11.5)"),
     ),
 )]
 pub struct ApiDoc;
@@ -237,6 +296,50 @@ mod tests {
         ] {
             assert!(paths.contains_key(path), "{path} must be documented");
         }
+    }
+
+    #[test]
+    fn the_spec_describes_the_phase_three_surface() {
+        let spec: serde_json::Value =
+            serde_json::from_str(&spec_json()).expect("spec is valid JSON");
+        let paths = spec["paths"].as_object().expect("paths object");
+
+        // §11.3's claim, all of §11.4's campaign and redemption rows, and the §11.5
+        // administrative surface Phase 3 adds.
+        for path in [
+            "/api/coupon/v1/owner/campaigns",
+            "/api/coupon/v1/owner/campaigns/{campaign_id}",
+            "/api/coupon/v1/owner/campaigns/{campaign_id}/publish",
+            "/api/coupon/v1/owner/campaigns/{campaign_id}/pause",
+            "/api/coupon/v1/owner/campaigns/{campaign_id}/resume",
+            "/api/coupon/v1/owner/campaigns/{campaign_id}/cancel",
+            "/api/coupon/v1/campaigns/{campaign_id}/claims",
+            "/api/coupon/v1/owner/redemptions/preview",
+            "/api/coupon/v1/owner/redemptions/{reservation_id}/confirm",
+            "/api/coupon/v1/owner/redemptions/{reservation_id}/cancel",
+            "/api/coupon/v1/admin/adjustments",
+            "/api/coupon/v1/admin/campaigns/{campaign_id}/emergency-stop",
+            "/api/coupon/v1/admin/campaigns/{campaign_id}/revoke-job",
+            "/api/coupon/v1/admin/jobs",
+            "/api/coupon/v1/admin/jobs/{job_id}",
+            "/api/coupon/v1/admin/jobs/{job_id}/retry",
+        ] {
+            assert!(paths.contains_key(path), "{path} must be documented");
+        }
+    }
+
+    #[test]
+    fn unlimited_quantity_is_a_distinct_shape_in_the_contract() {
+        // §8.4: 총수량 무제한은 운영 상한을 가진 별도 표현이다. A generated client must
+        // not be able to express "unlimited" as a null.
+        let spec: serde_json::Value =
+            serde_json::from_str(&spec_json()).expect("spec is valid JSON");
+        let schema = &spec["components"]["schemas"]["TotalQuantity"];
+
+        let rendered = schema.to_string();
+        assert!(rendered.contains("LIMITED"), "{rendered}");
+        assert!(rendered.contains("UNLIMITED"), "{rendered}");
+        assert!(rendered.contains("operational_cap"), "{rendered}");
     }
 
     #[test]

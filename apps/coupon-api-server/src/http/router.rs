@@ -16,6 +16,7 @@ use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 
 use crate::admin::admin_router;
+use crate::campaigns::{campaign_claim_router, owner_campaign_router};
 use crate::catalog::owner_catalog_router;
 use crate::consents::consents_router;
 use crate::error::{ApiError, ErrorCode};
@@ -24,6 +25,7 @@ use crate::http::{API_BASE_PATH, health};
 use crate::loyalty::owner_loyalty_router;
 use crate::openapi::swagger_router;
 use crate::qr::qr_router;
+use crate::redemptions::owner_redemption_router;
 use crate::state::AppState;
 use crate::stores::owner_store_router;
 use crate::users::{me_router, users_router};
@@ -46,6 +48,9 @@ pub fn build(state: AppState) -> Router {
         .merge(owner_loyalty_router())
         .merge(qr_router())
         .merge(wallet_router())
+        .merge(owner_campaign_router())
+        .merge(campaign_claim_router())
+        .merge(owner_redemption_router())
         .merge(admin_router())
         // Applied bottom-up: auth runs first, then origin, then idempotency — which needs
         // the actor auth established.

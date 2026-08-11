@@ -11,6 +11,11 @@ publish = false
 [workspace.dependencies]
 aes-gcm = "0.10"
 anyhow = "1"
+# Job transport, delayed delivery and retry plumbing (§14.2). Apalis carries messages;
+# PostgreSQL `job_registry` remains the source of truth, so a lost Redis costs delivery
+# latency rather than correctness.
+apalis = { version = "0.7", default-features = false, features = ["tracing"] }
+apalis-redis = "0.7"
 axum = "0.8"
 axum-extra = "0.10"
 base64 = "0.22"

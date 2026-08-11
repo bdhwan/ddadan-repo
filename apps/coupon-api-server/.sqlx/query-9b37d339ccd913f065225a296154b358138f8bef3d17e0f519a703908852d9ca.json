@@ -1,0 +1,106 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, attempt_no, generation, worker_id, status, started_at, finished_at,\n                   processed_count, succeeded_count, failed_count, checkpoint, error_code,\n                   error_message, retryable, next_attempt_at\n            FROM coupon.job_attempts\n            WHERE job_id = $1\n            ORDER BY generation, attempt_no\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "attempt_no",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 2,
+        "name": "generation",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "worker_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "finished_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "processed_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "succeeded_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "failed_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "checkpoint",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
+        "name": "error_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "retryable",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 14,
+        "name": "next_attempt_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "9b37d339ccd913f065225a296154b358138f8bef3d17e0f519a703908852d9ca"
+}

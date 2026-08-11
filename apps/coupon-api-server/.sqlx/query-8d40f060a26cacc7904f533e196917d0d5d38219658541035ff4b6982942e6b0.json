@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.coupon_instances\n            SET status = $2::text::coupon.coupon_status,\n                used_at = NULL,\n                voided_at = CASE WHEN $2 = 'VOIDED' THEN $3 ELSE voided_at END\n            WHERE id = $1 AND status = 'USED'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8d40f060a26cacc7904f533e196917d0d5d38219658541035ff4b6982942e6b0"
+}

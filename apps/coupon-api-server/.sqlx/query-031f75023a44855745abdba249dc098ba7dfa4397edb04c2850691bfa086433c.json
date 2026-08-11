@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                        UPDATE coupon.outbox_events\n                        SET status = 'PUBLISHED', published_at = $2, attempt_count = attempt_count + 1\n                        WHERE id = $1\n                        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "031f75023a44855745abdba249dc098ba7dfa4397edb04c2850691bfa086433c"
+}

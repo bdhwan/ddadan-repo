@@ -1,0 +1,140 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, unique_key, job_type, status::text AS \"status!\", generation,\n                   attempt_count, max_attempts, processed_count, succeeded_count,\n                   failed_count, store_id, resource_id, scheduled_at, next_attempt_at,\n                   started_at, heartbeat_at, finished_at, last_error_code,\n                   last_error_message, created_at\n            FROM coupon.job_registry\n            WHERE ($1::text IS NULL OR job_type = $1)\n              AND ($2::text IS NULL OR status::text = $2)\n              AND ($3::uuid IS NULL OR store_id = $3)\n              AND ($4::uuid IS NULL OR resource_id = $4)\n            ORDER BY created_at DESC\n            LIMIT $5\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "unique_key",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "job_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "generation",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "attempt_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "max_attempts",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "processed_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "succeeded_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "failed_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 11,
+        "name": "resource_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 12,
+        "name": "scheduled_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "next_attempt_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "started_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "heartbeat_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 16,
+        "name": "finished_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 17,
+        "name": "last_error_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 18,
+        "name": "last_error_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 19,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "b6713b5c2a080d78ffb5788d6da9d830e0596f3a949946a77370ed2258b16c18"
+}

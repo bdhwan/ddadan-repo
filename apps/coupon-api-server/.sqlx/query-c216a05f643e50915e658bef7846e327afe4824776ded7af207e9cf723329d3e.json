@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.job_attempts\n            SET status = 'SUCCEEDED', finished_at = $2, checkpoint = $3,\n                processed_count = $4, succeeded_count = $5, failed_count = $6\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Jsonb",
+        "Int8",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c216a05f643e50915e658bef7846e327afe4824776ded7af207e9cf723329d3e"
+}

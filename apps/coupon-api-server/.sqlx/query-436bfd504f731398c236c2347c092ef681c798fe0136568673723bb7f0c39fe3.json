@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, aggregate_id\n            FROM coupon.outbox_events\n            WHERE event_type IN ('JOB_ENQUEUED', 'JOB_RESUMED')\n              AND status IN ('PENDING', 'FAILED')\n              AND available_at <= $1\n            ORDER BY created_at\n            LIMIT $2\n            FOR UPDATE SKIP LOCKED\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "aggregate_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "436bfd504f731398c236c2347c092ef681c798fe0136568673723bb7f0c39fe3"
+}
