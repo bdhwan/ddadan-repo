@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.store_reviews (store_id, status, submission_snapshot)\n            VALUES ($1, 'PENDING', $2)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c8048b14cf6cff85336da5ace3dbfc17f42a1d5d8de3bf00c6e26af4798114bb"
+}

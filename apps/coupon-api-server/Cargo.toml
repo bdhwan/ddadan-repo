@@ -1,0 +1,55 @@
+[package]
+name = "coupon-api-server"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "DDADAN store coupon and loyalty API server"
+
+[lib]
+name = "coupon_api_server"
+path = "src/lib.rs"
+
+[[bin]]
+name = "coupon-api"
+path = "src/main.rs"
+
+[[bin]]
+name = "coupon-worker"
+path = "src/bin/coupon_worker.rs"
+
+[dependencies]
+aes-gcm.workspace = true
+anyhow.workspace = true
+axum.workspace = true
+axum-extra.workspace = true
+base64.workspace = true
+chrono.workspace = true
+figment.workspace = true
+hex.workspace = true
+hmac.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+jsonwebtoken.workspace = true
+rand.workspace = true
+redis.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+sqlx.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+utoipa.workspace = true
+utoipa-swagger-ui.workspace = true
+uuid.workspace = true
+validator.workspace = true
+x509-cert.workspace = true
+
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }

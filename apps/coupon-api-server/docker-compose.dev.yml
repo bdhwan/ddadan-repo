@@ -1,0 +1,50 @@
+# Local development dependencies for the coupon API server.
+#
+# This stack is intentionally separate from the root docker-compose.yml, which runs
+# the live digital-signage product. Ports and volumes are namespaced so the two can
+# run side by side on the same machine.
+#
+#   docker compose -f apps/coupon-api-server/docker-compose.dev.yml up -d
+#
+# Credentials here are local-only development values. Never reuse them anywhere else.
+name: coupon-dev
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: coupon-dev-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: coupon
+      POSTGRES_PASSWORD: coupon_dev_password
+      POSTGRES_DB: coupon
+      # Deterministic collation so slug/ordering behaviour matches CI.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "55432:5432"
+    volumes:
+      - coupon-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coupon -d coupon"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7
+    container_name: coupon-dev-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "56379:6379"
+    volumes:
+      - coupon-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  coupon-postgres-data:
+  coupon-redis-data:

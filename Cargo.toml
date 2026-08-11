@@ -1,0 +1,49 @@
+[workspace]
+resolver = "3"
+members = ["apps/coupon-api-server"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+aes-gcm = "0.10"
+anyhow = "1"
+axum = "0.8"
+axum-extra = "0.10"
+base64 = "0.22"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+figment = { version = "0.10", features = ["env"] }
+hex = "0.4"
+hmac = "0.12"
+http = "1"
+http-body-util = "0.1"
+jsonwebtoken = "9"
+rand = "0.8"
+redis = { version = "0.27", default-features = false, features = ["tokio-rustls-comp", "connection-manager"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+sqlx = { version = "0.8", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "json",
+    "macros",
+    "migrate",
+] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "time", "sync"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace", "limit", "timeout", "catch-panic"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
+utoipa-swagger-ui = { version = "9", features = ["axum", "vendored"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+validator = { version = "0.20", features = ["derive"] }
+x509-cert = { version = "0.2", features = ["pem"] }

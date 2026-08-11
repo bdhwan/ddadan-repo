@@ -1,0 +1,7 @@
+{
+  "/api/coupon/v1": {
+    "target": "http://localhost:7810",
+    "secure": false,
+    "changeOrigin": true
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "../../node_modules/@angular/service-worker/config/schema.json",
+  "index": "/index.html",
+  "assetGroups": [
+    {
+      "name": "app-shell",
+      "installMode": "prefetch",
+      "resources": { "files": ["/index.html", "/manifest.webmanifest", "/*.css", "/*.js"] }
+    },
+    {
+      "name": "static-assets",
+      "installMode": "lazy",
+      "updateMode": "prefetch",
+      "resources": { "files": ["/assets/**", "/*.(png|svg|webp|woff2)"] }
+    }
+  ],
+  "dataGroups": [
+    {
+      "name": "public-store-data",
+      "urls": ["/api/coupon/v1/public/stores", "/api/coupon/v1/public/stores/**"],
+      "cacheConfig": { "strategy": "freshness", "maxSize": 20, "maxAge": "10m", "timeout": "3s" }
+    }
+  ]
+}

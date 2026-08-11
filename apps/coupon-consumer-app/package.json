@@ -1,0 +1,33 @@
+{
+  "name": "coupon-consumer-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve --port 4310",
+    "build": "ng build --configuration production"
+  },
+  "dependencies": {
+    "@angular/common": "^21.2.0",
+    "@angular/compiler": "^21.2.0",
+    "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
+    "@angular/platform-browser": "^21.2.0",
+    "@angular/router": "^21.2.0",
+    "@angular/service-worker": "^21.2.0",
+    "@coupon/client-core": "*",
+    "@coupon/contracts": "*",
+    "@coupon/domain": "*",
+    "@coupon/ui": "*",
+    "firebase": "^12.0.0",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.2.7",
+    "@angular/cli": "^21.2.7",
+    "@angular/compiler-cli": "^21.2.0",
+    "sass": "^1.86.0",
+    "typescript": "~5.9.2"
+  }
+}

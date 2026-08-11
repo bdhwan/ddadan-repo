@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT ON (e.scope, COALESCE(e.store_id, '00000000-0000-0000-0000-000000000000'::uuid))\n                e.scope,\n                e.store_id,\n                e.action::text AS \"action!\",\n                e.occurred_at,\n                d.version_label AS \"version_label?\"\n            FROM coupon.consent_events e\n            LEFT JOIN coupon.terms_documents d ON d.id = e.document_id\n            WHERE e.user_id = $1\n            ORDER BY\n                e.scope,\n                COALESCE(e.store_id, '00000000-0000-0000-0000-000000000000'::uuid),\n                e.occurred_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "scope",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "action!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "version_label?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "1959cc04c09acb0b8a185aebd527d66506e95211e3536d1591ac793e38d1d5f6"
+}

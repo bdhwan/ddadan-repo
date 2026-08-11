@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT enabled\n            FROM coupon.notification_preferences\n            WHERE user_id = $1\n              AND COALESCE(store_id, '00000000-0000-0000-0000-000000000000'::uuid)\n                = COALESCE($2::uuid, '00000000-0000-0000-0000-000000000000'::uuid)\n              AND purpose = $3\n              AND channel = $4::text::coupon.notification_channel\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "enabled",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bfd16cc8a5954a3e7c5bb44aa293906257a56b2ee368e6c1933c3f0ed914ec66"
+}

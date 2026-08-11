@@ -1,0 +1,16 @@
+{
+  "name": "@coupon/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/public-api.ts"
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../../apps/coupon-api-server/openapi.json --output src/generated/openapi.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.9.1",
+    "typescript": "~5.9.2"
+  }
+}

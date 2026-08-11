@@ -1,0 +1,5 @@
+[env]
+# Build against the checked-in `.sqlx/` query metadata so a clone builds without a
+# live PostgreSQL. `cargo sqlx prepare` overrides this on its own, and a developer
+# who wants live compile-time checking can export SQLX_OFFLINE=false.
+SQLX_OFFLINE = { value = "true", force = false }

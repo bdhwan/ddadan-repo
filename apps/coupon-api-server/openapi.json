@@ -1,0 +1,1236 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "DDADAN Coupon API",
+    "description": "상점별 쿠폰·도장 발급 시스템 API. 모든 경로는 `/api/coupon/v1` 아래에 있으며, JSON 필드는 snake_case, 식별자는 UUID 문자열, 시각은 RFC 3339 UTC, 금액은 원 단위 정수입니다.",
+    "license": {
+      "name": "UNLICENSED",
+      "identifier": "UNLICENSED"
+    },
+    "version": "0.1.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:7810",
+      "description": "Local development"
+    }
+  ],
+  "paths": {
+    "/api/coupon/v1/health/live": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness. Touches nothing external on purpose: a dependency outage must not make the\norchestrator kill a healthy process.",
+        "operationId": "live",
+        "responses": {
+          "200": {
+            "description": "Process is running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coupon/v1/health/ready": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Readiness.",
+        "operationId": "ready",
+        "responses": {
+          "200": {
+            "description": "Ready for traffic",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coupon/v1/me": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "My profile.",
+        "operationId": "get_me",
+        "responses": {
+          "200": {
+            "description": "Current profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Signed in but not bootstrapped yet"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Update my profile.",
+        "operationId": "patch_me",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Expected version, e.g. \"3\"",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Someone else changed the profile first"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/me/consents": {
+      "get": {
+        "tags": [
+          "consents"
+        ],
+        "summary": "My current consent state, including scopes I have never touched.",
+        "operationId": "get_consents",
+        "responses": {
+          "200": {
+            "description": "Current consent state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "consents"
+        ],
+        "summary": "Grant or revoke consent. Each change appends an immutable event (§9.4).",
+        "operationId": "post_consents",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateConsentsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Consent state after the change",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Required consent cannot be revoked here"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/me/roles": {
+      "get": {
+        "tags": [
+          "users"
+        ],
+        "summary": "My active roles, with the store each store-scoped role refers to.",
+        "operationId": "get_roles",
+        "responses": {
+          "200": {
+            "description": "Active roles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RolesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/store": {
+      "get": {
+        "tags": [
+          "stores"
+        ],
+        "summary": "My store.",
+        "operationId": "get_store",
+        "responses": {
+          "200": {
+            "description": "The caller's store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No store yet"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "stores"
+        ],
+        "summary": "Create my store draft. One per account (§12.6-1).",
+        "operationId": "create_store",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Store draft created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This account already has a store, or the slug is taken"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "stores"
+        ],
+        "summary": "Update my store.",
+        "operationId": "patch_store",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Expected version, e.g. \"3\"",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Someone else changed the store first"
+          },
+          "422": {
+            "description": "The store cannot be edited in its current state"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/store/submit-review": {
+      "post": {
+        "tags": [
+          "stores"
+        ],
+        "summary": "Submit my store for review.",
+        "description": "High-risk: it freezes the business identity a reviewer will act on, so it requires a\nrecent sign-in (§9.3).",
+        "operationId": "submit_review",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Store queued for review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoreResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sign-in is too old for this operation"
+          },
+          "409": {
+            "description": "A review is already pending"
+          },
+          "422": {
+            "description": "Required information is still missing"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/users/bootstrap": {
+      "post": {
+        "tags": [
+          "users"
+        ],
+        "summary": "Create the internal account for a signed-in Firebase user.",
+        "operationId": "bootstrap",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BootstrapRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Account already existed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Account created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid Firebase ID token"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountRole": {
+        "type": "string",
+        "description": "`coupon.account_role`.",
+        "enum": [
+          "CONSUMER",
+          "STORE_OWNER",
+          "SUPPORT",
+          "OPERATIONS",
+          "SECURITY",
+          "SUPER_ADMIN",
+          "UNKNOWN"
+        ]
+      },
+      "BootstrapRequest": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Defaults to the Firebase display name, then to a generated nickname."
+          }
+        }
+      },
+      "BusinessProfileInput": {
+        "type": "object",
+        "required": [
+          "registration_no",
+          "representative_name"
+        ],
+        "properties": {
+          "business_address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "registration_no": {
+            "type": "string",
+            "description": "사업자등록번호. Stored encrypted plus a keyed hash for duplicate detection."
+          },
+          "representative_name": {
+            "type": "string"
+          }
+        }
+      },
+      "ComponentHealth": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`ok`, `degraded`, `disabled` or `down`."
+          }
+        }
+      },
+      "ConsentAction": {
+        "type": "string",
+        "enum": [
+          "GRANTED",
+          "REVOKED"
+        ]
+      },
+      "ConsentChange": {
+        "type": "object",
+        "description": "One change in a `POST /me/consents` batch.",
+        "required": [
+          "scope",
+          "action",
+          "source"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ConsentAction"
+          },
+          "document_version": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Version label of the document shown to the user, e.g. `2026-08-01`."
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ConsentScope"
+          },
+          "source": {
+            "type": "string",
+            "description": "The screen that collected the consent (§9.4), e.g. `signup`, `settings/alerts`."
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Required for store-scoped consent, rejected otherwise."
+          }
+        }
+      },
+      "ConsentScope": {
+        "type": "string",
+        "description": "The consent scopes from the §9.4 table.",
+        "enum": [
+          "TERMS_OF_SERVICE",
+          "PRIVACY_POLICY",
+          "LOCATION_BASED_SEARCH",
+          "TRANSACTIONAL_WEB_PUSH",
+          "KAKAO_INFORMATIONAL",
+          "MARKETING_ALL",
+          "MARKETING_STORE"
+        ]
+      },
+      "ConsentState": {
+        "type": "object",
+        "description": "One consent as it stands right now, derived from the latest event.",
+        "required": [
+          "scope",
+          "granted",
+          "required"
+        ],
+        "properties": {
+          "decided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "document_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "granted": {
+            "type": "boolean"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ConsentScope"
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "ConsentsResponse": {
+        "type": "object",
+        "required": [
+          "consents"
+        ],
+        "properties": {
+          "consents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsentState"
+            }
+          }
+        }
+      },
+      "CreateStoreRequest": {
+        "type": "object",
+        "required": [
+          "name",
+          "slug"
+        ],
+        "properties": {
+          "address": {},
+          "business_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contact_phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Public URL segment. Validated by [`ensure_valid_slug`], which mirrors the\n`ck_stores_slug_format` CHECK constraint."
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ErrorBody": {
+        "type": "object",
+        "description": "Wire shape of a failure. Matches the example in §11.1 exactly.",
+        "required": [
+          "code",
+          "message",
+          "field_errors",
+          "retryable",
+          "request_id"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "field_errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldError"
+            }
+          },
+          "message": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        }
+      },
+      "FieldError": {
+        "type": "object",
+        "description": "One invalid field, for a form to highlight.",
+        "required": [
+          "field",
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "LiveResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "version"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "ReadyResponse": {
+        "type": "object",
+        "required": [
+          "status",
+          "postgres",
+          "redis",
+          "config"
+        ],
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/ComponentHealth"
+          },
+          "expected_migration_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "migration_version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "postgres": {
+            "$ref": "#/components/schemas/ComponentHealth"
+          },
+          "redis": {
+            "$ref": "#/components/schemas/ComponentHealth"
+          },
+          "status": {
+            "type": "string",
+            "description": "`ready` or `not_ready`. `degraded` components do not change it."
+          }
+        }
+      },
+      "ReviewStatus": {
+        "type": "string",
+        "description": "`coupon.review_status`.",
+        "enum": [
+          "PENDING",
+          "APPROVED",
+          "CHANGES_REQUESTED",
+          "REJECTED",
+          "CANCELLED"
+        ]
+      },
+      "RoleGrant": {
+        "type": "object",
+        "required": [
+          "role",
+          "granted_at"
+        ],
+        "properties": {
+          "granted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "role": {
+            "$ref": "#/components/schemas/AccountRole"
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Set for store-scoped roles. Phase 1 grants only account-wide roles."
+          }
+        }
+      },
+      "RolesResponse": {
+        "type": "object",
+        "required": [
+          "roles"
+        ],
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RoleGrant"
+            }
+          }
+        }
+      },
+      "StoreResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "name",
+          "slug",
+          "address",
+          "timezone",
+          "business_day_cutoff",
+          "business_hours",
+          "business_profile_complete",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "address": {},
+          "business_day_cutoff": {
+            "type": "string",
+            "description": "Local time a business day rolls over, `HH:MM:SS`."
+          },
+          "business_hours": {},
+          "business_profile_complete": {
+            "type": "boolean",
+            "description": "Whether the encrypted business-identity record has been filled in."
+          },
+          "business_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contact_phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "latest_review": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StoreReviewResponse"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StoreStatus"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "StoreReviewResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "submitted_at"
+        ],
+        "properties": {
+          "decided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "public_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Reason shown to the owner. Internal reviewer notes are never returned here."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ReviewStatus"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StoreStatus": {
+        "type": "string",
+        "description": "`coupon.store_status`.",
+        "enum": [
+          "DRAFT",
+          "PENDING_REVIEW",
+          "ACTIVE",
+          "SUSPENDED",
+          "CLOSED"
+        ]
+      },
+      "SubmitReviewRequest": {
+        "type": "object",
+        "properties": {
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional note for the reviewer."
+          }
+        }
+      },
+      "UpdateConsentsRequest": {
+        "type": "object",
+        "required": [
+          "consents"
+        ],
+        "properties": {
+          "consents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsentChange"
+            }
+          }
+        }
+      },
+      "UpdateProfileRequest": {
+        "type": "object",
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Expected `version`; may also be supplied as `If-Match`."
+          }
+        }
+      },
+      "UpdateStoreRequest": {
+        "type": "object",
+        "properties": {
+          "address": {},
+          "business_day_cutoff": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`HH:MM` or `HH:MM:SS` local time."
+          },
+          "business_hours": {},
+          "business_profile": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BusinessProfileInput",
+                "description": "Business identity, required before review. Encrypted at rest (§16.5)."
+              }
+            ]
+          },
+          "business_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contact_phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Expected `version`; may also be supplied as `If-Match`."
+          }
+        }
+      },
+      "UserProfile": {
+        "type": "object",
+        "required": [
+          "id",
+          "consumer_key",
+          "display_name",
+          "status",
+          "email_verified",
+          "roles",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "consumer_key": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Stable pseudonymous identifier. Safe to show a store owner; never put it in a QR\npayload (§16.2)."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "display_name": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email_verified": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AccountRole"
+            }
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "UserStatus": {
+        "type": "string",
+        "description": "`coupon.user_status`.",
+        "enum": [
+          "PENDING_VERIFICATION",
+          "ACTIVE",
+          "SUSPENDED",
+          "WITHDRAWAL_PENDING",
+          "WITHDRAWN"
+        ]
+      }
+    },
+    "securitySchemes": {
+      "firebase": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Firebase ID token"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "health",
+      "description": "Liveness and readiness probes"
+    },
+    {
+      "name": "users",
+      "description": "Account bootstrap, profile and roles"
+    },
+    {
+      "name": "consents",
+      "description": "Terms and channel consent"
+    },
+    {
+      "name": "stores",
+      "description": "Store draft, edit and review submission"
+    }
+  ]
+}

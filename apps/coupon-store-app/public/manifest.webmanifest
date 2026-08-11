@@ -1,0 +1,10 @@
+{
+  "name": "다단 상점",
+  "short_name": "다단상점",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#155e4b",
+  "lang": "ko-KR",
+  "scope": "/"
+}

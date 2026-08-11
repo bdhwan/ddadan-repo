@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                u.id,\n                u.consumer_key,\n                u.display_name,\n                u.status::text AS \"status!\",\n                u.primary_email_ciphertext,\n                u.email_verified_at,\n                u.created_at,\n                u.updated_at,\n                u.version,\n                COALESCE(\n                    ARRAY(\n                        SELECT r.role::text FROM coupon.user_roles r\n                        WHERE r.user_id = u.id AND r.revoked_at IS NULL\n                        ORDER BY r.granted_at\n                    ),\n                    ARRAY[]::text[]\n                ) AS \"roles!: Vec<String>\"\n            FROM coupon.users u\n            WHERE u.id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "consumer_key",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "display_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "primary_email_ciphertext",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 5,
+        "name": "email_verified_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "version",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 9,
+        "name": "roles!: Vec<String>",
+        "type_info": "TextArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      true,
+      true,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "f1a255c2c3758027c2efc1f5d0c29e7e27c43d0f42813ba62fdafcfe9d171fda"
+}

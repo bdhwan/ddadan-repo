@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.user_roles (user_id, role)\n            SELECT $1, $2::text::coupon.account_role\n            WHERE NOT EXISTS (\n                SELECT 1 FROM coupon.user_roles\n                WHERE user_id = $1\n                  AND role = $2::text::coupon.account_role\n                  AND revoked_at IS NULL\n            )\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9966fcb343701df89b8e4bc1877c922aec580b0a94cda0b752bb387d4be3a291"
+}

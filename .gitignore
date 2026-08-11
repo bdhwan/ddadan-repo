@@ -31,3 +31,8 @@ out-tsc/
 # Session debug screenshots
 artifacts/
 __pycache__/
+
+# --- coupon system ---
+.env.coupon
+/target/
+apps/coupon-api-server/target/

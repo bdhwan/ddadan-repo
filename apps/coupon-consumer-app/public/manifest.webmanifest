@@ -1,0 +1,10 @@
+{
+  "name": "다단 쿠폰",
+  "short_name": "다단쿠폰",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#155e4b",
+  "lang": "ko-KR",
+  "scope": "/"
+}

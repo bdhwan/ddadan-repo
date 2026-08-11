@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.stores\n            SET name = COALESCE($3, name),\n                business_type = COALESCE($4, business_type),\n                description = COALESCE($5, description),\n                contact_phone_ciphertext = COALESCE($6, contact_phone_ciphertext),\n                contact_phone_lookup_hash = COALESCE($7, contact_phone_lookup_hash),\n                address_snapshot = COALESCE($8::jsonb, address_snapshot),\n                business_hours = COALESCE($9::jsonb, business_hours),\n                timezone = COALESCE($10, timezone),\n                business_day_cutoff = COALESCE($11::text::time, business_day_cutoff)\n            WHERE id = $1\n              AND owner_user_id = $2\n              AND ($12::bigint IS NULL OR version = $12)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Bytea",
+        "Bytea",
+        "Jsonb",
+        "Jsonb",
+        "Varchar",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9e713597bbf76845105e33f4fd0e6fb31c853cad7f31848a62a55343efe326a3"
+}

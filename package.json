@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "workspaces": [
     "apps/*",
-    "services/*"
+    "services/*",
+    "libs/*"
   ],
   "scripts": {
     "dev:api": "npm run start:dev --workspace ddadan-api-server",
@@ -18,6 +19,15 @@
     "build:android": "cd apps/ddadan-android-app && ./gradlew assembleDebug",
     "run:android": "cd apps/ddadan-android-app && ./gradlew assembleDebug && android run --apks=app/build/outputs/apk/debug/app-debug.apk --activity=com.ddadan.player.MainActivity --debug",
     "infra:up": "docker compose up -d",
-    "infra:down": "docker compose down"
+    "infra:down": "docker compose down",
+    "dev:coupon-consumer": "npm run start --workspace coupon-consumer-app",
+    "dev:coupon-store": "npm run start --workspace coupon-store-app",
+    "dev:coupon-admin": "npm run start --workspace coupon-system-admin-app",
+    "build:coupon-consumer": "npm run build --workspace coupon-consumer-app",
+    "build:coupon-store": "npm run build --workspace coupon-store-app",
+    "build:coupon-admin": "npm run build --workspace coupon-system-admin-app",
+    "test:coupon-domain": "npm run test --workspace @coupon/domain",
+    "test:coupon-pwa": "npm run test --workspace @coupon/client-core",
+    "generate:coupon-contracts": "npm run generate --workspace @coupon/contracts"
   }
 }
