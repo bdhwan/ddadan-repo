@@ -80,6 +80,10 @@ export const routes: Routes = [
         },
       },
       {
+        path: "stores",
+        component: StoreDetailComponent,
+      },
+      {
         path: "stores/:slug",
         component: StoreDetailComponent,
       },

@@ -1,246 +1,165 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  DestroyRef,
-  OnInit,
-  inject,
-  signal,
-} from "@angular/core";
-import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
+import { ChangeDetectionStrategy, Component } from "@angular/core";
+import { FormsModule } from "@angular/forms";
 import { RouterLink } from "@angular/router";
-import type { AdminCampaignDto } from "@coupon/contracts";
-import { formatKoreaDateTime } from "@coupon/domain";
-import {
-  CouponBadgeComponent,
-  CouponButtonComponent,
-  CouponCardComponent,
-  CouponEmptyStateComponent,
-  CouponErrorStateComponent,
-  CouponPageHeaderComponent,
-  CouponSkeletonComponent,
-} from "@coupon/ui";
-import { AdminOperationsApi } from "./admin-operations.api";
+import { CouponCardComponent, CouponPageHeaderComponent } from "@coupon/ui";
 
 @Component({
   selector: "coupon-admin-campaigns",
   imports: [
+    FormsModule,
     RouterLink,
-    CouponBadgeComponent,
-    CouponButtonComponent,
     CouponCardComponent,
-    CouponEmptyStateComponent,
-    CouponErrorStateComponent,
     CouponPageHeaderComponent,
-    CouponSkeletonComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <coupon-page-header
       title="캠페인 운영"
-      description="대상 스냅샷·처리·발급·사용 수를 구분하고 고위험 작업은 별도 재인증 화면에서 실행합니다."
+      description="캠페인 식별자로 긴급 중단 또는 대량 회수 재인증 화면에 진입합니다."
       eyebrow="High-risk operations"
-      ><coupon-button variant="secondary" (click)="load()"
-        >새로고침</coupon-button
-      ></coupon-page-header
-    >
-    @if (loading()) {
-      <coupon-card
-        ><coupon-skeleton
-          [lines]="8"
-          label="캠페인 운영 현황을 불러오는 중입니다."
-      /></coupon-card>
-    } @else if (error()) {
-      <coupon-error-state
-        title="캠페인 현황을 불러오지 못했어요"
-        [description]="error()!"
-        [retryable]="true"
-        (retry)="load()"
-      />
-    } @else if (items().length === 0) {
-      <coupon-empty-state
-        title="조회된 캠페인이 없습니다"
-        description="필터를 바꾸거나 나중에 다시 확인하세요."
-      />
-    } @else {
-      <div class="table-wrap">
-        <table>
-          <caption class="sr-only">
-            운영 캠페인 목록
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">캠페인</th>
-              <th scope="col">상태</th>
-              <th scope="col">대상/처리</th>
-              <th scope="col">발급/사용</th>
-              <th scope="col">최종 갱신</th>
-              <th scope="col">고위험 작업</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (campaign of items(); track campaign.id) {
-              <tr>
-                <td>
-                  <strong>{{ campaign.name }}</strong
-                  ><br /><span>{{ campaign.store_name }}</span>
-                </td>
-                <td>
-                  <coupon-badge
-                    [status]="
-                      campaign.status === 'CANCELLED'
-                        ? 'danger'
-                        : campaign.status === 'PAUSED'
-                          ? 'warning'
-                          : 'neutral'
-                    "
-                    [label]="campaign.status"
-                    >{{ campaign.status }}</coupon-badge
-                  >
-                </td>
-                <td>
-                  스냅샷
-                  {{
-                    campaign.snapshot_target_count === null
-                      ? "확정 중"
-                      : campaign.snapshot_target_count + "명"
-                  }}<br />처리 {{ campaign.processed_count }}명
-                </td>
-                <td>
-                  발급 {{ campaign.issued_count }}건<br />사용
-                  {{ campaign.used_count }}건
-                </td>
-                <td>{{ date(campaign.updated_at) }}</td>
-                <td>
-                  <div class="actions">
-                    <a
-                      [routerLink]="[
-                        '/campaigns',
-                        campaign.id,
-                        'emergency-action',
-                      ]"
-                      [queryParams]="actionParams(campaign, 'stop')"
-                      >긴급 중단</a
-                    ><a
-                      [routerLink]="[
-                        '/campaigns',
-                        campaign.id,
-                        'emergency-action',
-                      ]"
-                      [queryParams]="actionParams(campaign, 'revoke')"
-                      >대량 회수</a
-                    >
-                  </div>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    }
+    />
+    <coupon-card>
+      <section aria-labelledby="campaign-action-title">
+        <h2 id="campaign-action-title">캠페인 고위험 작업</h2>
+        <p>
+          서버는 관리자 캠페인 목록 API를 제공하지 않습니다. 따라서 존재하지
+          않는
+          <code>GET /admin/campaigns</code>를 호출하지 않고, 감사 가능한 캠페인
+          ID로 기획서 §6.4의 긴급 작업만 시작합니다.
+        </p>
+        <label>
+          캠페인 UUID
+          <input
+            [(ngModel)]="campaignId"
+            autocomplete="off"
+            placeholder="00000000-0000-0000-0000-000000000000"
+          />
+        </label>
+        <label>
+          화면에 표시할 캠페인 이름
+          <input [(ngModel)]="campaignName" maxlength="80" />
+        </label>
+        @if (campaignId && !validCampaignId()) {
+          <p class="error" role="alert">올바른 캠페인 UUID를 입력해 주세요.</p>
+        }
+        <div class="actions">
+          <a
+            [class.disabled]="!canContinue()"
+            [attr.aria-disabled]="!canContinue()"
+            [attr.tabindex]="canContinue() ? 0 : -1"
+            [routerLink]="
+              canContinue()
+                ? ['/campaigns', campaignId, 'emergency-action']
+                : null
+            "
+            [queryParams]="actionParams('stop')"
+            >긴급 중단 검토</a
+          >
+          <a
+            [class.disabled]="!canContinue()"
+            [attr.aria-disabled]="!canContinue()"
+            [attr.tabindex]="canContinue() ? 0 : -1"
+            [routerLink]="
+              canContinue()
+                ? ['/campaigns', campaignId, 'emergency-action']
+                : null
+            "
+            [queryParams]="actionParams('revoke')"
+            >대량 회수 검토</a
+          >
+        </div>
+      </section>
+    </coupon-card>
     <p class="risk-note" role="note">
-      <strong>되돌림 가능성:</strong> 긴급 중단은 상태 검증 후 재개할 수 있지만,
-      이미 완료된 회수는 자동 되돌림이 불가능합니다. 두 작업 모두 일반 확인
-      모달이 아닌 재인증 화면을 사용합니다.
+      <strong>목록 확인:</strong> 대상·처리·발급 진행은 지원되는 작업 큐와 거래
+      탐색에서 확인합니다. 고위험 작업은 별도 재인증 화면에서 영향과 되돌림
+      가능성을 다시 확인합니다.
     </p>
   `,
   styles: `
     :host {
-      display: block;
+      display: grid;
+      max-width: 56rem;
+      gap: 1rem;
     }
-    .table-wrap {
-      overflow-x: auto;
+    section,
+    label {
+      display: grid;
+      gap: 0.5rem;
+    }
+    section {
+      gap: 1rem;
+    }
+    h2,
+    p {
+      margin: 0;
+    }
+    label {
+      font-weight: 800;
+    }
+    input {
+      min-height: 44px;
+      padding: 0.65rem;
       border: 1px solid var(--coupon-color-border);
-      border-radius: var(--coupon-radius-md);
-      background: var(--coupon-color-surface);
-    }
-    table {
-      width: 100%;
-      min-width: 980px;
-      border-collapse: collapse;
-    }
-    th,
-    td {
-      padding: 0.75rem;
-      border-bottom: 1px solid var(--coupon-color-border);
-      text-align: left;
-      vertical-align: middle;
-    }
-    th {
-      background: var(--coupon-color-surface-muted);
-    }
-    td span {
-      color: var(--coupon-color-text-muted);
+      border-radius: var(--coupon-radius-sm);
+      background: var(--coupon-color-bg);
+      color: var(--coupon-color-text);
     }
     .actions {
       display: flex;
-      gap: 0.5rem;
+      flex-wrap: wrap;
+      gap: 0.75rem;
     }
     .actions a {
-      display: inline-grid;
-      place-items: center;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       min-height: 44px;
-      padding: 0.45rem 0.7rem;
-      border: 1px solid var(--coupon-color-danger);
+      padding: 0.65rem 1rem;
+      border: 2px solid var(--coupon-color-danger);
       border-radius: var(--coupon-radius-sm);
       color: var(--coupon-color-danger);
       font-weight: 800;
       text-decoration: none;
+    }
+    .actions a.disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .error {
+      color: var(--coupon-color-danger);
+      font-weight: 800;
     }
     .risk-note {
       padding: 0.8rem;
       border-left: 4px solid var(--coupon-color-warning);
       background: var(--coupon-color-surface-muted);
     }
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-    }
   `,
 })
-export class AdminCampaignsComponent implements OnInit {
-  private readonly api = inject(AdminOperationsApi);
-  private readonly destroyRef = inject(DestroyRef);
-  readonly items = signal<AdminCampaignDto[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal<string | null>(null);
-  ngOnInit(): void {
-    this.load();
+export class AdminCampaignsComponent {
+  campaignId = "";
+  campaignName = "";
+
+  validCampaignId(): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      this.campaignId,
+    );
   }
-  load(): void {
-    this.loading.set(true);
-    this.api
-      .campaigns()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (response) => {
-          this.items.set(response.items);
-          this.loading.set(false);
-          this.error.set(null);
-        },
-        error: () => {
-          this.error.set("운영 API 연결을 확인해 주세요.");
-          this.loading.set(false);
-        },
-      });
+
+  canContinue(): boolean {
+    return this.validCampaignId() && this.campaignName.trim().length > 0;
   }
-  date(value: string): string {
-    return formatKoreaDateTime(value);
-  }
-  actionParams(
-    campaign: AdminCampaignDto,
-    action: "stop" | "revoke",
-  ): Record<string, string | number> {
+
+  actionParams(action: "stop" | "revoke"): Record<string, string | number> {
     return {
       action,
-      name: campaign.name,
-      store: campaign.store_name,
-      issued: campaign.issued_count,
-      used: campaign.used_count,
-      revoke_count: campaign.estimated_revoke_count,
-      reversible: String(action === "stop" && campaign.reversible_after_stop),
+      name: this.campaignName.trim() || "캠페인",
+      store: "거래 탐색에서 확인",
+      issued: 0,
+      used: 0,
+      revoke_count: 0,
+      reversible: String(action === "stop"),
     };
   }
 }

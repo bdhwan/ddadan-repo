@@ -28,30 +28,6 @@ export class AccountApi {
       })
       .pipe(mapApiData());
   }
-
-  revokeSessions(): Observable<void> {
-    return this.http
-      .post<ApiSuccessDto<void>>(
-        `${this.base}/sessions/revoke`,
-        {},
-        {
-          headers: idempotencyHeaders(),
-        },
-      )
-      .pipe(mapApiData());
-  }
-
-  withdraw(): Observable<{ status: string; preserved_records: string[] }> {
-    return this.http
-      .post<ApiSuccessDto<{ status: string; preserved_records: string[] }>>(
-        `${this.base}/withdrawal`,
-        { confirmation: "WITHDRAW" },
-        {
-          headers: idempotencyHeaders(),
-        },
-      )
-      .pipe(mapApiData());
-  }
 }
 
 function idempotencyHeaders(): HttpHeaders {

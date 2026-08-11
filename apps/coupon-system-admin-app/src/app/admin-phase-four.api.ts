@@ -3,8 +3,6 @@ import { inject, Injectable } from "@angular/core";
 import type {
   AdminAuditLogDto,
   AdminCaseDto,
-  AdminMemberDto,
-  AdminNotificationDeliveryDto,
   AdminOperationsOverviewDto,
   AdminStoreReviewDto,
   ApiSuccessDto,
@@ -14,12 +12,26 @@ import type {
 import { map, type Observable } from "rxjs";
 import type { AdminListQuery } from "./admin-list-query";
 
-export type AdminResourceKind = "members" | "notifications" | "cases" | "audit";
-export type AdminResourceRow =
-  | AdminMemberDto
-  | AdminNotificationDeliveryDto
-  | AdminCaseDto
-  | AdminAuditLogDto;
+export type AdminResourceKind = "cases" | "audit";
+export type AdminResourceRow = AdminCaseDto | AdminAuditLogDto;
+
+export type AdminUserActionRequest =
+  | {
+      action: "revoke-sessions";
+      userId: string;
+      reason: string;
+      caseId: string | null;
+    }
+  | {
+      action: "suspend";
+      userId: string;
+      sanctionType: "TEMPORARY" | "PERMANENT";
+      caseId: string;
+      publicReason: string;
+      internalReason: string;
+      expiresAt: string | null;
+      approvedByUserId: string | null;
+    };
 
 interface OperationalMetricsTransport {
   process: {
@@ -155,13 +167,6 @@ export class AdminPhaseFourApi {
     kind: AdminResourceKind,
     query: AdminListQuery,
   ): Observable<CursorPageDto<AdminResourceRow>> {
-    if (kind === "members" || kind === "notifications") {
-      return this.http.get<never>(
-        `${this.base}/${kind === "members" ? "members" : "notifications"}`,
-        { params: listParams(query, undefined, true) },
-      );
-    }
-
     const cursor = this.cursorFor(kind, query);
     if (kind === "cases") {
       return this.http
@@ -196,18 +201,25 @@ export class AdminPhaseFourApi {
       );
   }
 
-  highRiskAction(
-    endpoint: string,
-    reason: string,
-  ): Observable<{ status: string }> {
-    const safeEndpoint = endpoint
-      .split("/")
-      .filter((segment) => /^[a-z0-9_-]+$/i.test(segment))
-      .join("/");
+  userAction(request: AdminUserActionRequest): Observable<{ status: string }> {
+    const userId = encodeURIComponent(request.userId);
+    const endpoint =
+      request.action === "revoke-sessions" ? "revoke-sessions" : "suspend";
+    const body =
+      request.action === "revoke-sessions"
+        ? { reason: request.reason, case_id: request.caseId }
+        : {
+            sanction_type: request.sanctionType,
+            case_id: request.caseId,
+            public_reason: request.publicReason,
+            internal_reason: request.internalReason,
+            expires_at: request.expiresAt,
+            approved_by_user_id: request.approvedByUserId,
+          };
     return this.http
       .post<
         ApiSuccessDto<unknown>
-      >(`${this.base}/${safeEndpoint}`, { reason, case_id: null }, { headers: idempotencyHeaders() })
+      >(`${this.base}/users/${userId}/${endpoint}`, body, { headers: idempotencyHeaders() })
       .pipe(map(() => ({ status: "ACCEPTED" })));
   }
 

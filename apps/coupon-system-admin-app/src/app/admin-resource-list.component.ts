@@ -8,12 +8,7 @@ import {
 } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
-import type {
-  AdminAuditLogDto,
-  AdminCaseDto,
-  AdminMemberDto,
-  AdminNotificationDeliveryDto,
-} from "@coupon/contracts";
+import type { AdminAuditLogDto, AdminCaseDto } from "@coupon/contracts";
 import { formatKoreaDateTime } from "@coupon/domain";
 import {
   CouponBadgeComponent,
@@ -38,15 +33,6 @@ import {
 
 const COPY: Record<AdminResourceKind, { title: string; description: string }> =
   {
-    members: {
-      title: "회원·상점",
-      description:
-        "상태·역할·제재·세션·관련 사건을 마스킹한 상태로 조회합니다.",
-    },
-    notifications: {
-      title: "알림 운영",
-      description: "템플릿 버전·발송·provider callback·영구 실패를 확인합니다.",
-    },
     cases: {
       title: "민원",
       description: "분류·증거·당사자 메시지·해결·승인 상태를 확인합니다.",
@@ -266,7 +252,7 @@ export class AdminResourceListComponent implements OnInit, OnDestroy {
   private subscription?: Subscription;
 
   readonly kind = (this.route.snapshot.data["kind"] ??
-    "members") as AdminResourceKind;
+    "cases") as AdminResourceKind;
   readonly copy = COPY[this.kind];
   readonly query = signal<AdminListQuery>({
     filter: "ALL",
@@ -333,31 +319,19 @@ export class AdminResourceListComponent implements OnInit, OnDestroy {
   }
 
   filterOptions(): Array<{ value: string; label: string }> {
-    return this.kind === "members"
+    return this.kind === "cases"
       ? [
           { value: "ALL", label: "전체" },
-          { value: "ACTIVE", label: "활성" },
-          { value: "SUSPENDED", label: "제재" },
+          { value: "OPEN", label: "처리 중" },
+          { value: "PENDING_APPROVAL", label: "승인 대기" },
+          { value: "RESOLVED", label: "해결" },
         ]
-      : this.kind === "notifications"
-        ? [
-            { value: "ALL", label: "전체" },
-            { value: "DELIVERED", label: "발송 완료" },
-            { value: "FAILED_PERMANENT", label: "영구 실패" },
-          ]
-        : this.kind === "cases"
-          ? [
-              { value: "ALL", label: "전체" },
-              { value: "OPEN", label: "처리 중" },
-              { value: "PENDING_APPROVAL", label: "승인 대기" },
-              { value: "RESOLVED", label: "해결" },
-            ]
-          : [
-              { value: "ALL", label: "전체" },
-              { value: "READ", label: "조회" },
-              { value: "CHANGE", label: "변경" },
-              { value: "LOCKED", label: "보존 잠금" },
-            ];
+      : [
+          { value: "ALL", label: "전체" },
+          { value: "READ", label: "조회" },
+          { value: "CHANGE", label: "변경" },
+          { value: "LOCKED", label: "보존 잠금" },
+        ];
   }
 
   searchPlaceholder(): string {
@@ -365,17 +339,11 @@ export class AdminResourceListComponent implements OnInit, OnDestroy {
   }
 
   primary(row: AdminResourceRow): string {
-    if ("display_name_masked" in row)
-      return `${row.display_name_masked} · ${row.identifier_masked}`;
-    if ("template_code" in row)
-      return `${row.template_code} v${row.template_version}`;
     if ("category" in row) return `${row.category} · ${row.subject_masked}`;
     return `${row.actor_masked} → ${row.resource}`;
   }
 
   status(row: AdminResourceRow): string {
-    if ("permanent_failure" in row)
-      return row.permanent_failure ? "FAILED_PERMANENT" : row.status;
     if ("retention_locked" in row)
       return row.retention_locked ? "LOCKED" : row.action;
     return row.status;
@@ -390,52 +358,19 @@ export class AdminResourceListComponent implements OnInit, OnDestroy {
   }
 
   evidence(row: AdminResourceRow): string {
-    if ("roles" in row)
-      return `역할 ${row.roles.join(", ")} · 관련 사건 ${row.incident_count}건`;
-    if ("template_version" in row)
-      return `템플릿 ${row.template_version} · ${row.channel}`;
     if ("evidence_count" in row)
       return `증거 ${row.evidence_count}건 · 메시지 ${row.party_message_count}건`;
     return row.reason ?? "사유 기록 없음";
   }
 
   detail(row: AdminResourceRow): string {
-    if ("store_name" in row) return row.store_name ?? "상점 없음";
-    if ("callback_status" in row)
-      return `${row.recipient_masked} · callback ${row.callback_status ?? "대기"}`;
     if ("resolution" in row) return row.resolution ?? "해결 방식 미정";
     return `${formatKoreaDateTime(row.occurred_at)} · ${row.action}`;
   }
 
   action(
-    row: AdminResourceRow,
+    _row: AdminResourceRow,
   ): { label: string; query: Record<string, string> } | null {
-    if (this.kind === "members" && "display_name_masked" in row) {
-      return {
-        label: "제재·세션 폐기",
-        query: {
-          title: "회원 제재·세션 폐기",
-          target: row.display_name_masked,
-          endpoint: `users/${row.id}/revoke-sessions`,
-          reversible: "false",
-        },
-      };
-    }
-    if (
-      this.kind === "cases" &&
-      "requires_approval" in row &&
-      row.requires_approval
-    ) {
-      return {
-        label: "해결 승인",
-        query: {
-          title: "민원 해결 승인",
-          target: row.subject_masked,
-          endpoint: `cases/${row.id}/approve`,
-          reversible: "false",
-        },
-      };
-    }
     return null;
   }
 }

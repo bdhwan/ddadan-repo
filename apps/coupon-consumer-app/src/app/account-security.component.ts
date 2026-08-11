@@ -11,7 +11,6 @@ import {
   CouponCardComponent,
   CouponPageHeaderComponent,
 } from "@coupon/ui";
-import { AccountApi } from "./account.api";
 
 @Component({
   selector: "coupon-account-security",
@@ -58,17 +57,17 @@ import { AccountApi } from "./account.api";
           >비밀번호 변경 링크 보내기</coupon-button
         >
       </coupon-card>
-      <coupon-card class="danger-zone">
-        <h2>모든 세션 폐기</h2>
+      <coupon-card>
+        <h2>이 기기에서 로그아웃</h2>
         <p>
-          이 기기를 포함한 로그인 세션과 미사용 QR을 폐기합니다. 거래·쿠폰
-          기록은 유지됩니다.
+          현재 브라우저의 Firebase 세션만 종료합니다. 다른 기기의 세션 폐기는
+          소비자 API 계약에 없으므로 이 화면에서 요청하지 않습니다.
         </p>
         <coupon-button
-          variant="danger"
+          variant="secondary"
           [disabled]="busy()"
-          (click)="revokeSessions()"
-          >모든 세션 폐기</coupon-button
+          (click)="signOutThisDevice()"
+          >이 기기에서 로그아웃</coupon-button
         >
       </coupon-card>
       <p role="status" aria-live="polite">{{ status() }}</p>
@@ -94,14 +93,10 @@ import { AccountApi } from "./account.api";
       justify-content: space-between;
       gap: 1rem;
     }
-    .danger-zone {
-      border-color: var(--coupon-color-danger);
-    }
   `,
 })
 export class AccountSecurityComponent {
   private readonly auth = inject(AuthSessionService);
-  private readonly api = inject(AccountApi);
 
   readonly busy = signal(false);
   readonly status = signal("");
@@ -136,18 +131,15 @@ export class AccountSecurityComponent {
     }
   }
 
-  revokeSessions(): void {
+  async signOutThisDevice(): Promise<void> {
     this.busy.set(true);
-    this.api.revokeSessions().subscribe({
-      next: async () => {
-        this.status.set("모든 세션을 폐기했습니다. 다시 로그인해 주세요.");
-        await this.auth.signOut();
-        this.busy.set(false);
-      },
-      error: () => {
-        this.status.set("세션 폐기를 완료하지 못했습니다. 다시 시도해 주세요.");
-        this.busy.set(false);
-      },
-    });
+    try {
+      await this.auth.signOut();
+      this.status.set("이 기기에서 로그아웃했습니다.");
+    } catch {
+      this.status.set("로그아웃하지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      this.busy.set(false);
+    }
   }
 }

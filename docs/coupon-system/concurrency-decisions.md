@@ -2,6 +2,7 @@
 
 > 원본: [scenarios.md §15](./scenarios.md#15-동시성-결정표)
 > `구현 위치` 는 `apps/coupon-api-server` 소스·테스트를 대조한 결과다. 찾지 못한 항목은 `미구현`이다.
+> Phase 3(캠페인·사용)·Phase 4(알림·운영) 이후 아래 8행은 모두 서버 통합 테스트로 덮였다.
 > 테스트 이름은 `apps/coupon-api-server/tests/` 에서 `grep` 으로 실재를 확인했다.
 
 | 경합 | 승자 결정 | 패자 응답 | 불변식 | 구현 위치 |

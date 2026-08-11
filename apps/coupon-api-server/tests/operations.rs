@@ -148,6 +148,50 @@ fn uid(label: &str) -> String {
     format!("ops-{label}-{}", Uuid::new_v4().simple())
 }
 
+/// Follow `next_cursor` through a list endpoint until `matches` hits, and return that item.
+///
+/// Every list here is global and this database is shared, kept between runs and never
+/// truncated, so "is my row in the list" cannot be asked of the first page alone: the
+/// answer is yes until the table outgrows one page and no afterwards. Walking the cursor
+/// asks the question the test actually means, and paying one extra request per hundred
+/// accumulated rows is cheaper than a suite that decays into flakiness.
+async fn find_across_pages(
+    app: &Router,
+    path: &str,
+    uid: &str,
+    matches: impl Fn(&Value) -> bool,
+) -> Option<Value> {
+    let separator = if path.contains('?') { '&' } else { '?' };
+    let mut cursor: Option<String> = None;
+
+    // A page holds at most 100 rows (§11.1); the bound only stops a runaway loop from
+    // hanging the suite if `next_cursor` ever stopped advancing.
+    for _ in 0..10_000 {
+        let url = match &cursor {
+            Some(cursor) => format!("{path}{separator}cursor={cursor}"),
+            None => path.to_owned(),
+        };
+        let response = send(app, "GET", &url, uid, None).await;
+        let page = response.expect_ok("list page");
+
+        if let Some(found) = page["items"]
+            .as_array()
+            .expect("items")
+            .iter()
+            .find(|item| matches(item))
+        {
+            return Some(found.clone());
+        }
+
+        match page["next_cursor"].as_str() {
+            Some(next) => cursor = Some(next.to_owned()),
+            None => return None,
+        }
+    }
+
+    panic!("{path}: 커서가 끝에 닿지 않았다");
+}
+
 async fn bootstrap(app: &Router, user_uid: &str, name: &str) -> Uuid {
     let response = send(
         app,
@@ -897,22 +941,19 @@ async fn the_review_queue_activates_a_store_on_approval() {
     assert_eq!(store["status"], "PENDING_REVIEW");
     let review_id = store["latest_review"]["id"].as_str().expect("review id");
 
-    let queue = send(
+    // The queue is oldest-first (§11.5), so a submission made just now sits on the *last*
+    // page — and this database is shared and long-lived. Reading only the first page passes
+    // on an empty database and starts failing the moment the queue outgrows one page, which
+    // reads as flakiness rather than as the accumulation it is.
+    let entry = find_across_pages(
         &harness.app,
-        "GET",
         "/api/coupon/v1/admin/store-reviews?status=PENDING&limit=100",
         &admin_uid,
-        None,
+        |entry| entry["id"] == review_id,
     )
-    .await;
-    assert!(
-        queue.expect_ok("queue")["items"]
-            .as_array()
-            .expect("items")
-            .iter()
-            .any(|entry| entry["id"] == review_id),
-        "the submission is in the queue"
-    );
+    .await
+    .expect("the submission is in the queue");
+    assert_eq!(entry["store_status"], "PENDING_REVIEW");
 
     let decided = send(
         &harness.app,

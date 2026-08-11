@@ -2,7 +2,6 @@ import { HttpClient, HttpHeaders, HttpParams } from "@angular/common/http";
 import { inject, Injectable } from "@angular/core";
 import type {
   ApiSuccessDto,
-  AdminCampaignListResponseDto,
   AdminEmergencyCampaignRequestDto,
   AdminJobDto,
   AdminJobListResponseDto,
@@ -42,14 +41,6 @@ interface JobSummaryTransport {
 export class AdminOperationsApi {
   private readonly http = inject(HttpClient);
   private readonly base = "/api/coupon/v1/admin";
-
-  campaigns(cursor?: string): Observable<AdminCampaignListResponseDto> {
-    const params = cursor ? new HttpParams().set("cursor", cursor) : undefined;
-    return this.http.get<AdminCampaignListResponseDto>(
-      `${this.base}/campaigns`,
-      { params },
-    );
-  }
 
   emergencyCampaignAction(
     campaignId: string,

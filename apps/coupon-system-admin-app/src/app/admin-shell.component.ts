@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component } from "@angular/core";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  inject,
+  signal,
+} from "@angular/core";
 import { RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
 
 @Component({
@@ -27,7 +34,14 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
           <a routerLink="/audit" routerLinkActive="active">감사</a>
         </nav>
       </aside>
-      <main id="main-content" tabindex="-1"><router-outlet /></main>
+      <main
+        id="main-content"
+        tabindex="-1"
+        [class.mobile-read-only]="mobileReadOnly()"
+        [attr.data-read-only]="mobileReadOnly() ? 'true' : null"
+      >
+        <router-outlet />
+      </main>
     </div>
   `,
   styles: `
@@ -85,11 +99,8 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
       padding: 1.5rem 1rem 3rem;
     }
     @media (max-width: 1023px) {
-      main {
-        pointer-events: none;
-      }
-      main a {
-        pointer-events: auto;
+      main.mobile-read-only :is(button, input, select, textarea) {
+        cursor: not-allowed;
       }
     }
     @media (min-width: 1024px) {
@@ -121,4 +132,38 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from "@angular/router";
     }
   `,
 })
-export class AdminShellComponent {}
+export class AdminShellComponent {
+  private readonly host = inject(ElementRef<HTMLElement>);
+  private readonly destroyRef = inject(DestroyRef);
+  readonly mobileReadOnly = signal(false);
+
+  constructor() {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 1023px)");
+    const update = () => this.mobileReadOnly.set(media.matches);
+    const guard = (event: Event) => this.guardMobileMutation(event);
+    update();
+    media.addEventListener("change", update);
+    for (const type of ["click", "submit", "beforeinput", "change"]) {
+      this.host.nativeElement.addEventListener(type, guard, true);
+    }
+    this.destroyRef.onDestroy(() => {
+      media.removeEventListener("change", update);
+      for (const type of ["click", "submit", "beforeinput", "change"]) {
+        this.host.nativeElement.removeEventListener(type, guard, true);
+      }
+    });
+  }
+
+  private guardMobileMutation(event: Event): void {
+    if (!this.mobileReadOnly()) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    const control = target.closest(
+      "main button, main input, main select, main textarea, main form",
+    );
+    if (!control) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+}

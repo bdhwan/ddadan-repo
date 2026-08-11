@@ -9,6 +9,8 @@ import { AdminJobsComponent } from "./admin-jobs.component";
 import { AdminOperationsOverviewComponent } from "./admin-operations-overview.component";
 import { AdminResourceListComponent } from "./admin-resource-list.component";
 import { AdminHighRiskActionComponent } from "./admin-high-risk-action.component";
+import { AdminMemberActionsComponent } from "./admin-member-actions.component";
+import { AdminNotificationOperationsComponent } from "./admin-notification-operations.component";
 
 export const routes: Routes = [
   { path: "login", component: AdminLoginComponent },
@@ -24,8 +26,7 @@ export const routes: Routes = [
       { path: "store-reviews", component: AdminReviewQueueComponent },
       {
         path: "members",
-        component: AdminResourceListComponent,
-        data: { kind: "members" },
+        component: AdminMemberActionsComponent,
       },
       { path: "transactions", component: AdminTransactionExplorerComponent },
       { path: "campaigns", component: AdminCampaignsComponent },
@@ -39,8 +40,7 @@ export const routes: Routes = [
       },
       {
         path: "notifications",
-        component: AdminResourceListComponent,
-        data: { kind: "notifications" },
+        component: AdminNotificationOperationsComponent,
       },
       {
         path: "cases",

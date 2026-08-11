@@ -2,9 +2,12 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  ElementRef,
+  HostListener,
   OnInit,
   inject,
   signal,
+  viewChild,
 } from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormsModule } from "@angular/forms";
@@ -63,7 +66,9 @@ type CampaignAction = "pause" | "cancel" | "revoke";
         <div class="wizard-head">
           <div>
             <p class="eyebrow">새 캠페인 작성</p>
-            <h2 id="wizard-title">{{ stepLabel(step()) }}</h2>
+            <h2 #wizardHeading id="wizard-title" tabindex="-1">
+              {{ stepLabel(step()) }}
+            </h2>
           </div>
           <button type="button" class="plain-button" (click)="closeWizard()">
             목록으로
@@ -329,7 +334,7 @@ type CampaignAction = "pause" | "cancel" | "revoke";
           }
 
           @if (validationErrors().length) {
-            <div class="errors" role="alert">
+            <div #validationError class="errors" role="alert" tabindex="-1">
               <strong>확인해 주세요</strong>
               <ul>
                 @for (message of validationErrors(); track message) {
@@ -497,7 +502,9 @@ type CampaignAction = "pause" | "cancel" | "revoke";
         aria-modal="true"
         aria-labelledby="action-title"
       >
-        <h2 id="action-title">{{ actionTitle() }}</h2>
+        <h2 #actionHeading id="action-title" tabindex="-1">
+          {{ actionTitle() }}
+        </h2>
         <p class="danger-note">
           <strong>영향 요약</strong> 신규 발급이 중지되며,
           {{ target.issued_count }}건의 발급분과 {{ target.used_count }}건의
@@ -539,7 +546,9 @@ type CampaignAction = "pause" | "cancel" | "revoke";
         aria-modal="true"
         aria-labelledby="quantity-title"
       >
-        <h2 id="quantity-title">발급 수량 수정</h2>
+        <h2 #quantityHeading id="quantity-title" tabindex="-1">
+          발급 수량 수정
+        </h2>
         <p>
           <strong>현재 발급 {{ target.issued_count }}건.</strong>
           발급 시작 후 증량은 가능하지만, 감소할 때는 이미 발급·예약된 수량
@@ -564,7 +573,7 @@ type CampaignAction = "pause" | "cancel" | "revoke";
           <p class="errors" role="alert">{{ quantityError() }}</p>
         }
         <div class="wizard-actions">
-          <coupon-button variant="secondary" (click)="quantityTarget.set(null)"
+          <coupon-button variant="secondary" (click)="cancelQuantity()"
             >취소</coupon-button
           ><coupon-button [disabled]="saving()" (click)="saveQuantity()"
             >수량 저장</coupon-button
@@ -580,7 +589,9 @@ type CampaignAction = "pause" | "cancel" | "revoke";
         aria-modal="true"
         aria-labelledby="publish-title"
       >
-        <h2 id="publish-title">캠페인 게시 검토</h2>
+        <h2 #publishHeading id="publish-title" tabindex="-1">
+          캠페인 게시 검토
+        </h2>
         <p class="danger-note">
           <strong>{{ target.name }}</strong
           >을 게시하면 즉시 또는 예약 시각에 대상 스냅샷·발급 작업을 단 한 번
@@ -824,10 +835,19 @@ type CampaignAction = "pause" | "cancel" | "revoke";
   `,
 })
 export class CampaignProgressComponent implements OnInit {
+  readonly wizardHeading = viewChild<ElementRef<HTMLElement>>("wizardHeading");
+  readonly validationError =
+    viewChild<ElementRef<HTMLElement>>("validationError");
+  readonly actionHeading = viewChild<ElementRef<HTMLElement>>("actionHeading");
+  readonly quantityHeading =
+    viewChild<ElementRef<HTMLElement>>("quantityHeading");
+  readonly publishHeading =
+    viewChild<ElementRef<HTMLElement>>("publishHeading");
   private readonly api = inject(CampaignsApi);
   private readonly auth = inject(AuthSessionService);
   private readonly destroyRef = inject(DestroyRef);
   private inFlight = false;
+  private returnFocus: HTMLElement | null = null;
   readonly steps = CAMPAIGN_WIZARD_STEPS;
   readonly immutableFields = IMMUTABLE_AFTER_ISSUANCE;
   readonly items = signal<OwnerCampaignDto[]>([]);
@@ -884,27 +904,35 @@ export class CampaignProgressComponent implements OnInit {
   }
 
   startWizard(): void {
+    this.captureFocus();
     this.draft = createCampaignDraft();
     this.step.set("benefit");
     this.validationErrors.set([]);
     this.mode.set("wizard");
+    this.focusAfterRender(this.wizardHeading);
   }
 
   closeWizard(): void {
     this.mode.set("list");
+    this.restoreFocus();
   }
 
   nextStep(): void {
     const errors = validateCampaignStep(this.draft, this.step());
     this.validationErrors.set(errors);
-    if (errors.length) return;
+    if (errors.length) {
+      this.focusAfterRender(this.validationError);
+      return;
+    }
     this.step.set(this.steps[this.stepIndex() + 1]);
+    this.focusAfterRender(this.wizardHeading);
   }
 
   previousStep(): void {
     if (this.stepIndex() === 0) return;
     this.validationErrors.set([]);
     this.step.set(this.steps[this.stepIndex() - 1]);
+    this.focusAfterRender(this.wizardHeading);
   }
 
   saveCampaign(): void {
@@ -920,27 +948,32 @@ export class CampaignProgressComponent implements OnInit {
           this.items.update((items) => [campaign, ...items]);
           this.saving.set(false);
           this.mode.set("list");
+          this.restoreFocus();
         },
         error: () => {
           this.validationErrors.set([
             "초안을 저장하지 못했습니다. 입력값과 연결을 확인해 주세요.",
           ]);
           this.saving.set(false);
+          this.focusAfterRender(this.validationError);
         },
       });
   }
 
   beginAction(campaign: OwnerCampaignDto, action: CampaignAction): void {
+    this.captureFocus();
     this.actionTarget.set(campaign);
     this.action.set(action);
     this.confirmation = "";
     this.actionReason = "";
     this.actionError.set(null);
+    this.focusAfterRender(this.actionHeading);
   }
 
   cancelAction(): void {
     this.actionTarget.set(null);
     this.action.set(null);
+    this.restoreFocus();
   }
 
   resume(campaign: OwnerCampaignDto): void {
@@ -973,23 +1006,33 @@ export class CampaignProgressComponent implements OnInit {
   }
 
   beginQuantityEdit(campaign: OwnerCampaignDto): void {
+    this.captureFocus();
     this.quantityTarget.set(campaign);
     this.quantityTotal =
       campaign.total_quantity ?? Math.max(campaign.issued_count, 1);
     this.quantityPerUser = campaign.per_user_quantity;
     this.quantityError.set(null);
+    this.focusAfterRender(this.quantityHeading);
+  }
+
+  cancelQuantity(): void {
+    this.quantityTarget.set(null);
+    this.restoreFocus();
   }
 
   beginPublish(campaign: OwnerCampaignDto): void {
+    this.captureFocus();
     this.publishTarget.set(campaign);
     this.publishConfirmation = "";
     this.publishReauthentication = "";
     this.publishError.set(null);
+    this.focusAfterRender(this.publishHeading);
   }
 
   cancelPublish(): void {
     this.publishTarget.set(null);
     this.publishReauthentication = "";
+    this.restoreFocus();
   }
 
   async confirmPublish(): Promise<void> {
@@ -1062,6 +1105,7 @@ export class CampaignProgressComponent implements OnInit {
           this.replaceCampaign(updated);
           this.quantityTarget.set(null);
           this.saving.set(false);
+          this.restoreFocus();
         },
         error: () => {
           this.quantityError.set(
@@ -1199,6 +1243,34 @@ export class CampaignProgressComponent implements OnInit {
   actionTitle(): string {
     return `${this.confirmationPhrase()} 영향 확인`;
   }
+
+  @HostListener("document:keydown.escape")
+  closeActiveLayer(): void {
+    if (this.actionTarget()) this.cancelAction();
+    else if (this.quantityTarget()) this.cancelQuantity();
+    else if (this.publishTarget()) this.cancelPublish();
+    else if (this.mode() === "wizard") this.closeWizard();
+  }
+
+  private captureFocus(): void {
+    this.returnFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+  }
+
+  private restoreFocus(): void {
+    const target = this.returnFocus;
+    this.returnFocus = null;
+    setTimeout(() => target?.focus());
+  }
+
+  private focusAfterRender(
+    ref: () => ElementRef<HTMLElement> | undefined,
+  ): void {
+    setTimeout(() => ref()?.nativeElement.focus());
+  }
+
   private replaceCampaign(campaign: OwnerCampaignDto): void {
     this.items.update((items) =>
       items.map((item) => (item.id === campaign.id ? campaign : item)),

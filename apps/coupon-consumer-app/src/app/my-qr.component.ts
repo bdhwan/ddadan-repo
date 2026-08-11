@@ -72,7 +72,13 @@ type QrViewState =
       @case ("ready") {
         @if (token(); as current) {
           <section class="qr-card" aria-labelledby="qr-title">
-            <div class="timer">
+            <div
+              class="timer"
+              role="timer"
+              aria-live="polite"
+              aria-atomic="true"
+              [attr.aria-label]="'QR 남은 시간 ' + secondsLeft() + '초'"
+            >
               <span>남은 시간</span
               ><strong [class.urgent]="secondsLeft() <= 10"
                 >{{ secondsLeft() }}초</strong
@@ -336,10 +342,17 @@ export class MyQrComponent implements OnInit, OnDestroy {
       document.visibilityState === "visible"
         ? void this.acquireWakeLock()
         : void this.releaseWakeLock();
+    const offline = () => {
+      this.token.set(null);
+      this.state.set("offline");
+      this.refreshing.set(false);
+    };
     document.addEventListener("visibilitychange", visibility);
-    this.destroyRef.onDestroy(() =>
-      document.removeEventListener("visibilitychange", visibility),
-    );
+    window.addEventListener("offline", offline);
+    this.destroyRef.onDestroy(() => {
+      document.removeEventListener("visibilitychange", visibility);
+      window.removeEventListener("offline", offline);
+    });
   }
 
   ngOnDestroy(): void {

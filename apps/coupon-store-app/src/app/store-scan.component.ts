@@ -91,6 +91,15 @@ interface BarcodeDetectorConstructor {
         </li>
       }
     </ol>
+    <p
+      #scanStepHeading
+      class="sr-only"
+      tabindex="-1"
+      role="status"
+      aria-live="polite"
+    >
+      현재 단계 {{ stepNumber() }}/8, {{ stepLabel(state()) }}
+    </p>
 
     @switch (state()) {
       @case ("READY") {
@@ -992,6 +1001,13 @@ interface BarcodeDetectorConstructor {
     .result coupon-button {
       width: min(100%, 30rem);
     }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+    }
     @keyframes spin {
       to {
         transform: rotate(360deg);
@@ -1013,6 +1029,8 @@ interface BarcodeDetectorConstructor {
 })
 export class StoreScanComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly video = viewChild<ElementRef<HTMLVideoElement>>("video");
+  readonly scanStepHeading =
+    viewChild<ElementRef<HTMLElement>>("scanStepHeading");
   readonly steps: ScanState[] = [
     "READY",
     "SCANNING",
@@ -1583,8 +1601,12 @@ export class StoreScanComponent implements OnInit, AfterViewInit, OnDestroy {
     if (video) video.srcObject = null;
   }
   private sync(): void {
+    const stateChanged = this.state() !== this.machine.state;
     this.state.set(this.machine.state);
     this.camera.set(this.machine.camera);
+    if (stateChanged) {
+      setTimeout(() => this.scanStepHeading()?.nativeElement.focus());
+    }
   }
 }
 

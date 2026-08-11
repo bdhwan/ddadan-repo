@@ -12,6 +12,7 @@ DDADAN 상점별 쿠폰 발급 시스템의 로컬 개발 환경 셋업 방법�
 | [acceptance-checklist.md](./acceptance-checklist.md) | MVP 인수 시나리오 체크리스트 |
 | [concurrency-decisions.md](./concurrency-decisions.md) | 동시성 결정표와 구현 위치 |
 | [runbook.md](./runbook.md) | 운영 런북 (헬스·배포·테스트 DB·DLQ) |
+| [rollout-plan.md](./rollout-plan.md) | 단계적 출시·기능 플래그·외부 확정·알려진 한계 |
 
 ## 모노레포 구조
 

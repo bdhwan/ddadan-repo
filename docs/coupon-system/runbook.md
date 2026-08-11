@@ -113,6 +113,22 @@ cargo run --bin coupon-api
 
 `COUPON_TEST_DATABASE_URL` 이 없으면 DB 통합 테스트가 조용히 skip 되어 통과처럼 보인다. `test.sh` 가 이 변수를 반드시 설정한다.
 
+### 테스트 DB 누적 (검수 큐 limit=100)
+
+같은 `coupon_test` DB로 통합 테스트를 반복하면 검수 큐에 `PENDING` 이 쌓인다. `the_review_queue_activates_a_store_on_approval` (`tests/operations.rs`) 는 `GET /admin/store-reviews?status=PENDING&limit=100` 으로 방금 만든 건을 찾는데, 누적 PENDING이 100건을 넘으면 첫 페이지 밖으로 밀려 실패한다(커밋 `7a1b682` 알려진 한계).
+
+**언제 reset 하나**
+
+- 위 테스트(또는 검수 큐를 limit=100 으로 훑는 테스트)가 간헐 실패할 때
+- 테스트 DB를 오래 돌려 상태가 불명확할 때
+
+```bash
+./scripts/coupon/db-test-reset.sh
+./scripts/coupon/test.sh
+```
+
+개발용 DB(`coupon`)는 건드리지 않는다. 이 절은 테스트가 페이지네이션/필터로 고쳐지기 전까지 유효하다.
+
 ## DLQ(dead-letter) 대응
 
 기획서 §14.7: dead-letter 재처리는 원인 해결 확인, 관리자 사유, 새 generation 을 요구한다. §18.4 핵심 경보에 dead-letter 신규 발생이 포함된다.
