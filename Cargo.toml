@@ -15,6 +15,12 @@ axum = "0.8"
 axum-extra = "0.10"
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+# IANA timezone database. Business days are a store-local concept (§5.2), so the
+# calculation needs real zone rules rather than a fixed offset.
+chrono-tz = { version = "0.10", default-features = false, features = ["std"] }
+# Ed25519 for the rotating QR signature (§16.2). Asymmetric on purpose: a scanner must be
+# able to verify without holding a key that could mint tokens.
+ed25519-dalek = { version = "2", default-features = false, features = ["std", "fast", "zeroize"] }
 figment = { version = "0.10", features = ["env"] }
 hex = "0.4"
 hmac = "0.12"

@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT\n                    b.lot_id AS \"lot_id!\",\n                    b.balance AS \"balance!\",\n                    b.expires_at AS \"expires_at!\"\n                FROM coupon.stamp_lot_balances b\n                JOIN coupon.stamp_lots l ON l.id = b.lot_id\n                WHERE b.store_id = $1 AND b.user_id = $2\n                ORDER BY b.expires_at, b.lot_id\n                FOR UPDATE OF l\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "lot_id!",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "balance!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "expires_at!",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "8e0cb50f6c028eef968dd8abafdd69c7e8784a8c9e676bf23a08551b5dffb4ed"
+}

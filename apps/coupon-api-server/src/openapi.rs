@@ -39,6 +39,26 @@ pub const SPEC_FILE: &str = "openapi.json";
         crate::stores::routes::create_store,
         crate::stores::routes::patch_store,
         crate::stores::routes::submit_review,
+        crate::catalog::routes::list_items,
+        crate::catalog::routes::create_item,
+        crate::catalog::routes::patch_item,
+        crate::catalog::routes::list_categories,
+        crate::catalog::routes::create_category,
+        crate::catalog::routes::patch_category,
+        crate::loyalty::routes::list_policies,
+        crate::loyalty::routes::create_policy,
+        crate::loyalty::routes::patch_policy,
+        crate::loyalty::routes::publish_policy,
+        crate::loyalty::routes::resolve_scan,
+        crate::loyalty::routes::preview_stamp_transaction,
+        crate::loyalty::routes::confirm_stamp_transaction,
+        crate::loyalty::routes::void_stamp_transaction,
+        crate::qr::routes::issue_qr_token,
+        crate::wallet::routes::get_stamps,
+        crate::wallet::routes::list_coupons,
+        crate::wallet::routes::get_coupon,
+        crate::admin::routes::get_transaction,
+        crate::admin::routes::preview_adjustment,
     ),
     components(schemas(
         crate::error::ErrorEnvelope,
@@ -68,6 +88,55 @@ pub const SPEC_FILE: &str = "openapi.json";
         crate::stores::UpdateStoreRequest,
         crate::stores::BusinessProfileInput,
         crate::stores::SubmitReviewRequest,
+        crate::catalog::ResourceStatus,
+        crate::catalog::CatalogCategory,
+        crate::catalog::CatalogItem,
+        crate::catalog::CatalogCategoriesResponse,
+        crate::catalog::CatalogItemsResponse,
+        crate::catalog::CreateCategoryRequest,
+        crate::catalog::UpdateCategoryRequest,
+        crate::catalog::CreateItemRequest,
+        crate::catalog::UpdateItemRequest,
+        crate::catalog::OrderItemInput,
+        crate::loyalty::PolicyStatus,
+        crate::loyalty::BenefitType,
+        crate::loyalty::PolicyRules,
+        crate::loyalty::RewardDefinition,
+        crate::loyalty::LoyaltyPolicy,
+        crate::loyalty::LoyaltyPoliciesResponse,
+        crate::loyalty::CreatePolicyRequest,
+        crate::loyalty::UpdatePolicyRequest,
+        crate::loyalty::PublishPolicyRequest,
+        crate::loyalty::ScanRequest,
+        crate::loyalty::ScanResolution,
+        crate::loyalty::StampPreviewRequest,
+        crate::loyalty::StampPreview,
+        crate::loyalty::ConfirmStampRequest,
+        crate::loyalty::StampTransaction,
+        crate::loyalty::StampTransactionStatus,
+        crate::loyalty::VoidStampRequest,
+        crate::loyalty::OrderInput,
+        crate::loyalty::PolicySummary,
+        crate::loyalty::PreviewIssue,
+        crate::loyalty::PseudonymousCustomer,
+        crate::loyalty::StampBoard,
+        crate::loyalty::IssuedReward,
+        crate::qr::QrTokenResponse,
+        crate::wallet::CouponStatus,
+        crate::wallet::WalletFilter,
+        crate::wallet::WalletCoupon,
+        crate::wallet::WalletCouponDetail,
+        crate::wallet::CouponStatusEvent,
+        crate::wallet::WalletStampBoard,
+        crate::wallet::WalletStampsResponse,
+        crate::admin::AdminTransactionDetail,
+        crate::admin::AdminLedgerEntry,
+        crate::admin::AdminRewardSummary,
+        crate::admin::TimelineEvent,
+        crate::admin::AdjustmentType,
+        crate::admin::AdjustmentPreviewRequest,
+        crate::admin::AdjustmentPreview,
+        crate::admin::ProposedLedgerEntry,
     )),
     modifiers(&SecurityAddon),
     tags(
@@ -75,6 +144,11 @@ pub const SPEC_FILE: &str = "openapi.json";
         (name = "users", description = "Account bootstrap, profile and roles"),
         (name = "consents", description = "Terms and channel consent"),
         (name = "stores", description = "Store draft, edit and review submission"),
+        (name = "catalog", description = "품목·카테고리 (§8.3)"),
+        (name = "loyalty", description = "도장 정책 버전, 스캔, 적립 원장 (§8.1, §13.1)"),
+        (name = "qr", description = "회전형 QR 발급 (§16.2)"),
+        (name = "wallet", description = "소비자 지갑: 도장판과 리워드 쿠폰 (§6.2)"),
+        (name = "admin", description = "거래 탐색과 보정 미리보기 (§11.5)"),
     ),
 )]
 pub struct ApiDoc;
@@ -133,6 +207,51 @@ mod tests {
         ] {
             assert!(paths.contains_key(path), "{path} must be documented");
         }
+    }
+
+    #[test]
+    fn the_spec_describes_the_phase_two_surface() {
+        let spec: serde_json::Value =
+            serde_json::from_str(&spec_json()).expect("spec is valid JSON");
+        let paths = spec["paths"].as_object().expect("paths object");
+
+        // Every §11.3/§11.4/§11.5 path this phase implements. The Angular clients are
+        // generated from this file, so a missing path is a missing feature downstream.
+        for path in [
+            "/api/coupon/v1/owner/catalog/items",
+            "/api/coupon/v1/owner/catalog/items/{item_id}",
+            "/api/coupon/v1/owner/catalog/categories",
+            "/api/coupon/v1/owner/loyalty-policies",
+            "/api/coupon/v1/owner/loyalty-policies/{policy_id}",
+            "/api/coupon/v1/owner/loyalty-policies/{policy_id}/publish",
+            "/api/coupon/v1/owner/scan/resolve",
+            "/api/coupon/v1/owner/stamp-transactions/preview",
+            "/api/coupon/v1/owner/stamp-transactions",
+            "/api/coupon/v1/owner/stamp-transactions/{transaction_id}/void",
+            "/api/coupon/v1/me/qr-tokens",
+            "/api/coupon/v1/me/wallet/stamps",
+            "/api/coupon/v1/me/wallet/coupons",
+            "/api/coupon/v1/me/wallet/coupons/{coupon_id}",
+            "/api/coupon/v1/admin/transactions/{transaction_id}",
+            "/api/coupon/v1/admin/adjustments/preview",
+        ] {
+            assert!(paths.contains_key(path), "{path} must be documented");
+        }
+    }
+
+    #[test]
+    fn the_qr_contract_never_promises_a_raw_nonce() {
+        // §16.2: the nonce travels inside the signed token and nowhere else. If it ever
+        // appeared as its own response field, every client would be tempted to store it.
+        let spec: serde_json::Value =
+            serde_json::from_str(&spec_json()).expect("spec is valid JSON");
+        let properties = spec["components"]["schemas"]["QrTokenResponse"]["properties"]
+            .as_object()
+            .expect("QrTokenResponse properties");
+
+        assert!(properties.contains_key("token"));
+        assert!(properties.contains_key("fallback_code"));
+        assert!(!properties.contains_key("nonce"));
     }
 
     #[test]

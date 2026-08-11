@@ -98,6 +98,66 @@ impl FromRequestParts<AppState> for RecentlyAuthenticated {
     }
 }
 
+/// A caller acting as a system administrator (§3.3).
+///
+/// Any of the four administrative roles gets through here; what each of them may *do* is
+/// decided per endpoint, because §3.3 separates read scope from change scope and a single
+/// "is an admin" bit would flatten that distinction.
+#[derive(Debug, Clone)]
+pub struct SystemAdmin {
+    pub user: CurrentUser,
+    /// The administrative roles this caller actually holds.
+    pub roles: Vec<AccountRole>,
+}
+
+impl SystemAdmin {
+    /// Roles §3.3 grants administrative access to. `CONSUMER` and `STORE_OWNER` are
+    /// deliberately absent.
+    pub const ADMIN_ROLES: [AccountRole; 4] = [
+        AccountRole::Support,
+        AccountRole::Operations,
+        AccountRole::Security,
+        AccountRole::SuperAdmin,
+    ];
+
+    /// Demand one specific role for a narrower action.
+    pub fn require_any(&self, allowed: &[AccountRole]) -> Result<(), ApiError> {
+        if self.roles.iter().any(|role| allowed.contains(role)) {
+            Ok(())
+        } else {
+            Err(ApiError::with_message(
+                ErrorCode::RoleRequired,
+                "이 작업에는 더 높은 관리자 권한이 필요합니다.",
+            ))
+        }
+    }
+}
+
+impl FromRequestParts<AppState> for SystemAdmin {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let user = CurrentUser::from_request_parts(parts, state).await?;
+
+        let roles: Vec<AccountRole> = Self::ADMIN_ROLES
+            .into_iter()
+            .filter(|role| user.account.has_role(*role))
+            .collect();
+
+        if roles.is_empty() {
+            return Err(ApiError::with_message(
+                ErrorCode::RoleRequired,
+                "관리자 권한이 필요합니다.",
+            ));
+        }
+
+        Ok(SystemAdmin { user, roles })
+    }
+}
+
 /// A caller acting as a store owner. Phase 1 only needs the role check; the store-scoped
 /// permission model lands with the staff features.
 #[derive(Debug, Clone)]

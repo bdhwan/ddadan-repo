@@ -7,6 +7,7 @@
 //! `stores(owner_user_id) WHERE status <> 'CLOSED'`, so the check survives a race that
 //! an application-level lookup would lose.
 
+pub mod business_day;
 pub mod routes;
 
 use std::sync::Arc;
@@ -179,6 +180,52 @@ pub struct SubmitReviewRequest {
     pub note: Option<String>,
 }
 
+/// The minimum a store-scoped feature needs to know about the caller's store.
+///
+/// Deliberately much smaller than [`StoreResponse`]: catalogue, loyalty and scanning all
+/// need the identity, the status and the day boundaries, and none of them should be
+/// handling encrypted business identity to get them.
+#[derive(Debug, Clone)]
+pub struct OwnedStore {
+    pub id: Uuid,
+    pub status: StoreStatus,
+    pub name: String,
+    pub timezone: String,
+    /// Local rollover time, `HH:MM:SS`.
+    pub business_day_cutoff: String,
+}
+
+impl OwnedStore {
+    pub fn calendar(&self) -> ApiResult<business_day::BusinessCalendar> {
+        Ok(business_day::BusinessCalendar::new(
+            &self.timezone,
+            business_day::parse_cutoff(&self.business_day_cutoff)?,
+        ))
+    }
+
+    /// Whether the store may take new accruals and issue new benefits (STORE-004).
+    ///
+    /// A suspended or closed store keeps serving its wallet history; what stops is new
+    /// value being created.
+    pub fn ensure_operating(&self) -> ApiResult<()> {
+        match self.status {
+            StoreStatus::Active => Ok(()),
+            StoreStatus::Draft | StoreStatus::PendingReview => Err(ApiError::with_message(
+                ErrorCode::StoreNotActive,
+                "상점 검수가 끝난 뒤에 이용할 수 있습니다.",
+            )),
+            StoreStatus::Suspended => Err(ApiError::with_message(
+                ErrorCode::StoreNotActive,
+                "일시 정지된 상점에서는 처리할 수 없습니다.",
+            )),
+            StoreStatus::Closed => Err(ApiError::with_message(
+                ErrorCode::StoreNotActive,
+                "폐점한 상점에서는 처리할 수 없습니다.",
+            )),
+        }
+    }
+}
+
 pub struct StoreService {
     sealer: Arc<Sealer>,
     lookup_hash: Arc<LookupHash>,
@@ -330,6 +377,89 @@ impl StoreService {
             updated_at: row.updated_at,
             version: row.version,
         }))
+    }
+
+    /// The caller's store, in the reduced form store-scoped features need.
+    ///
+    /// Ownership is resolved from the `stores` table, never from a role claim: a token
+    /// says who signed in, not what they own (SEC-001).
+    pub async fn owned_store<'e, E>(&self, executor: E, owner_user_id: Uuid) -> ApiResult<OwnedStore>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                id,
+                status::text AS "status!",
+                name,
+                timezone,
+                to_char(business_day_cutoff, 'HH24:MI:SS') AS "business_day_cutoff!"
+            FROM coupon.stores
+            WHERE owner_user_id = $1 AND status <> 'CLOSED'
+            "#,
+            owner_user_id,
+        )
+        .fetch_optional(executor)
+        .await?
+        .ok_or_else(|| ApiError::new(ErrorCode::StoreNotFound))?;
+
+        Ok(OwnedStore {
+            id: row.id,
+            status: StoreStatus::from_db(&row.status),
+            name: row.name,
+            timezone: row.timezone,
+            business_day_cutoff: row.business_day_cutoff,
+        })
+    }
+
+    /// Same as [`StoreService::owned_store`], but takes the row lock the accrual
+    /// transaction needs.
+    ///
+    /// `FOR NO KEY UPDATE` rather than `FOR UPDATE`: it serialises concurrent accruals in
+    /// one store against each other — which is the point — without blocking every insert
+    /// that merely references the store through a foreign key.
+    pub async fn lock_store(&self, tx: &mut crate::db::Tx<'_>, store_id: Uuid) -> ApiResult<()> {
+        sqlx::query_scalar!(
+            "SELECT id FROM coupon.stores WHERE id = $1 FOR NO KEY UPDATE",
+            store_id,
+        )
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or_else(|| ApiError::new(ErrorCode::StoreNotFound))?;
+
+        Ok(())
+    }
+
+    /// A store as a consumer-facing feature sees it, by id.
+    pub async fn find_public<'e, E>(&self, executor: E, store_id: Uuid) -> ApiResult<OwnedStore>
+    where
+        E: sqlx::Executor<'e, Database = sqlx::Postgres>,
+    {
+        let row = sqlx::query!(
+            r#"
+            SELECT
+                id,
+                status::text AS "status!",
+                name,
+                timezone,
+                to_char(business_day_cutoff, 'HH24:MI:SS') AS "business_day_cutoff!"
+            FROM coupon.stores
+            WHERE id = $1
+            "#,
+            store_id,
+        )
+        .fetch_optional(executor)
+        .await?
+        .ok_or_else(|| ApiError::new(ErrorCode::StoreNotFound))?;
+
+        Ok(OwnedStore {
+            id: row.id,
+            status: StoreStatus::from_db(&row.status),
+            name: row.name,
+            timezone: row.timezone,
+            business_day_cutoff: row.business_day_cutoff,
+        })
     }
 
     /// Apply an owner's edit under optimistic concurrency.

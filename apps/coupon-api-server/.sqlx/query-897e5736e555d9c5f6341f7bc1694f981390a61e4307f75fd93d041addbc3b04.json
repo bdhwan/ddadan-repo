@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT DISTINCT ON (l.store_id)\n                l.store_id, p.id, p.target_stamp_count, p.rule_snapshot\n            FROM coupon.stamp_lots l\n            JOIN coupon.loyalty_policies p ON p.id = l.policy_id\n            WHERE l.user_id = $1 AND l.store_id = ANY($2)\n            ORDER BY l.store_id, l.earned_at DESC\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "target_stamp_count",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "rule_snapshot",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "897e5736e555d9c5f6341f7bc1694f981390a61e4307f75fd93d041addbc3b04"
+}

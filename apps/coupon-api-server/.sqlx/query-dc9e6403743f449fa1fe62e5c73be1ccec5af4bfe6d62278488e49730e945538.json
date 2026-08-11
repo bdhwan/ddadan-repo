@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                lot_id,\n                event_type::text AS \"event_type!\",\n                quantity_delta,\n                reason_code,\n                reward_coupon_id,\n                source_stamp_transaction_id,\n                actor_type::text AS \"actor_type!\",\n                actor_user_id,\n                occurred_at\n            FROM coupon.stamp_ledger\n            WHERE source_stamp_transaction_id = $1\n               OR lot_id IN (SELECT id FROM coupon.stamp_lots WHERE source_transaction_id = $1)\n            ORDER BY occurred_at, id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "lot_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "event_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "quantity_delta",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 4,
+        "name": "reason_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "reward_coupon_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "source_stamp_transaction_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "actor_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "actor_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      false,
+      true,
+      true,
+      null,
+      true,
+      false
+    ]
+  },
+  "hash": "dc9e6403743f449fa1fe62e5c73be1ccec5af4bfe6d62278488e49730e945538"
+}

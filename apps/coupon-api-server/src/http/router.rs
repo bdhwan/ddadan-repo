@@ -15,14 +15,19 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 
+use crate::admin::admin_router;
+use crate::catalog::owner_catalog_router;
 use crate::consents::consents_router;
 use crate::error::{ApiError, ErrorCode};
 use crate::http::middleware as coupon_middleware;
 use crate::http::{API_BASE_PATH, health};
+use crate::loyalty::owner_loyalty_router;
 use crate::openapi::swagger_router;
+use crate::qr::qr_router;
 use crate::state::AppState;
 use crate::stores::owner_store_router;
 use crate::users::{me_router, users_router};
+use crate::wallet::wallet_router;
 
 /// Requests are given this long before the server gives up on them.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
@@ -37,6 +42,11 @@ pub fn build(state: AppState) -> Router {
         .merge(me_router())
         .merge(consents_router())
         .merge(owner_store_router())
+        .merge(owner_catalog_router())
+        .merge(owner_loyalty_router())
+        .merge(qr_router())
+        .merge(wallet_router())
+        .merge(admin_router())
         // Applied bottom-up: auth runs first, then origin, then idempotency — which needs
         // the actor auth established.
         .layer(middleware::from_fn_with_state(

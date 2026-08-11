@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO coupon.qr_nonces\n                    (nonce_hash, fallback_code_hash, user_id, audience, key_id,\n                     issued_at, expires_at)\n                VALUES ($1, $2, $3, $4, $5, $6, $7)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Bytea",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4d065434e735aa882a1289aa391bfba349aeb2a79a5131b6c4731517f1dd347f"
+}

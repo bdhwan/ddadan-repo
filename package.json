@@ -26,8 +26,12 @@
     "build:coupon-consumer": "npm run build --workspace coupon-consumer-app",
     "build:coupon-store": "npm run build --workspace coupon-store-app",
     "build:coupon-admin": "npm run build --workspace coupon-system-admin-app",
+    "build:coupon-all": "npm run build:coupon-consumer && npm run build:coupon-store && npm run build:coupon-admin",
+    "test:coupon-consumer": "npm run test --workspace coupon-consumer-app",
+    "test:coupon-store": "npm run test --workspace coupon-store-app",
     "test:coupon-domain": "npm run test --workspace @coupon/domain",
     "test:coupon-pwa": "npm run test --workspace @coupon/client-core",
+    "test:coupon-all": "npm run test:coupon-domain && npm run test:coupon-pwa && npm run test:coupon-consumer && npm run test:coupon-store",
     "generate:coupon-contracts": "npm run generate --workspace @coupon/contracts"
   }
 }

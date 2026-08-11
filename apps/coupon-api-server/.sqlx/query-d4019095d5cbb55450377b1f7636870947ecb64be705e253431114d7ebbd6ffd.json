@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.catalog_items\n            SET name = COALESCE($3, name),\n                category_id = COALESCE($4, category_id),\n                sku = COALESCE($5, sku),\n                reference_price = COALESCE($6, reference_price),\n                status = COALESCE($7::text::coupon.resource_status, status)\n            WHERE id = $1 AND store_id = $2\n              AND ($8::bigint IS NULL OR version = $8)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Uuid",
+        "Varchar",
+        "Int8",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d4019095d5cbb55450377b1f7636870947ecb64be705e253431114d7ebbd6ffd"
+}

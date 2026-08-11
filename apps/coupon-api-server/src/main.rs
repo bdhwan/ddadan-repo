@@ -85,7 +85,8 @@ async fn main() -> anyhow::Result<()> {
     let lookup_hash = LookupHash::from_config(&config).context("invalid lookup hash secret")?;
 
     let bind_addr = config.bind_addr;
-    let state = AppState::new(Arc::new(config), pool, redis, sealer, lookup_hash);
+    let state = AppState::new(Arc::new(config), pool, redis, sealer, lookup_hash)
+        .map_err(|error| anyhow::anyhow!("failed to build application state: {error}"))?;
     let app = http::router::build(state.clone());
 
     let listener = TcpListener::bind(bind_addr)

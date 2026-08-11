@@ -9,6 +9,7 @@ DDADAN 상점별 쿠폰 발급 시스템의 로컬 개발 환경 셋업 방법�
 | [product-spec.md](./product-spec.md) | 기획서 (상세 구현 기준안) |
 | [scenarios.md](./scenarios.md) | 시나리오 명세 |
 | [api-endpoints.md](./api-endpoints.md) | 엔드포인트 목록 (구현 진행 체크리스트) |
+| [acceptance-checklist.md](./acceptance-checklist.md) | MVP 인수 시나리오 체크리스트 |
 
 ## 모노레포 구조
 
@@ -55,6 +56,7 @@ compose 파일: `apps/coupon-api-server/docker-compose.dev.yml`
    ```bash
    sqlx migrate run
    ```
+   > `sqlx-cli` 는 `COUPON_` 접두사를 모른다. `DATABASE_URL` 을 따로 export 해야 한다.
 3. 쿠폰 API 서버 실행
    ```bash
    cargo run --bin coupon-api
@@ -62,6 +64,14 @@ compose 파일: `apps/coupon-api-server/docker-compose.dev.yml`
 4. 각 Angular 앱 dev server 실행 (`coupon-consumer-app` / `coupon-store-app` / `coupon-system-admin-app`)
 
 환경변수는 저장소 루트의 `.env.coupon.example` 를 참고해 `.env.coupon` 을 만들어 로드한다.
+
+## 테스트 실행
+
+DB 통합 테스트는 `COUPON_TEST_DATABASE_URL` 이 없으면 조용히 skip 되면서 통과처럼 보인다. 반드시 다음처럼 돌린다:
+
+```sh
+COUPON_TEST_DATABASE_URL=postgres://coupon:coupon_dev_password@localhost:55432/coupon cargo test --workspace
+```
 
 ## 주의: 기존 사이니지 제품과 분리
 

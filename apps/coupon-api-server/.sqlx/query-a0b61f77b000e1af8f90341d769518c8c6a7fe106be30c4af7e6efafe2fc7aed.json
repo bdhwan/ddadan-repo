@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.loyalty_policies\n            SET name = $3,\n                target_stamp_count = $4,\n                stamps_per_order = $5,\n                minimum_order_amount = $6,\n                daily_earning_limit = $7,\n                duplicate_warning_seconds = $8,\n                stamp_validity_days = $9,\n                ends_at = COALESCE($10, ends_at),\n                eligible_item_ids = $11,\n                eligible_category_ids = $12,\n                excluded_item_ids = $13,\n                rule_snapshot = $14\n            WHERE id = $1 AND store_id = $2 AND status = 'DRAFT'\n              AND ($15::bigint IS NULL OR version = $15)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Int2",
+        "Int2",
+        "Int8",
+        "Int2",
+        "Int4",
+        "Int2",
+        "Timestamptz",
+        "UuidArray",
+        "UuidArray",
+        "UuidArray",
+        "Jsonb",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a0b61f77b000e1af8f90341d769518c8c6a7fe106be30c4af7e6efafe2fc7aed"
+}

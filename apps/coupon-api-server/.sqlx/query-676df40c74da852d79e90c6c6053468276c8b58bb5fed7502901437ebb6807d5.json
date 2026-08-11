@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id,\n                status::text AS \"status!\",\n                name,\n                timezone,\n                to_char(business_day_cutoff, 'HH24:MI:SS') AS \"business_day_cutoff!\"\n            FROM coupon.stores\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "timezone",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "business_day_cutoff!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "676df40c74da852d79e90c6c6053468276c8b58bb5fed7502901437ebb6807d5"
+}

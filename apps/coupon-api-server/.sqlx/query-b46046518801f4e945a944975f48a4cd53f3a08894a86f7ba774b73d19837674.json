@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT lot_id, quantity_delta, reward_coupon_id\n            FROM coupon.stamp_ledger\n            WHERE source_stamp_transaction_id = $1 AND event_type = 'CONSUME_FOR_REWARD'\n            ORDER BY occurred_at, id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "lot_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "quantity_delta",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 2,
+        "name": "reward_coupon_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "b46046518801f4e945a944975f48a4cd53f3a08894a86f7ba774b73d19837674"
+}

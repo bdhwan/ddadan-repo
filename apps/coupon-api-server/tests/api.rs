@@ -45,7 +45,8 @@ async fn test_app() -> Option<Router> {
 
     let sealer = Sealer::from_config(&config).expect("sealer");
     let lookup_hash = LookupHash::from_config(&config).expect("lookup hash");
-    let state = AppState::new(Arc::new(config), pool, None, sealer, lookup_hash);
+    let state =
+        AppState::new(Arc::new(config), pool, None, sealer, lookup_hash).expect("build state");
 
     Some(http::router::build(state))
 }

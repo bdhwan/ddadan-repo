@@ -21,8 +21,28 @@ export const couponHttpInterceptor: HttpInterceptorFn = (request, next) => {
   const errors = inject(CouponErrorMapper);
   const telemetry = inject(CouponTelemetryService);
 
+  return interceptCouponRequest(request, next, auth, errors, telemetry);
+};
+
+export interface CouponTokenProvider {
+  readonly currentUser: unknown | null;
+  getIdToken(forceRefresh?: boolean): Promise<string | null>;
+}
+
+/** Exported for transport-level tests without booting Firebase. */
+export function interceptCouponRequest(
+  request: HttpRequest<unknown>,
+  next: HttpHandlerFn,
+  auth: CouponTokenProvider,
+  errors: Pick<CouponErrorMapper, 'from'>,
+  telemetry: Pick<CouponTelemetryService, 'recordRequest'>,
+): Observable<HttpEvent<unknown>> {
+  let preparedRequest = request;
   return from(auth.getIdToken()).pipe(
-    switchMap((token) => next(prepareRequest(request, token))),
+    switchMap((token) => {
+      preparedRequest = prepareRequest(request, token);
+      return next(preparedRequest);
+    }),
     tap((event) => recordResponse(event, request, telemetry)),
     catchError((error: unknown) => {
       recordErrorResponse(error, request, telemetry);
@@ -37,7 +57,10 @@ export const couponHttpInterceptor: HttpInterceptorFn = (request, next) => {
         return from(auth.getIdToken(true)).pipe(
           switchMap((token) => {
             const retry = prepareRequest(
-              request.clone({ context: request.context.set(TOKEN_REFRESH_ATTEMPTED, true) }),
+              preparedRequest.clone({
+                headers: preparedRequest.headers.delete('Authorization'),
+                context: request.context.set(TOKEN_REFRESH_ATTEMPTED, true),
+              }),
               token,
             );
             return next(retry);
@@ -52,7 +75,7 @@ export const couponHttpInterceptor: HttpInterceptorFn = (request, next) => {
       return throwError(() => errors.from(error));
     }),
   );
-};
+}
 
 function prepareRequest(request: HttpRequest<unknown>, idToken: string | null): HttpRequest<unknown> {
   let headers = request.headers;
@@ -68,7 +91,7 @@ function prepareRequest(request: HttpRequest<unknown>, idToken: string | null): 
 function recordErrorResponse(
   error: unknown,
   request: HttpRequest<unknown>,
-  telemetry: CouponTelemetryService,
+  telemetry: Pick<CouponTelemetryService, 'recordRequest'>,
 ): void {
   if (!(error instanceof HttpErrorResponse) || typeof error.error !== 'object' || error.error === null) {
     return;
@@ -87,7 +110,7 @@ function recordErrorResponse(
 function recordResponse(
   event: HttpEvent<unknown>,
   request: HttpRequest<unknown>,
-  telemetry: CouponTelemetryService,
+  telemetry: Pick<CouponTelemetryService, 'recordRequest'>,
 ): void {
   if (event.type !== HttpEventType.Response || typeof event.body !== 'object' || event.body === null) {
     return;

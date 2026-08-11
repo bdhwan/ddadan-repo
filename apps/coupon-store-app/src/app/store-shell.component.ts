@@ -12,6 +12,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
         <a routerLink="/dashboard" routerLinkActive="active">오늘</a>
         <a routerLink="/scan" routerLinkActive="active">스캔</a>
         <a routerLink="/loyalty" routerLinkActive="active">도장 정책</a>
+        <a routerLink="/catalog" routerLinkActive="active">품목</a>
         <a routerLink="/campaigns" routerLinkActive="active">할인 캠페인</a>
         <a routerLink="/customers" routerLinkActive="active">고객</a>
         <a routerLink="/analytics" routerLinkActive="active">통계</a>

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.store_customers (store_id, user_id, alias)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (store_id, user_id) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7cd649119651bf8993b09502edf168cf0029602af1a681f9f1ff235715116df3"
+}

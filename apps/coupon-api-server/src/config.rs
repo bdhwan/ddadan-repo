@@ -87,6 +87,33 @@ pub struct Config {
     #[serde(default)]
     pub lookup_hash_secret: Option<String>,
 
+    /// Base64 32-byte Ed25519 seed used to sign rotating QR tokens (§16.2). Required in
+    /// production; outside it a deterministic development seed keeps local runs working.
+    #[serde(default)]
+    pub qr_signing_key: Option<String>,
+
+    /// How long an issued QR token is accepted for (§16.2, §23.1).
+    #[serde(default = "default_qr_token_ttl_secs")]
+    pub qr_token_ttl_secs: i64,
+
+    /// Owner self-service window for reversing an accrual (§8.6).
+    #[serde(default = "default_stamp_void_window_hours")]
+    pub stamp_void_window_hours: i64,
+
+    /// How long an administrative adjustment preview stays executable before it must be
+    /// taken again (§13.4).
+    #[serde(default = "default_admin_preview_ttl_minutes")]
+    pub admin_preview_ttl_minutes: i64,
+
+    /// §16.4 rate limits. Operational settings, not constants, so they can be relaxed or
+    /// tightened without a deploy.
+    #[serde(default = "default_qr_issue_rate_limit")]
+    pub rate_limit_qr_issue_per_min: u32,
+    #[serde(default = "default_qr_resolve_failure_rate_limit")]
+    pub rate_limit_qr_resolve_failure_per_min: u32,
+    #[serde(default = "default_stamp_approval_rate_limit")]
+    pub rate_limit_stamp_approval_per_min: u32,
+
     #[serde(default = "default_log_format")]
     pub log_format: LogFormat,
 
@@ -193,6 +220,30 @@ fn default_idempotency_ttl_hours() -> i64 {
     24
 }
 
+fn default_qr_token_ttl_secs() -> i64 {
+    60
+}
+
+fn default_stamp_void_window_hours() -> i64 {
+    24
+}
+
+fn default_admin_preview_ttl_minutes() -> i64 {
+    15
+}
+
+fn default_qr_issue_rate_limit() -> u32 {
+    20
+}
+
+fn default_qr_resolve_failure_rate_limit() -> u32 {
+    30
+}
+
+fn default_stamp_approval_rate_limit() -> u32 {
+    30
+}
+
 fn default_log_format() -> LogFormat {
     LogFormat::Json
 }
@@ -262,6 +313,27 @@ impl Config {
                     "COUPON_REDIS_URL is required in production".to_owned(),
                 ));
             }
+            // A predictable signing seed means anyone can mint a QR for any consumer.
+            if self.qr_signing_key.is_none() {
+                return Err(ConfigError::Invalid(
+                    "COUPON_QR_SIGNING_KEY is required in production".to_owned(),
+                ));
+            }
+        }
+
+        // §16.2 fixes the token lifetime at 60 seconds. Allow it to be tuned for a slow
+        // venue, but not stretched into something that is no longer single-use in
+        // practice.
+        if !(10..=300).contains(&self.qr_token_ttl_secs) {
+            return Err(ConfigError::Invalid(
+                "COUPON_QR_TOKEN_TTL_SECS must be between 10 and 300".to_owned(),
+            ));
+        }
+
+        if !(1..=168).contains(&self.stamp_void_window_hours) {
+            return Err(ConfigError::Invalid(
+                "COUPON_STAMP_VOID_WINDOW_HOURS must be between 1 and 168".to_owned(),
+            ));
         }
 
         Ok(())
@@ -273,6 +345,18 @@ impl Config {
 
     pub fn recent_auth_max_age(&self) -> Duration {
         Duration::from_secs(self.recent_auth_max_age_secs)
+    }
+
+    pub fn qr_token_ttl(&self) -> chrono::Duration {
+        chrono::Duration::seconds(self.qr_token_ttl_secs)
+    }
+
+    pub fn stamp_void_window(&self) -> chrono::Duration {
+        chrono::Duration::hours(self.stamp_void_window_hours)
+    }
+
+    pub fn admin_preview_ttl(&self) -> chrono::Duration {
+        chrono::Duration::minutes(self.admin_preview_ttl_minutes.clamp(1, 24 * 60))
     }
 
     /// Expected `iss` for Firebase ID tokens.
@@ -313,6 +397,13 @@ mod tests {
             idempotency_ttl_hours: 24,
             data_encryption_key: None,
             lookup_hash_secret: None,
+            qr_signing_key: None,
+            qr_token_ttl_secs: default_qr_token_ttl_secs(),
+            stamp_void_window_hours: default_stamp_void_window_hours(),
+            admin_preview_ttl_minutes: default_admin_preview_ttl_minutes(),
+            rate_limit_qr_issue_per_min: default_qr_issue_rate_limit(),
+            rate_limit_qr_resolve_failure_per_min: default_qr_resolve_failure_rate_limit(),
+            rate_limit_stamp_approval_per_min: default_stamp_approval_rate_limit(),
             log_format: LogFormat::Json,
             log_filter: default_log_filter(),
         }
@@ -399,6 +490,43 @@ mod tests {
 
         serde_json::from_value::<Flag>(serde_json::json!({ "value": "ture" }))
             .expect_err("a typo must not silently disable the flag");
+    }
+
+    #[test]
+    fn production_will_not_boot_without_a_qr_signing_key() {
+        let mut config = base_config();
+        config.env = Environment::Production;
+        config.allowed_origins = CommaList(vec!["https://app.example".to_owned()]);
+        config.data_encryption_key = Some("a".repeat(44));
+        config.lookup_hash_secret = Some("secret".to_owned());
+        config.redis_url = Some("redis://localhost:6379".to_owned());
+
+        let error = config.validate().expect_err("must demand a signing key");
+        assert!(error.to_string().contains("COUPON_QR_SIGNING_KEY"));
+
+        config.qr_signing_key = Some("seed".to_owned());
+        config.validate().expect("a configured key satisfies it");
+    }
+
+    #[test]
+    fn a_qr_lifetime_outside_the_usable_range_is_refused() {
+        for ttl in [0, 5, 600] {
+            let mut config = base_config();
+            config.qr_token_ttl_secs = ttl;
+            let error = config.validate().expect_err("must reject");
+            assert!(error.to_string().contains("COUPON_QR_TOKEN_TTL_SECS"));
+        }
+
+        let mut config = base_config();
+        config.qr_token_ttl_secs = 60;
+        config.validate().expect("the documented default is valid");
+    }
+
+    #[test]
+    fn the_void_window_defaults_to_the_documented_twenty_four_hours() {
+        let config = base_config();
+        assert_eq!(config.stamp_void_window().num_hours(), 24);
+        assert_eq!(config.qr_token_ttl().num_seconds(), 60);
     }
 
     #[test]

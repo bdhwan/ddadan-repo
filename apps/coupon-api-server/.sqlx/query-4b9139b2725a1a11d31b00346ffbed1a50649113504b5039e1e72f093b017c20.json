@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.stamp_transactions\n                (store_id, user_id, policy_id, business_day, quantity, external_order_ref,\n                 order_snapshot, status, approved_by_user_id, confirmed_at, idempotency_key)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, 'CONFIRMED', $8, $9, $10)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Date",
+        "Int2",
+        "Varchar",
+        "Jsonb",
+        "Uuid",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4b9139b2725a1a11d31b00346ffbed1a50649113504b5039e1e72f093b017c20"
+}

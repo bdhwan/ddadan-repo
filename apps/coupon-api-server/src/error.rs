@@ -37,10 +37,17 @@ pub enum ErrorCode {
     ReauthenticationRequired,
     OriginNotAllowed,
 
+    // 403 — the store itself may not act.
+    StoreNotActive,
+
     // 404 — absent, or not owned by the caller.
     NotFound,
     StoreNotFound,
     UserNotFound,
+    CatalogItemNotFound,
+    LoyaltyPolicyNotFound,
+    TransactionNotFound,
+    CouponNotFound,
 
     // 409 — state, version and quantity contention.
     Conflict,
@@ -50,11 +57,27 @@ pub enum ErrorCode {
     StoreAlreadyExists,
     StoreSlugTaken,
     ReviewAlreadyPending,
+    /// §15: the losing side of two scans of the same QR.
+    QrAlreadyUsed,
+    /// STAMP-003: an identical order arrived inside the policy's duplicate window.
+    DuplicateTransactionSuspected,
+    PolicyAlreadyScheduled,
+    PreviewExpired,
 
     // 422 — well-formed but the business rule says no.
     UnprocessableRequest,
     StoreNotReadyForReview,
     InvalidStateTransition,
+    /// SEC-002 deliberately collapses forged, malformed and unknown tokens into one code.
+    QrTokenInvalid,
+    QrTokenExpired,
+    NoActivePolicy,
+    PolicyNotEditable,
+    MinimumOrderNotMet,
+    ItemNotEligible,
+    DailyLimitExceeded,
+    VoidWindowExpired,
+    RequiresAdminReview,
 
     // 429 / 503.
     RateLimited,
@@ -82,9 +105,14 @@ impl ErrorCode {
             ErrorCode::ConsentRequired => "CONSENT_REQUIRED",
             ErrorCode::ReauthenticationRequired => "REAUTHENTICATION_REQUIRED",
             ErrorCode::OriginNotAllowed => "ORIGIN_NOT_ALLOWED",
+            ErrorCode::StoreNotActive => "STORE_NOT_ACTIVE",
             ErrorCode::NotFound => "NOT_FOUND",
             ErrorCode::StoreNotFound => "STORE_NOT_FOUND",
             ErrorCode::UserNotFound => "USER_NOT_FOUND",
+            ErrorCode::CatalogItemNotFound => "CATALOG_ITEM_NOT_FOUND",
+            ErrorCode::LoyaltyPolicyNotFound => "LOYALTY_POLICY_NOT_FOUND",
+            ErrorCode::TransactionNotFound => "TRANSACTION_NOT_FOUND",
+            ErrorCode::CouponNotFound => "COUPON_NOT_FOUND",
             ErrorCode::Conflict => "CONFLICT",
             ErrorCode::VersionConflict => "VERSION_CONFLICT",
             ErrorCode::IdempotencyKeyReused => "IDEMPOTENCY_KEY_REUSED",
@@ -92,9 +120,22 @@ impl ErrorCode {
             ErrorCode::StoreAlreadyExists => "STORE_ALREADY_EXISTS",
             ErrorCode::StoreSlugTaken => "STORE_SLUG_TAKEN",
             ErrorCode::ReviewAlreadyPending => "REVIEW_ALREADY_PENDING",
+            ErrorCode::QrAlreadyUsed => "QR_ALREADY_USED",
+            ErrorCode::DuplicateTransactionSuspected => "DUPLICATE_TRANSACTION_SUSPECTED",
+            ErrorCode::PolicyAlreadyScheduled => "POLICY_ALREADY_SCHEDULED",
+            ErrorCode::PreviewExpired => "PREVIEW_EXPIRED",
             ErrorCode::UnprocessableRequest => "UNPROCESSABLE_REQUEST",
             ErrorCode::StoreNotReadyForReview => "STORE_NOT_READY_FOR_REVIEW",
             ErrorCode::InvalidStateTransition => "INVALID_STATE_TRANSITION",
+            ErrorCode::QrTokenInvalid => "QR_TOKEN_INVALID",
+            ErrorCode::QrTokenExpired => "QR_TOKEN_EXPIRED",
+            ErrorCode::NoActivePolicy => "NO_ACTIVE_POLICY",
+            ErrorCode::PolicyNotEditable => "POLICY_NOT_EDITABLE",
+            ErrorCode::MinimumOrderNotMet => "MINIMUM_ORDER_NOT_MET",
+            ErrorCode::ItemNotEligible => "ITEM_NOT_ELIGIBLE",
+            ErrorCode::DailyLimitExceeded => "DAILY_LIMIT_EXCEEDED",
+            ErrorCode::VoidWindowExpired => "VOID_WINDOW_EXPIRED",
+            ErrorCode::RequiresAdminReview => "REQUIRES_ADMIN_REVIEW",
             ErrorCode::RateLimited => "RATE_LIMITED",
             ErrorCode::ServiceUnavailable => "SERVICE_UNAVAILABLE",
             ErrorCode::DependencyUnavailable => "DEPENDENCY_UNAVAILABLE",
@@ -124,13 +165,18 @@ impl ErrorCode {
             | ErrorCode::AccountWithdrawn
             | ErrorCode::ConsentRequired
             | ErrorCode::ReauthenticationRequired
-            | ErrorCode::OriginNotAllowed => StatusCode::FORBIDDEN,
+            | ErrorCode::OriginNotAllowed
+            | ErrorCode::StoreNotActive => StatusCode::FORBIDDEN,
 
             // 404: absent, or present but not owned by the caller — indistinguishable on
             // purpose, so ownership cannot be probed.
-            ErrorCode::NotFound | ErrorCode::StoreNotFound | ErrorCode::UserNotFound => {
-                StatusCode::NOT_FOUND
-            }
+            ErrorCode::NotFound
+            | ErrorCode::StoreNotFound
+            | ErrorCode::UserNotFound
+            | ErrorCode::CatalogItemNotFound
+            | ErrorCode::LoyaltyPolicyNotFound
+            | ErrorCode::TransactionNotFound
+            | ErrorCode::CouponNotFound => StatusCode::NOT_FOUND,
 
             // 409: state, version or quantity contention.
             ErrorCode::Conflict
@@ -139,12 +185,25 @@ impl ErrorCode {
             | ErrorCode::IdempotencyRequestInProgress
             | ErrorCode::StoreAlreadyExists
             | ErrorCode::StoreSlugTaken
-            | ErrorCode::ReviewAlreadyPending => StatusCode::CONFLICT,
+            | ErrorCode::ReviewAlreadyPending
+            | ErrorCode::QrAlreadyUsed
+            | ErrorCode::DuplicateTransactionSuspected
+            | ErrorCode::PolicyAlreadyScheduled
+            | ErrorCode::PreviewExpired => StatusCode::CONFLICT,
 
             // 422: shape is fine, the business condition is not met.
             ErrorCode::UnprocessableRequest
             | ErrorCode::StoreNotReadyForReview
-            | ErrorCode::InvalidStateTransition => StatusCode::UNPROCESSABLE_ENTITY,
+            | ErrorCode::InvalidStateTransition
+            | ErrorCode::QrTokenInvalid
+            | ErrorCode::QrTokenExpired
+            | ErrorCode::NoActivePolicy
+            | ErrorCode::PolicyNotEditable
+            | ErrorCode::MinimumOrderNotMet
+            | ErrorCode::ItemNotEligible
+            | ErrorCode::DailyLimitExceeded
+            | ErrorCode::VoidWindowExpired
+            | ErrorCode::RequiresAdminReview => StatusCode::UNPROCESSABLE_ENTITY,
 
             ErrorCode::RateLimited => StatusCode::TOO_MANY_REQUESTS,
 
@@ -185,9 +244,14 @@ impl ErrorCode {
             ErrorCode::ConsentRequired => "필수 약관에 동의해야 이용할 수 있습니다.",
             ErrorCode::ReauthenticationRequired => "보안을 위해 다시 로그인해 주세요.",
             ErrorCode::OriginNotAllowed => "허용되지 않은 요청 출처입니다.",
+            ErrorCode::StoreNotActive => "현재 상점 상태에서는 처리할 수 없습니다.",
             ErrorCode::NotFound => "요청한 리소스를 찾을 수 없습니다.",
             ErrorCode::StoreNotFound => "상점을 찾을 수 없습니다.",
             ErrorCode::UserNotFound => "회원 정보를 찾을 수 없습니다.",
+            ErrorCode::CatalogItemNotFound => "품목을 찾을 수 없습니다.",
+            ErrorCode::LoyaltyPolicyNotFound => "도장 정책을 찾을 수 없습니다.",
+            ErrorCode::TransactionNotFound => "거래를 찾을 수 없습니다.",
+            ErrorCode::CouponNotFound => "쿠폰을 찾을 수 없습니다.",
             ErrorCode::Conflict => "현재 상태에서는 처리할 수 없습니다.",
             ErrorCode::VersionConflict => {
                 "다른 곳에서 먼저 수정되었습니다. 새로고침 후 다시 시도해 주세요."
@@ -201,9 +265,30 @@ impl ErrorCode {
             ErrorCode::StoreAlreadyExists => "계정당 상점은 하나만 만들 수 있습니다.",
             ErrorCode::StoreSlugTaken => "이미 사용 중인 상점 주소입니다.",
             ErrorCode::ReviewAlreadyPending => "이미 검수 대기 중입니다.",
+            ErrorCode::QrAlreadyUsed => "이미 사용된 QR 입니다. 새 QR 을 받아 주세요.",
+            ErrorCode::DuplicateTransactionSuspected => {
+                "조금 전 같은 조건의 거래가 있었습니다. 별도 주문이면 주문번호를 입력해 주세요."
+            }
+            ErrorCode::PolicyAlreadyScheduled => "이미 예약된 다음 버전이 있습니다.",
+            ErrorCode::PreviewExpired => "미리보기가 만료되었습니다. 다시 조회해 주세요.",
             ErrorCode::UnprocessableRequest => "요청 조건을 충족하지 않습니다.",
             ErrorCode::StoreNotReadyForReview => "검수 제출에 필요한 정보가 아직 부족합니다.",
             ErrorCode::InvalidStateTransition => "현재 상태에서는 변경할 수 없습니다.",
+            // SEC-002: one message for forged, malformed, unknown and wrong-audience
+            // tokens, so a probe learns nothing from the difference.
+            ErrorCode::QrTokenInvalid => "QR 을 확인할 수 없습니다. 새 QR 을 받아 주세요.",
+            ErrorCode::QrTokenExpired => "QR 이 만료되었습니다. 새 QR 을 받아 주세요.",
+            ErrorCode::NoActivePolicy => "활성화된 도장 정책이 없습니다.",
+            ErrorCode::PolicyNotEditable => {
+                "활성 정책은 수정할 수 없습니다. 새 버전을 만들어 주세요."
+            }
+            ErrorCode::MinimumOrderNotMet => "최소 주문 금액에 미치지 않습니다.",
+            ErrorCode::ItemNotEligible => "적립 대상 품목이 포함되어 있지 않습니다.",
+            ErrorCode::DailyLimitExceeded => "오늘의 적립 한도를 모두 사용했습니다.",
+            ErrorCode::VoidWindowExpired => "취소 가능 시간이 지났습니다.",
+            ErrorCode::RequiresAdminReview => {
+                "점주가 직접 처리할 수 없는 거래입니다. 고객센터 문의가 필요합니다."
+            }
             ErrorCode::RateLimited => "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.",
             ErrorCode::ServiceUnavailable => "일시적인 오류입니다. 잠시 후 다시 시도해 주세요.",
             ErrorCode::DependencyUnavailable => "일시적인 오류입니다. 잠시 후 다시 시도해 주세요.",
@@ -413,9 +498,14 @@ mod tests {
             (ErrorCode::ConsentRequired, 403),
             (ErrorCode::ReauthenticationRequired, 403),
             (ErrorCode::OriginNotAllowed, 403),
+            (ErrorCode::StoreNotActive, 403),
             (ErrorCode::NotFound, 404),
             (ErrorCode::StoreNotFound, 404),
             (ErrorCode::UserNotFound, 404),
+            (ErrorCode::CatalogItemNotFound, 404),
+            (ErrorCode::LoyaltyPolicyNotFound, 404),
+            (ErrorCode::TransactionNotFound, 404),
+            (ErrorCode::CouponNotFound, 404),
             (ErrorCode::Conflict, 409),
             (ErrorCode::VersionConflict, 409),
             (ErrorCode::IdempotencyKeyReused, 409),
@@ -423,9 +513,22 @@ mod tests {
             (ErrorCode::StoreAlreadyExists, 409),
             (ErrorCode::StoreSlugTaken, 409),
             (ErrorCode::ReviewAlreadyPending, 409),
+            (ErrorCode::QrAlreadyUsed, 409),
+            (ErrorCode::DuplicateTransactionSuspected, 409),
+            (ErrorCode::PolicyAlreadyScheduled, 409),
+            (ErrorCode::PreviewExpired, 409),
             (ErrorCode::UnprocessableRequest, 422),
             (ErrorCode::StoreNotReadyForReview, 422),
             (ErrorCode::InvalidStateTransition, 422),
+            (ErrorCode::QrTokenInvalid, 422),
+            (ErrorCode::QrTokenExpired, 422),
+            (ErrorCode::NoActivePolicy, 422),
+            (ErrorCode::PolicyNotEditable, 422),
+            (ErrorCode::MinimumOrderNotMet, 422),
+            (ErrorCode::ItemNotEligible, 422),
+            (ErrorCode::DailyLimitExceeded, 422),
+            (ErrorCode::VoidWindowExpired, 422),
+            (ErrorCode::RequiresAdminReview, 422),
             (ErrorCode::RateLimited, 429),
             (ErrorCode::ServiceUnavailable, 503),
             (ErrorCode::DependencyUnavailable, 503),

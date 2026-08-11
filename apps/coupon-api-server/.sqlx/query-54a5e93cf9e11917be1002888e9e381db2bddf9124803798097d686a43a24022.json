@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT entry_hash\n            FROM coupon.audit_logs\n            WHERE resource_type = $1 AND resource_id IS NOT DISTINCT FROM $2\n            ORDER BY occurred_at DESC, id DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "entry_hash",
+        "type_info": "Bpchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "54a5e93cf9e11917be1002888e9e381db2bddf9124803798097d686a43a24022"
+}

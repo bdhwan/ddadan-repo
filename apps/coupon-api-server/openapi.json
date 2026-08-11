@@ -16,6 +16,105 @@
     }
   ],
   "paths": {
+    "/api/coupon/v1/admin/adjustments/preview": {
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Simulate a correction before anyone is allowed to run it (ADMIN-003, §13.4).",
+        "description": "Restricted to the roles §3.3 lets request a correction; approving and executing one is\na separate act with its own separation-of-duties rule.",
+        "operationId": "preview_adjustment",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustmentPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "A snapshot of what the correction would do",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdjustmentPreview"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This role may not request corrections"
+          },
+          "404": {
+            "description": "No such case or transaction"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/admin/transactions/{transaction_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "One transaction, its ledger and its whole event history (§2.1 목표 5).",
+        "description": "Readable by every administrative role: answering \"what happened to this customer\" is\nsupport's daily work, and the response carries no unmasked personal data.",
+        "operationId": "get_transaction",
+        "parameters": [
+          {
+            "name": "transaction_id",
+            "in": "path",
+            "description": "Stamp transaction id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ledger and timeline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTransactionDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an administrator"
+          },
+          "404": {
+            "description": "No such transaction"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
     "/api/coupon/v1/health/live": {
       "get": {
         "tags": [
@@ -231,6 +330,50 @@
         ]
       }
     },
+    "/api/coupon/v1/me/qr-tokens": {
+      "post": {
+        "tags": [
+          "qr"
+        ],
+        "summary": "Issue a 60-second rotating QR and its manual code.",
+        "description": "Rate limited to 20/minute per user (§16.4): a legitimate screen refreshes every 30\nseconds, so anything approaching the ceiling is a script harvesting nonces.",
+        "operationId": "issue_qr_token",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "A fresh rotating token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QrTokenResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The account may not present a QR"
+          },
+          "429": {
+            "description": "Too many tokens requested"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
     "/api/coupon/v1/me/roles": {
       "get": {
         "tags": [
@@ -248,6 +391,900 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/me/wallet/coupons": {
+      "get": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "My coupons.",
+        "operationId": "list_coupons",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "`AVAILABLE`, `HISTORY` or `ALL`. Defaults to `ALL` — the wallet never hides a\nbenefit, it only groups it (§6.2).",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/WalletFilter"
+                }
+              ]
+            }
+          },
+          {
+            "name": "store_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "1–100. Defaults to 20 (§11.1).",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` from the previous page.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of coupons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_WalletCoupon"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/me/wallet/coupons/{coupon_id}": {
+      "get": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "One coupon, with the conditions frozen at issuance and its full history.",
+        "operationId": "get_coupon",
+        "parameters": [
+          {
+            "name": "coupon_id",
+            "in": "path",
+            "description": "Coupon instance id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Coupon detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletCouponDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such coupon, or it is not the caller's"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/me/wallet/stamps": {
+      "get": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "My stamp boards, one per store.",
+        "operationId": "get_stamps",
+        "responses": {
+          "200": {
+            "description": "Stamp boards",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletStampsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/catalog/categories": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "My catalogue categories.",
+        "operationId": "list_categories",
+        "responses": {
+          "200": {
+            "description": "Categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogCategoriesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Add a category.",
+        "operationId": "create_category",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Category created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogCategory"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The name is already used in this store"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/catalog/categories/{category_id}": {
+      "patch": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Edit a category.",
+        "operationId": "patch_category",
+        "parameters": [
+          {
+            "name": "category_id",
+            "in": "path",
+            "description": "Category id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Expected version",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCategoryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated category",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogCategory"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such category in this store"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/catalog/items": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "My catalogue items.",
+        "operationId": "list_items",
+        "parameters": [
+          {
+            "name": "include_inactive",
+            "in": "query",
+            "description": "Include deactivated items. Off by default, because the common case is picking an\nitem for a new policy, where only active items may be chosen (§8.3).",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalogue items",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogItemsResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Add a catalogue item.",
+        "operationId": "create_item",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Item created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogItem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The SKU is already in use"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/catalog/items/{item_id}": {
+      "patch": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Edit a catalogue item, including deactivating it.",
+        "operationId": "patch_item",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "Catalogue item id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Expected version",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateItemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogItem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such item in this store"
+          },
+          "409": {
+            "description": "Someone else changed it first"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/loyalty-policies": {
+      "get": {
+        "tags": [
+          "loyalty"
+        ],
+        "summary": "Every version of my stamp policy.",
+        "operationId": "list_policies",
+        "responses": {
+          "200": {
+            "description": "Policy versions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoyaltyPoliciesResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "loyalty"
+        ],
+        "summary": "Draft the next version.",
+        "operationId": "create_policy",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Draft created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoyaltyPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A value is outside its §8.1 range"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/loyalty-policies/{policy_id}": {
+      "patch": {
+        "tags": [
+          "loyalty"
+        ],
+        "summary": "Edit a draft. An active version is never edited in place (STAMP-008).",
+        "operationId": "patch_policy",
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "description": "Policy version id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "description": "Expected version",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Updated draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoyaltyPolicy"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "This version is not a draft"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/loyalty-policies/{policy_id}/publish": {
+      "post": {
+        "tags": [
+          "loyalty"
+        ],
+        "summary": "Publish a draft, now or at a chosen instant.",
+        "operationId": "publish_policy",
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "description": "Policy version id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Published or scheduled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoyaltyPolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The reward is missing wording customers must see"
+          },
+          "409": {
+            "description": "Another version is already scheduled"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/scan/resolve": {
+      "post": {
+        "tags": [
+          "loyalty"
+        ],
+        "summary": "Read a customer's QR and describe who they are — pseudonymously (§11.4, WALLET-005).",
+        "description": "Does not consume the QR: the owner may still abandon the sale.",
+        "operationId": "resolve_scan",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScanRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Pseudonymous customer and stamp board",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScanResolution"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That QR has already been used"
+          },
+          "422": {
+            "description": "The QR could not be accepted"
+          },
+          "429": {
+            "description": "Too many failed scans"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/stamp-transactions": {
+      "post": {
+        "tags": [
+          "loyalty"
+        ],
+        "summary": "Approve the accrual (§13.1).",
+        "operationId": "confirm_stamp_transaction",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmStampRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Stamps granted, and any reward earned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StampTransaction"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The QR was already used, or this looks like a duplicate"
+          },
+          "422": {
+            "description": "A policy condition is not met"
+          },
+          "429": {
+            "description": "Too many approvals"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/stamp-transactions/preview": {
+      "post": {
+        "tags": [
+          "loyalty"
+        ],
+        "summary": "Check an order against the active policy and show what would happen.",
+        "description": "Returns 200 with `approvable: false` and the reasons when the accrual would be\nrefused, because the scan screen has to display them (§6.3).",
+        "operationId": "preview_stamp_transaction",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StampPreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "What approving would do",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StampPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The QR or the store state makes a preview impossible"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/owner/stamp-transactions/{transaction_id}/void": {
+      "post": {
+        "tags": [
+          "loyalty"
+        ],
+        "summary": "Reverse an accrual within the owner's own window (STAMP-007).",
+        "operationId": "void_stamp_transaction",
+        "parameters": [
+          {
+            "name": "transaction_id",
+            "in": "path",
+            "description": "The accrual to reverse",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidStampRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Reversed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StampTransaction"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such accrual in this store"
+          },
+          "422": {
+            "description": "Past the window, or a reward has moved on"
           }
         },
         "security": [
@@ -530,6 +1567,372 @@
           "UNKNOWN"
         ]
       },
+      "AdjustmentPreview": {
+        "type": "object",
+        "description": "What running the correction would do — and what must not have changed by then.",
+        "required": [
+          "adjustment_id",
+          "case_id",
+          "adjustment_type",
+          "status",
+          "snapshot_taken_at",
+          "preview_expires_at",
+          "stamps_before",
+          "stamps_after",
+          "affected_coupon_ids",
+          "ledger_entries_to_append",
+          "observed_versions",
+          "blockers",
+          "executable"
+        ],
+        "properties": {
+          "adjustment_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "adjustment_type": {
+            "$ref": "#/components/schemas/AdjustmentType"
+          },
+          "affected_coupon_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Rewards the correction would have to take back."
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Reasons the correction cannot be run as described."
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "executable": {
+            "type": "boolean"
+          },
+          "ledger_entries_to_append": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposedLedgerEntry"
+            },
+            "description": "The ledger rows the correction would append. Nothing is ever rewritten."
+          },
+          "observed_versions": {
+            "description": "The `version` of every mutable row this correction depends on. If any of them has\nmoved when execution is attempted, the preview is stale and must be retaken."
+          },
+          "preview_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "After this, the preview must be taken again (§13.4)."
+          },
+          "snapshot_taken_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Taken inside a `REPEATABLE READ` transaction, so every number below is one\nconsistent picture rather than a series of separate reads (§13.4)."
+          },
+          "stamps_after": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stamps_before": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "AdjustmentPreviewRequest": {
+        "type": "object",
+        "required": [
+          "case_id",
+          "adjustment_type",
+          "reason"
+        ],
+        "properties": {
+          "adjustment_type": {
+            "$ref": "#/components/schemas/AdjustmentType"
+          },
+          "case_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The case this correction belongs to. §11.5 requires an adjustment to hang off a\ncase, not to appear from nowhere."
+          },
+          "quantity": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "store_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Required by `STAMP_GRANT`."
+          },
+          "transaction_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Required by `STAMP_TRANSACTION_VOID`."
+          },
+          "user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "AdjustmentType": {
+        "type": "string",
+        "description": "The corrections Phase 2 can simulate.",
+        "enum": [
+          "STAMP_TRANSACTION_VOID",
+          "STAMP_GRANT"
+        ]
+      },
+      "AdminLedgerEntry": {
+        "type": "object",
+        "description": "One entry of the append-only stamp ledger, as an investigator reads it.",
+        "required": [
+          "id",
+          "lot_id",
+          "event_type",
+          "quantity_delta",
+          "reason_code",
+          "actor_type",
+          "occurred_at"
+        ],
+        "properties": {
+          "actor_type": {
+            "type": "string"
+          },
+          "actor_user_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "quantity_delta": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason_code": {
+            "type": "string"
+          },
+          "reward_coupon_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "source_stamp_transaction_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "AdminRewardSummary": {
+        "type": "object",
+        "description": "A reward this transaction created, and where it ended up.",
+        "required": [
+          "coupon_id",
+          "status",
+          "title",
+          "expires_at"
+        ],
+        "properties": {
+          "coupon_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issued_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminTransactionDetail": {
+        "type": "object",
+        "description": "`GET /admin/transactions/:id` — one id, the whole story (§2.1 목표 5).",
+        "required": [
+          "transaction_id",
+          "store_id",
+          "store_name",
+          "customer_key",
+          "customer_masked_name",
+          "policy_id",
+          "business_day",
+          "quantity",
+          "status",
+          "order_snapshot",
+          "approved_by_user_id",
+          "confirmed_at",
+          "version",
+          "ledger",
+          "rewards",
+          "timeline"
+        ],
+        "properties": {
+          "approved_by_user_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "business_day": {
+            "type": "string",
+            "format": "date"
+          },
+          "confirmed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer_key": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The customer's pseudonymous key. Never their email, phone or name (§11.5 마스킹)."
+          },
+          "customer_masked_name": {
+            "type": "string"
+          },
+          "external_order_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ledger": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminLedgerEntry"
+            }
+          },
+          "order_snapshot": {},
+          "policy_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "rewards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminRewardSummary"
+            }
+          },
+          "status": {
+            "type": "string"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "timeline": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimelineEvent"
+            },
+            "description": "Everything above, merged in time order."
+          },
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "void_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "voided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "BenefitType": {
+        "type": "string",
+        "description": "`coupon.benefit_type`.",
+        "enum": [
+          "FIXED_AMOUNT",
+          "PERCENTAGE",
+          "FREE_ITEM"
+        ]
+      },
       "BootstrapRequest": {
         "type": "object",
         "properties": {
@@ -564,6 +1967,137 @@
           }
         }
       },
+      "CatalogCategoriesResponse": {
+        "type": "object",
+        "required": [
+          "categories"
+        ],
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogCategory"
+            }
+          }
+        }
+      },
+      "CatalogCategory": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "status",
+          "sort_order",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sort_order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResourceStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CatalogItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "status",
+          "created_at",
+          "updated_at",
+          "version"
+        ],
+        "properties": {
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "category_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reference_price": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Reference price only. The price that counts is the one entered at the till (§8.3)."
+          },
+          "sku": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The store's own SKU. Optional — most small shops do not have one (§8.3)."
+          },
+          "status": {
+            "$ref": "#/components/schemas/ResourceStatus"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "CatalogItemsResponse": {
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CatalogItem"
+            }
+          }
+        }
+      },
       "ComponentHealth": {
         "type": "object",
         "required": [
@@ -581,6 +2115,36 @@
             "description": "`ok`, `degraded`, `disabled` or `down`."
           }
         }
+      },
+      "ConfirmStampRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ScanRequest"
+          },
+          {
+            "type": "object",
+            "required": [
+              "order"
+            ],
+            "properties": {
+              "acknowledge_duplicate": {
+                "type": "boolean",
+                "description": "Approve despite a duplicate warning, having entered a distinct order reference\n(STAMP-003)."
+              },
+              "order": {
+                "$ref": "#/components/schemas/OrderInput"
+              },
+              "preview_id": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uuid",
+                "description": "Echoed from the preview. Recorded for support, never trusted as a substitute for\nre-validation (§11.4)."
+              }
+            }
+          }
+        ]
       },
       "ConsentAction": {
         "type": "string",
@@ -692,6 +2256,140 @@
           }
         }
       },
+      "CouponStatus": {
+        "type": "string",
+        "description": "`coupon.coupon_status`.",
+        "enum": [
+          "PENDING",
+          "AVAILABLE",
+          "RESERVED",
+          "USED",
+          "EXPIRED",
+          "REVOKED",
+          "VOIDED",
+          "ISSUE_FAILED"
+        ]
+      },
+      "CouponStatusEvent": {
+        "type": "object",
+        "description": "One state change, for the \"what happened to my coupon\" history.",
+        "required": [
+          "to_status",
+          "reason_code",
+          "occurred_at"
+        ],
+        "properties": {
+          "from_status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CouponStatus"
+              }
+            ]
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason_code": {
+            "type": "string"
+          },
+          "to_status": {
+            "$ref": "#/components/schemas/CouponStatus"
+          }
+        }
+      },
+      "CreateCategoryRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "sort_order": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CreateItemRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reference_price": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "sku": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "CreatePolicyRequest": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Optional absolute end of the version."
+          },
+          "name": {
+            "type": "string"
+          },
+          "reward": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RewardDefinition"
+              }
+            ]
+          },
+          "rules": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyRules",
+                "description": "Omitted fields take the §8.1 defaults."
+              }
+            ]
+          }
+        }
+      },
       "CreateStoreRequest": {
         "type": "object",
         "required": [
@@ -795,6 +2493,36 @@
           }
         }
       },
+      "IssuedReward": {
+        "type": "object",
+        "required": [
+          "coupon_id",
+          "title",
+          "description",
+          "usable_from",
+          "expires_at"
+        ],
+        "properties": {
+          "coupon_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "description": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "title": {
+            "type": "string"
+          },
+          "usable_from": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "LiveResponse": {
         "type": "object",
         "required": [
@@ -807,6 +2535,589 @@
           },
           "version": {
             "type": "string"
+          }
+        }
+      },
+      "LoyaltyPoliciesResponse": {
+        "type": "object",
+        "required": [
+          "policies"
+        ],
+        "properties": {
+          "active_policy_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The version accruals are being judged against right now, if any."
+          },
+          "policies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LoyaltyPolicy"
+            }
+          },
+          "scheduled_policy_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The version that takes over at its `starts_at` (§6.3 shows this as \"다음 예약\")."
+          }
+        }
+      },
+      "LoyaltyPolicy": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PolicyRules"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "store_id",
+              "version_no",
+              "status",
+              "name",
+              "reward",
+              "schema_version",
+              "created_at",
+              "updated_at",
+              "version"
+            ],
+            "properties": {
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "ends_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string"
+              },
+              "published_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "reward": {
+                "$ref": "#/components/schemas/RewardDefinition"
+              },
+              "schema_version": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "starts_at": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "status": {
+                "$ref": "#/components/schemas/PolicyStatus"
+              },
+              "store_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "version": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "version_no": {
+                "type": "integer",
+                "format": "int32"
+              }
+            }
+          }
+        ],
+        "description": "One version, as the owner app sees it."
+      },
+      "OrderInput": {
+        "type": "object",
+        "description": "The order as the owner typed it (§11.4 적립 승인 요청 예시).",
+        "required": [
+          "gross_amount"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "external_order_ref": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Optional POS reference. STAMP-003 uses a *new* one as the owner's confirmation\nthat a near-duplicate really is a separate order."
+          },
+          "gross_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrderItemInput"
+            }
+          }
+        }
+      },
+      "OrderItemInput": {
+        "type": "object",
+        "description": "One `order.items[]` entry from a scan request (§11.4).",
+        "required": [
+          "quantity",
+          "unit_price"
+        ],
+        "properties": {
+          "catalog_item_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Optional: an owner may type an item that is not in the catalogue."
+          },
+          "name_snapshot": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "unit_price": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Page_WalletCoupon": {
+        "type": "object",
+        "description": "One page of results.",
+        "required": [
+          "items",
+          "has_more"
+        ],
+        "properties": {
+          "has_more": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "store_id",
+                "store_name",
+                "source_type",
+                "status",
+                "effective_status",
+                "title",
+                "description",
+                "benefit_type",
+                "usable_from",
+                "expires_at",
+                "created_at",
+                "version"
+              ],
+              "properties": {
+                "benefit_type": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "effective_status": {
+                  "$ref": "#/components/schemas/CouponStatus",
+                  "description": "What it means right now — `EXPIRED` once the clock has passed `expires_at`, even\nif the sweep has not caught up (§18.1)."
+                },
+                "expired_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "expires_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "issued_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "revocation_reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "Why it was taken away. Shown rather than hidden (§6.2)."
+                },
+                "revoked_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "source_type": {
+                  "type": "string"
+                },
+                "status": {
+                  "$ref": "#/components/schemas/CouponStatus",
+                  "description": "What the row says."
+                },
+                "store_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "store_name": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "usable_from": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "used_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "version": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass back as `?cursor=` to fetch the next page. `null` on the last page."
+          }
+        }
+      },
+      "PolicyRules": {
+        "type": "object",
+        "description": "Everything a draft or an active version says about earning a stamp.",
+        "required": [
+          "target_stamp_count",
+          "stamps_per_order",
+          "minimum_order_amount",
+          "duplicate_warning_minutes",
+          "stamp_validity_days",
+          "eligible_item_ids",
+          "eligible_category_ids",
+          "excluded_item_ids"
+        ],
+        "properties": {
+          "daily_earning_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Accruals per business day, 1–20. `None` means unlimited (§8.1)."
+          },
+          "duplicate_warning_minutes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1–60 minutes, default 5 (STAMP-003)."
+          },
+          "eligible_category_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "eligible_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "excluded_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "minimum_order_amount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Won, default 0."
+          },
+          "stamp_validity_days": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1–730 days, default 180."
+          },
+          "stamps_per_order": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1–10, default 1."
+          },
+          "target_stamp_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "2–100, default 10."
+          }
+        }
+      },
+      "PolicyStatus": {
+        "type": "string",
+        "description": "`coupon.policy_status`.",
+        "enum": [
+          "DRAFT",
+          "SCHEDULED",
+          "ACTIVE",
+          "PAUSED",
+          "ENDED"
+        ]
+      },
+      "PolicySummary": {
+        "type": "object",
+        "required": [
+          "policy_id",
+          "version_no",
+          "name",
+          "target_stamp_count",
+          "stamps_per_order",
+          "minimum_order_amount",
+          "restricts_items",
+          "reward_title",
+          "reward_validity_days"
+        ],
+        "properties": {
+          "daily_earning_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "minimum_order_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "policy_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "restricts_items": {
+            "type": "boolean"
+          },
+          "reward_title": {
+            "type": "string"
+          },
+          "reward_validity_days": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stamps_per_order": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "target_stamp_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version_no": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "PreviewIssue": {
+        "type": "object",
+        "description": "One reason an accrual cannot be approved as submitted.",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ProposedLedgerEntry": {
+        "type": "object",
+        "required": [
+          "lot_id",
+          "event_type",
+          "quantity_delta",
+          "reason_code"
+        ],
+        "properties": {
+          "event_type": {
+            "type": "string"
+          },
+          "lot_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "quantity_delta": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reason_code": {
+            "type": "string"
+          }
+        }
+      },
+      "PseudonymousCustomer": {
+        "type": "object",
+        "description": "What the owner is allowed to know about the customer in front of them (§3.1,\nWALLET-005).\n\nEvery field here is either store-local or masked. There is deliberately no email, no\nphone number, no Kakao identifier, and nothing about any other store.",
+        "required": [
+          "alias",
+          "masked_name",
+          "is_new_customer",
+          "visit_count"
+        ],
+        "properties": {
+          "alias": {
+            "type": "string",
+            "description": "Stable store-local nickname, derived rather than taken from the profile."
+          },
+          "first_seen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "is_new_customer": {
+            "type": "boolean"
+          },
+          "last_seen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "masked_name": {
+            "type": "string",
+            "description": "e.g. `김**`."
+          },
+          "store_customer_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "Store-scoped pseudonymous id. `None` until the customer's first accrual here."
+          },
+          "visit_count": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "PublishPolicyRequest": {
+        "type": "object",
+        "properties": {
+          "effective_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the version takes over. Absent or in the past means immediately."
+          }
+        }
+      },
+      "QrTokenResponse": {
+        "type": "object",
+        "required": [
+          "token",
+          "fallback_code",
+          "issued_at",
+          "expires_at",
+          "expires_in_seconds",
+          "refresh_after_seconds",
+          "key_id"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_in_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds the token remains valid."
+          },
+          "fallback_code": {
+            "type": "string",
+            "description": "Eight digits for STORE-005, when the camera is unavailable."
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "key_id": {
+            "type": "string",
+            "description": "Which signing key produced this token (§16.2)."
+          },
+          "refresh_after_seconds": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds after which the screen should request a replacement."
+          },
+          "token": {
+            "type": "string",
+            "description": "The signed payload to render as a QR code."
           }
         }
       },
@@ -848,6 +3159,15 @@
           }
         }
       },
+      "ResourceStatus": {
+        "type": "string",
+        "description": "`coupon.resource_status`.",
+        "enum": [
+          "ACTIVE",
+          "INACTIVE",
+          "ARCHIVED"
+        ]
+      },
       "ReviewStatus": {
         "type": "string",
         "description": "`coupon.review_status`.",
@@ -858,6 +3178,74 @@
           "REJECTED",
           "CANCELLED"
         ]
+      },
+      "RewardDefinition": {
+        "type": "object",
+        "description": "The reward a completed board pays out.",
+        "required": [
+          "benefit_type",
+          "free_item_ids",
+          "minimum_order_amount",
+          "validity_days",
+          "title",
+          "description",
+          "customer_notice"
+        ],
+        "properties": {
+          "benefit_type": {
+            "$ref": "#/components/schemas/BenefitType"
+          },
+          "customer_notice": {
+            "type": "string",
+            "description": "The notice STAMP-001 requires before a policy may go live."
+          },
+          "description": {
+            "type": "string",
+            "description": "The usage conditions in the customer's words."
+          },
+          "fixed_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "free_item_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "maximum_discount_amount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "minimum_order_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "percentage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "1–100."
+          },
+          "title": {
+            "type": "string",
+            "description": "Shown on the wallet card."
+          },
+          "validity_days": {
+            "type": "integer",
+            "format": "int32",
+            "description": "1–365 days, default 30."
+          }
+        }
       },
       "RoleGrant": {
         "type": "object",
@@ -896,6 +3284,314 @@
             }
           }
         }
+      },
+      "ScanRequest": {
+        "type": "object",
+        "description": "How the owner identified the customer. Exactly one must be present.",
+        "properties": {
+          "fallback_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The eight digits from the customer's screen (STORE-005)."
+          },
+          "qr_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The signed payload read from the camera."
+          }
+        }
+      },
+      "ScanResolution": {
+        "type": "object",
+        "description": "`POST /owner/scan/resolve` (§11.4).",
+        "required": [
+          "customer",
+          "qr_expires_at",
+          "policy",
+          "stamp_board",
+          "self_transaction"
+        ],
+        "properties": {
+          "customer": {
+            "$ref": "#/components/schemas/PseudonymousCustomer"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/PolicySummary"
+          },
+          "qr_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the presented QR stops being usable, so the owner knows how long they have."
+          },
+          "self_transaction": {
+            "type": "boolean",
+            "description": "True when the owner is scanning their own consumer profile (SEC-004). Not blocked,\nbut recorded and shown."
+          },
+          "stamp_board": {
+            "$ref": "#/components/schemas/StampBoard"
+          }
+        }
+      },
+      "StampBoard": {
+        "type": "object",
+        "description": "The stamp board as both apps render it (§8.1: `N/10`, 가장 이른 도장 만료).",
+        "required": [
+          "available",
+          "target",
+          "remaining_to_goal",
+          "expiring_within_seven_days"
+        ],
+        "properties": {
+          "available": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "earliest_expiry": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The soonest any currently-held stamp expires."
+          },
+          "expiring_within_seven_days": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Stamps that expire within seven days (§6.2 홈 우선 노출)."
+          },
+          "remaining_to_goal": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many more stamps until the next reward."
+          },
+          "target": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "StampPreview": {
+        "type": "object",
+        "description": "`POST /owner/stamp-transactions/preview` (§11.4).\n\nReturns 200 even when the accrual would be refused, with the reasons listed: the scan\nscreen's REVIEW step has to *show* why (§6.3), and an error response cannot carry the\ncustomer and board context it needs to do that. `confirm` re-checks everything, so a\nstale or forged preview buys nothing (§11.4).",
+        "required": [
+          "preview_id",
+          "customer",
+          "policy",
+          "business_day",
+          "gross_amount",
+          "eligible_amount",
+          "expected_stamps",
+          "stamp_board_before",
+          "stamp_board_after",
+          "rewards_to_issue",
+          "stamps_expire_at",
+          "daily_used",
+          "next_business_day_start",
+          "self_transaction",
+          "warnings",
+          "blockers",
+          "approvable"
+        ],
+        "properties": {
+          "approvable": {
+            "type": "boolean"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewIssue"
+            },
+            "description": "Blocking. `approvable` is false whenever this is non-empty."
+          },
+          "business_day": {
+            "type": "string",
+            "format": "date"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/PseudonymousCustomer"
+          },
+          "daily_limit": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "daily_used": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "eligible_amount": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The part of the order that counts, after item restrictions (§8.3)."
+          },
+          "expected_stamps": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gross_amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "next_business_day_start": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Start of the next business day, for the \"come back tomorrow\" message (STAMP-005)."
+          },
+          "policy": {
+            "$ref": "#/components/schemas/PolicySummary"
+          },
+          "preview_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "rewards_to_issue": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "self_transaction": {
+            "type": "boolean"
+          },
+          "stamp_board_after": {
+            "$ref": "#/components/schemas/StampBoard"
+          },
+          "stamp_board_before": {
+            "$ref": "#/components/schemas/StampBoard"
+          },
+          "stamps_expire_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the stamps this order would grant expire."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewIssue"
+            },
+            "description": "Non-blocking: shown to the owner before they approve (STAMP-003, SEC-004)."
+          }
+        }
+      },
+      "StampPreviewRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ScanRequest"
+          },
+          {
+            "type": "object",
+            "required": [
+              "order"
+            ],
+            "properties": {
+              "order": {
+                "$ref": "#/components/schemas/OrderInput"
+              }
+            }
+          }
+        ]
+      },
+      "StampTransaction": {
+        "type": "object",
+        "description": "The result of `POST /owner/stamp-transactions` and of a reversal.",
+        "required": [
+          "transaction_id",
+          "store_id",
+          "status",
+          "business_day",
+          "quantity",
+          "confirmed_at",
+          "customer",
+          "stamp_board",
+          "issued_rewards",
+          "revoked_reward_ids"
+        ],
+        "properties": {
+          "business_day": {
+            "type": "string",
+            "format": "date"
+          },
+          "confirmed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "customer": {
+            "$ref": "#/components/schemas/PseudonymousCustomer"
+          },
+          "external_order_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "issued_rewards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IssuedReward"
+            }
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revoked_reward_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Rewards taken back by a reversal (STAMP-007)."
+          },
+          "stamp_board": {
+            "$ref": "#/components/schemas/StampBoard"
+          },
+          "stamps_expire_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "status": {
+            "$ref": "#/components/schemas/StampTransactionStatus"
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "transaction_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "voidable_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Until when the owner may still reverse this themselves (§8.6)."
+          },
+          "voided_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "StampTransactionStatus": {
+        "type": "string",
+        "description": "`coupon.stamp_transaction_status`.",
+        "enum": [
+          "CONFIRMED",
+          "VOIDED",
+          "REQUIRES_ADMIN_REVIEW"
+        ]
       },
       "StoreResponse": {
         "type": "object",
@@ -1040,6 +3736,65 @@
           }
         }
       },
+      "TimelineEvent": {
+        "type": "object",
+        "description": "One thing that happened, from whichever table recorded it.",
+        "required": [
+          "occurred_at",
+          "source",
+          "event",
+          "detail"
+        ],
+        "properties": {
+          "detail": {},
+          "event": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "type": "string",
+            "description": "`ledger`, `coupon_status`, `qr`, `audit` or `transaction`."
+          }
+        }
+      },
+      "UpdateCategoryRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sort_order": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResourceStatus"
+              }
+            ]
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "UpdateConsentsRequest": {
         "type": "object",
         "required": [
@@ -1051,6 +3806,100 @@
             "items": {
               "$ref": "#/components/schemas/ConsentChange"
             }
+          }
+        }
+      },
+      "UpdateItemRequest": {
+        "type": "object",
+        "properties": {
+          "category_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference_price": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "sku": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResourceStatus",
+                "description": "Deactivating keeps the item in every snapshot that already names it (§8.3)."
+              }
+            ]
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "UpdatePolicyRequest": {
+        "type": "object",
+        "properties": {
+          "ends_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reward": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RewardDefinition"
+              }
+            ]
+          },
+          "rules": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PolicyRules"
+              }
+            ]
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
           }
         }
       },
@@ -1204,6 +4053,235 @@
           "WITHDRAWAL_PENDING",
           "WITHDRAWN"
         ]
+      },
+      "VoidStampRequest": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "WalletCoupon": {
+        "type": "object",
+        "required": [
+          "id",
+          "store_id",
+          "store_name",
+          "source_type",
+          "status",
+          "effective_status",
+          "title",
+          "description",
+          "benefit_type",
+          "usable_from",
+          "expires_at",
+          "created_at",
+          "version"
+        ],
+        "properties": {
+          "benefit_type": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          },
+          "effective_status": {
+            "$ref": "#/components/schemas/CouponStatus",
+            "description": "What it means right now — `EXPIRED` once the clock has passed `expires_at`, even\nif the sweep has not caught up (§18.1)."
+          },
+          "expired_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "issued_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "revocation_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it was taken away. Shown rather than hidden (§6.2)."
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CouponStatus",
+            "description": "What the row says."
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "usable_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "WalletCouponDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/WalletCoupon"
+          },
+          {
+            "type": "object",
+            "required": [
+              "condition_snapshot",
+              "history"
+            ],
+            "properties": {
+              "condition_snapshot": {
+                "description": "The conditions frozen at issuance. A later policy edit does not change them\n(§8.5)."
+              },
+              "history": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/CouponStatusEvent"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "WalletFilter": {
+        "type": "string",
+        "description": "`?status=` on the coupon list.",
+        "enum": [
+          "AVAILABLE",
+          "HISTORY",
+          "ALL"
+        ]
+      },
+      "WalletStampBoard": {
+        "type": "object",
+        "description": "One store's board in the wallet (§8.1: `N/10`, 가장 이른 도장 만료, 리워드 내용).",
+        "required": [
+          "store_id",
+          "store_name",
+          "available",
+          "target",
+          "remaining_to_goal",
+          "expiring_within_seven_days"
+        ],
+        "properties": {
+          "available": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "earliest_expiry": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "expiring_within_seven_days": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "policy_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "remaining_to_goal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reward_title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "store_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "store_name": {
+            "type": "string"
+          },
+          "target": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "WalletStampsResponse": {
+        "type": "object",
+        "required": [
+          "boards",
+          "total_available",
+          "as_of"
+        ],
+        "properties": {
+          "as_of": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Server time the balances were judged against, so a client can show staleness."
+          },
+          "boards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletStampBoard"
+            }
+          },
+          "total_available": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -1231,6 +4309,26 @@
     {
       "name": "stores",
       "description": "Store draft, edit and review submission"
+    },
+    {
+      "name": "catalog",
+      "description": "품목·카테고리 (§8.3)"
+    },
+    {
+      "name": "loyalty",
+      "description": "도장 정책 버전, 스캔, 적립 원장 (§8.1, §13.1)"
+    },
+    {
+      "name": "qr",
+      "description": "회전형 QR 발급 (§16.2)"
+    },
+    {
+      "name": "wallet",
+      "description": "소비자 지갑: 도장판과 리워드 쿠폰 (§6.2)"
+    },
+    {
+      "name": "admin",
+      "description": "거래 탐색과 보정 미리보기 (§11.5)"
     }
   ]
 }

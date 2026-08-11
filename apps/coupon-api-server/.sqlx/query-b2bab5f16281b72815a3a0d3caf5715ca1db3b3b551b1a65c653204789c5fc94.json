@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.outbox_events\n                (aggregate_type, aggregate_id, aggregate_version, event_type, correlation_id, payload)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ON CONFLICT (aggregate_type, aggregate_id, aggregate_version, event_type) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Uuid",
+        "Int8",
+        "Varchar",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b2bab5f16281b72815a3a0d3caf5715ca1db3b3b551b1a65c653204789c5fc94"
+}

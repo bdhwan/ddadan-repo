@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                c.id AS \"store_customer_id?\",\n                c.alias AS \"alias?\",\n                c.first_seen_at AS \"first_seen_at?\",\n                c.last_seen_at AS \"last_seen_at?\",\n                c.interaction_count AS \"interaction_count?\",\n                u.display_name\n            FROM coupon.users u\n            LEFT JOIN coupon.store_customers c\n                   ON c.user_id = u.id AND c.store_id = $1\n            WHERE u.id = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "store_customer_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "alias?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "first_seen_at?",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 3,
+        "name": "last_seen_at?",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "interaction_count?",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "display_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "501e80c1277165705539474c527ca0421049e8c0be2d240c1b3496d165eab493"
+}

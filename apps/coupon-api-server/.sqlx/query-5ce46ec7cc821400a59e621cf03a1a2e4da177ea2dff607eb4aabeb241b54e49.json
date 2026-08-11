@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.qr_nonces\n            SET revoked_at = clock_timestamp()\n            WHERE user_id = $1 AND consumed_at IS NULL AND revoked_at IS NULL\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5ce46ec7cc821400a59e621cf03a1a2e4da177ea2dff607eb4aabeb241b54e49"
+}

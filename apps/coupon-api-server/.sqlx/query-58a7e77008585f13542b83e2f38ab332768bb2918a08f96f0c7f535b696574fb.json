@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.loyalty_policies\n            SET status = 'ENDED'\n            WHERE store_id = $1 AND status = 'ACTIVE' AND ends_at IS NOT NULL AND ends_at <= $2\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "58a7e77008585f13542b83e2f38ab332768bb2918a08f96f0c7f535b696574fb"
+}

@@ -1,0 +1,124 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                c.id,\n                c.store_id,\n                s.name AS store_name,\n                c.source_type::text AS \"source_type!\",\n                c.status::text AS \"status!\",\n                c.title,\n                c.description,\n                c.benefit_type::text AS \"benefit_type!\",\n                c.usable_from,\n                c.expires_at,\n                c.issued_at,\n                c.used_at,\n                c.expired_at,\n                c.revoked_at,\n                c.revocation_reason,\n                c.created_at,\n                c.version\n            FROM coupon.coupon_instances c\n            JOIN coupon.stores s ON s.id = c.store_id\n            WHERE c.user_id = $1\n              AND ($2::uuid IS NULL OR c.store_id = $2)\n              -- AVAILABLE is a live judgement: still marked available *and* not past its\n              -- expiry. HISTORY is its complement, so the two tabs together are the whole\n              -- wallet with nothing hidden (§6.2).\n              AND (\n                    $3 = 'ALL'\n                 OR ($3 = 'AVAILABLE' AND c.status = 'AVAILABLE' AND c.expires_at > $4)\n                 OR ($3 = 'HISTORY' AND (c.status <> 'AVAILABLE' OR c.expires_at <= $4))\n              )\n              AND ($5::timestamptz IS NULL OR (c.created_at, c.id) < ($5, $6))\n            ORDER BY c.created_at DESC, c.id DESC\n            LIMIT $7\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "store_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "source_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "benefit_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "usable_from",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "issued_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "used_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "expired_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "revoked_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "revocation_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 16,
+        "name": "version",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      null,
+      false,
+      false,
+      null,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "06baaf7f1e495436af1c406319a2127fd1b5485a82ff374ea74c0654f1de518b"
+}

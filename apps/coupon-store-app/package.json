@@ -5,7 +5,8 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --port 4320",
-    "build": "ng build --configuration production"
+    "build": "ng build --configuration production",
+    "test": "vitest run"
   },
   "dependencies": {
     "@angular/common": "^21.2.0",
@@ -28,6 +29,7 @@
     "@angular/cli": "^21.2.7",
     "@angular/compiler-cli": "^21.2.0",
     "sass": "^1.86.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.0"
   }
 }
