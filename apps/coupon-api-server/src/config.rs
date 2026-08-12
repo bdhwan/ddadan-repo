@@ -70,6 +70,20 @@ pub struct Config {
     #[serde(default, deserialize_with = "deserialize_flag")]
     pub auth_dev_bypass: bool,
 
+    /// `host:port` of a Firebase Auth emulator, e.g. `192.168.150.185:9099` (§20.1 `local`).
+    ///
+    /// The emulator issues ID tokens the real service would recognise in every respect but
+    /// one: they carry `alg: none` and an empty signature, because there is no signing key
+    /// to fetch. Setting this switches the *signature* step of verification — and nothing
+    /// else — to that convention. Every claim check (`iss`, `aud`, `exp`, `sub`,
+    /// `auth_time`) stays on the same code path as production, which is the only reason
+    /// exercising it locally proves anything.
+    ///
+    /// Refused in production, exactly like [`Config::auth_dev_bypass`]: a process that
+    /// accepts unsigned tokens accepts tokens anyone can mint.
+    #[serde(default)]
+    pub firebase_auth_emulator_host: Option<String>,
+
     /// Maximum `auth_time` age accepted by high-risk endpoints (§9.3).
     #[serde(default = "default_recent_auth_secs")]
     pub recent_auth_max_age_secs: u64,
@@ -355,6 +369,16 @@ impl Config {
             ));
         }
 
+        // The emulator's tokens are unsigned. Accepting them in production would mean
+        // accepting a token anyone can write by hand, so this is the same class of
+        // mistake as the dev bypass and gets the same treatment.
+        if self.env.is_production() && self.firebase_auth_emulator_host.is_some() {
+            return Err(ConfigError::Invalid(
+                "COUPON_FIREBASE_AUTH_EMULATOR_HOST must not be set when COUPON_ENV=production"
+                    .to_owned(),
+            ));
+        }
+
         if self.database_url.trim().is_empty() {
             return Err(ConfigError::Invalid(
                 "COUPON_DATABASE_URL must not be empty".to_owned(),
@@ -364,6 +388,15 @@ impl Config {
         if !self.auth_dev_bypass && self.firebase_project_id.is_none() {
             return Err(ConfigError::Invalid(
                 "COUPON_FIREBASE_PROJECT_ID is required unless COUPON_AUTH_DEV_BYPASS=1".to_owned(),
+            ));
+        }
+
+        // The emulator's `iss`/`aud` are derived from the project id it was started with,
+        // so without one there is nothing to check them against.
+        if self.firebase_auth_emulator_host.is_some() && self.firebase_project_id.is_none() {
+            return Err(ConfigError::Invalid(
+                "COUPON_FIREBASE_PROJECT_ID is required when COUPON_FIREBASE_AUTH_EMULATOR_HOST is set"
+                    .to_owned(),
             ));
         }
 
@@ -478,6 +511,14 @@ impl Config {
             .map(|project| format!("https://securetoken.google.com/{project}"))
     }
 
+    /// `host:port` of the Auth emulator, when one is configured (§20.1 `local`).
+    pub fn firebase_auth_emulator(&self) -> Option<&str> {
+        self.firebase_auth_emulator_host
+            .as_deref()
+            .map(str::trim)
+            .filter(|host| !host.is_empty())
+    }
+
     /// Every accepted `aud`: the project id plus any explicitly allowed extra tenant.
     pub fn firebase_audiences(&self) -> Vec<String> {
         let mut audiences = Vec::new();
@@ -505,6 +546,7 @@ mod tests {
             firebase_extra_audiences: CommaList::default(),
             allowed_origins: CommaList::default(),
             auth_dev_bypass: false,
+            firebase_auth_emulator_host: None,
             recent_auth_max_age_secs: 600,
             idempotency_ttl_hours: 24,
             data_encryption_key: None,
@@ -551,6 +593,46 @@ mod tests {
         config.firebase_project_id = None;
 
         config.validate().expect("development may bypass auth");
+    }
+
+    #[test]
+    fn the_auth_emulator_is_refused_in_production() {
+        // An emulator token is unsigned, so a production process that accepted one would
+        // accept a token any stranger can write. Same class of mistake as the dev bypass.
+        let mut config = base_config();
+        config.env = Environment::Production;
+        config.firebase_auth_emulator_host = Some("192.168.150.185:9099".to_owned());
+
+        let error = config
+            .validate()
+            .expect_err("production must refuse the emulator");
+        assert!(
+            error
+                .to_string()
+                .contains("COUPON_FIREBASE_AUTH_EMULATOR_HOST")
+        );
+    }
+
+    #[test]
+    fn the_auth_emulator_is_allowed_outside_production_but_needs_a_project_id() {
+        let mut config = base_config();
+        config.firebase_auth_emulator_host = Some(" 192.168.150.185:9099 ".to_owned());
+        config.validate().expect("local may use the emulator");
+        assert_eq!(config.firebase_auth_emulator(), Some("192.168.150.185:9099"));
+
+        // The emulator's iss/aud come from the project it was started with. Without one
+        // there is nothing to check them against.
+        config.firebase_project_id = None;
+        config.auth_dev_bypass = true;
+        let error = config.validate().expect_err("must demand a project id");
+        assert!(error.to_string().contains("COUPON_FIREBASE_PROJECT_ID"));
+    }
+
+    #[test]
+    fn a_blank_emulator_host_reads_as_unset() {
+        let mut config = base_config();
+        config.firebase_auth_emulator_host = Some("   ".to_owned());
+        assert_eq!(config.firebase_auth_emulator(), None);
     }
 
     #[test]

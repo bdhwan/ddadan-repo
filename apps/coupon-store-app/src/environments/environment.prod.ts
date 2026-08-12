@@ -6,4 +6,5 @@ export const environment = {
     projectId: "replace-at-deploy",
     appId: "replace-at-deploy",
   },
+  authEmulator: { enabled: false, useSameOrigin: false },
 } as const;

@@ -1,9 +1,10 @@
 export const environment = {
   production: false,
   firebase: {
-    apiKey: "local-placeholder-api-key",
-    authDomain: "local-placeholder.firebaseapp.com",
-    projectId: "local-placeholder",
-    appId: "local-placeholder-app-id",
+    apiKey: "ddadan-dev-emulator-key",
+    authDomain: "ddadan-dev.firebaseapp.com",
+    projectId: "ddadan-dev",
+    appId: "ddadan-dev-store",
   },
+  authEmulator: { enabled: true, useSameOrigin: true },
 } as const;

@@ -1,5 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject } from "@angular/core";
-import { ActivatedRoute, RouterLink } from "@angular/router";
+import {
+  ChangeDetectionStrategy,
+  Component,
+  inject,
+  signal,
+} from "@angular/core";
+import { FormBuilder, ReactiveFormsModule, Validators } from "@angular/forms";
+import { ActivatedRoute, Router, RouterLink } from "@angular/router";
+import { AuthSessionService } from "@coupon/client-core";
 import { CouponButtonComponent } from "./button.component";
 import { CouponCardComponent } from "./card.component";
 import { CouponPageHeaderComponent } from "./page-header.component";
@@ -44,6 +51,7 @@ const AUTH_COPY: Record<string, { title: string; description: string }> = {
   selector: "coupon-auth-route",
   imports: [
     RouterLink,
+    ReactiveFormsModule,
     CouponButtonComponent,
     CouponCardComponent,
     CouponPageHeaderComponent,
@@ -59,26 +67,37 @@ const AUTH_COPY: Record<string, { title: string; description: string }> = {
       />
       <coupon-card>
         @if (mode === "login" || mode === "signup") {
-          <form (submit)="$event.preventDefault()">
+          <form [formGroup]="form" (ngSubmit)="submit()">
             <label
               >이메일<input
                 type="email"
+                formControlName="email"
                 autocomplete="email"
                 placeholder="name@example.com"
             /></label>
             <label
               >비밀번호<input
                 type="password"
+                formControlName="password"
                 [attr.autocomplete]="
                   mode === 'signup' ? 'new-password' : 'current-password'
                 "
             /></label>
-            @if (mode === "signup") {
-              <label>이름<input autocomplete="name" /></label>
+            @if (errorMessage()) {
+              <p class="auth-error" role="alert">{{ errorMessage() }}</p>
             }
-            <coupon-button type="submit" [fullWidth]="true">{{
-              mode === "signup" ? "가입 안내 받기" : "로그인"
-            }}</coupon-button>
+            <coupon-button
+              type="submit"
+              [fullWidth]="true"
+              [disabled]="form.invalid || submitting()"
+              >{{
+                submitting()
+                  ? "처리 중…"
+                  : mode === "signup"
+                    ? "이메일로 가입"
+                    : "로그인"
+              }}</coupon-button
+            >
             <coupon-button variant="secondary" [fullWidth]="true"
               >카카오로 계속하기</coupon-button
             >
@@ -128,6 +147,14 @@ const AUTH_COPY: Record<string, { title: string; description: string }> = {
       color: var(--coupon-color-text);
       font: inherit;
     }
+    .auth-error {
+      margin: 0;
+      padding: 0.75rem;
+      border-left: 4px solid var(--coupon-color-danger);
+      background: var(--coupon-color-surface-muted);
+      color: var(--coupon-color-danger);
+      font-weight: 700;
+    }
     .placeholder {
       text-align: center;
     }
@@ -142,6 +169,51 @@ const AUTH_COPY: Record<string, { title: string; description: string }> = {
 })
 export class CouponAuthRouteComponent {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly auth = inject(AuthSessionService);
+  private readonly formBuilder = inject(FormBuilder);
+
   readonly mode = String(this.route.snapshot.data["mode"] ?? "login");
   readonly copy = AUTH_COPY[this.mode] ?? AUTH_COPY["login"]!;
+  readonly submitting = signal(false);
+  readonly errorMessage = signal<string | null>(null);
+  readonly form = this.formBuilder.nonNullable.group({
+    email: ["", [Validators.required, Validators.email]],
+    password: ["", [Validators.required, Validators.minLength(6)]],
+  });
+
+  async submit(): Promise<void> {
+    if (this.form.invalid || this.submitting()) {
+      this.form.markAllAsTouched();
+      return;
+    }
+
+    this.submitting.set(true);
+    this.errorMessage.set(null);
+    const { email, password } = this.form.getRawValue();
+
+    try {
+      if (this.mode === "signup") {
+        await this.auth.createAccountWithEmail(email, password);
+      } else {
+        await this.auth.signInWithEmail(email, password);
+      }
+      await this.router.navigateByUrl(this.safeReturnUrl());
+    } catch {
+      this.errorMessage.set(
+        this.mode === "signup"
+          ? "계정을 만들 수 없습니다. 입력값이나 기존 가입 여부를 확인해 주세요."
+          : "이메일 또는 비밀번호가 맞지 않습니다.",
+      );
+    } finally {
+      this.submitting.set(false);
+    }
+  }
+
+  private safeReturnUrl(): string {
+    const requested = this.route.snapshot.queryParamMap.get("returnUrl");
+    return requested?.startsWith("/") && !requested.startsWith("//")
+      ? requested
+      : "/";
+  }
 }

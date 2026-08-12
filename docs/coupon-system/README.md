@@ -10,8 +10,9 @@ DDADAN 상점별 쿠폰 발급 시스템의 로컬 개발 환경 셋업 방법�
 | [scenarios.md](./scenarios.md) | 시나리오 명세 |
 | [api-endpoints.md](./api-endpoints.md) | 엔드포인트 목록 (구현 진행 체크리스트) |
 | [acceptance-checklist.md](./acceptance-checklist.md) | MVP 인수 시나리오 체크리스트 |
+| [device-test-guide.md](./device-test-guide.md) | 실기기 검증 절차서 (Chrome Android·Safari iOS, 사람이 수행) |
 | [concurrency-decisions.md](./concurrency-decisions.md) | 동시성 결정표와 구현 위치 |
-| [runbook.md](./runbook.md) | 운영 런북 (헬스·배포·테스트 DB·DLQ) |
+| [runbook.md](./runbook.md) | 운영 런북 (헬스·배포·테스트 DB·DLQ·실기기 LAN 기동) |
 | [rollout-plan.md](./rollout-plan.md) | 단계적 출시·기능 플래그·외부 확정·알려진 한계 |
 
 ## 모노레포 구조

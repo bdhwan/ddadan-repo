@@ -1,6 +1,21 @@
 {
   "/api/coupon/v1": {
-    "target": "http://localhost:7810",
+    "target": "http://192.168.150.185:7810",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/identitytoolkit.googleapis.com": {
+    "target": "http://192.168.150.185:9099",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/securetoken.googleapis.com": {
+    "target": "http://192.168.150.185:9099",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/emulator": {
+    "target": "http://192.168.150.185:9099",
     "secure": false,
     "changeOrigin": true
   }

@@ -12,6 +12,9 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(routes),
     provideHttpClient(withInterceptors([couponHttpInterceptor])),
-    provideCouponClientCore(environment.firebase),
+    provideCouponClientCore(environment.firebase, {
+      production: environment.production,
+      authEmulator: environment.authEmulator,
+    }),
   ],
 };

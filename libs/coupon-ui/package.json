@@ -10,6 +10,8 @@
   "peerDependencies": {
     "@angular/common": "^21.2.0",
     "@angular/core": "^21.2.0",
+    "@angular/forms": "^21.2.0",
+    "@coupon/client-core": "*",
     "@angular/router": "^21.2.0"
   }
 }

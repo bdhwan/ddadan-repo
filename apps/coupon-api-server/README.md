@@ -35,6 +35,52 @@ Swagger UI 는 <http://localhost:7810/api/coupon/v1/docs> 에서 볼 수 있다.
 |---|---|
 | `coupon-api` | HTTP API. `--dump-openapi [경로]` 로 스펙만 출력하고 종료 |
 | `coupon-worker` | 비동기 작업 실행기. **Phase 4 골격** — 기동·설정·로깅만 갖추고 큐는 아직 소비하지 않는다 |
+| `coupon-seed` | 인수 시나리오(§20)·실기기 검증(§19.5)용 시드 데이터. 멱등하며 `--reset` 지원 |
+
+## Firebase Auth emulator
+
+기획서 §20.1 은 `local` 환경을 emulator 로 규정하고, §19.3 은 emulator 로 이메일·토큰
+흐름을 확인하라고 요구한다.
+
+```bash
+./scripts/auth-emulator.sh up            # 0.0.0.0:9099 에 뜬다 (UI 4410)
+export COUPON_FIREBASE_AUTH_EMULATOR_HOST=192.168.150.185:9099
+export COUPON_FIREBASE_PROJECT_ID=ddadan-dev
+cargo run --bin coupon-api
+```
+
+emulator 토큰은 `alg: none` 에 서명이 비어 있다는 점만 다르고 클레임은 실제 Firebase 와
+같다. 그래서 서버는 **서명 단계만** 갈라지고 `iss`/`aud`/`exp`/`auth_time` 검사는 같은
+코드를 탄다(`src/auth/firebase.rs`). production 에서 이 설정이 켜져 있으면
+`COUPON_AUTH_DEV_BYPASS` 와 마찬가지로 **부팅을 거부**한다.
+
+`COUPON_AUTH_DEV_BYPASS` 는 그대로 남아 있다. 둘은 별개 경로이고, 프로세스 안에서 도는
+기존 통합 테스트는 계속 bypass 를 쓴다.
+
+## 시드 데이터
+
+승인된 ACTIVE 상점 하나를 얻으려면 계정 생성 → 상점 초안 → 사업자 정보 → 검수 제출 →
+관리자 승인까지 서로 다른 권한으로 다섯 번을 호출해야 한다. `coupon-seed` 가 그걸
+**실제 API 로** 해 준다(`UPDATE stores SET status='ACTIVE'` 같은 지름길을 쓰지 않는다).
+
+```bash
+export COUPON_DATABASE_URL=postgres://coupon:coupon_dev_password@localhost:55432/coupon
+# emulator 를 쓰면 표에 찍히는 이메일/비밀번호로 실기기에서 그대로 로그인할 수 있다
+export COUPON_FIREBASE_AUTH_EMULATOR_HOST=192.168.150.185:9099
+cargo run --bin coupon-seed -- --api-url http://192.168.150.185:7810
+
+cargo run --bin coupon-seed -- --reset      # 시드 데이터만 지우고 다시
+```
+
+몇 번을 돌려도 같은 상태로 수렴한다. 대상자 직접 지급 캠페인은 `coupon-worker` 가
+발급하므로 워커가 떠 있어야 지갑까지 들어온다.
+
+## 인수 시나리오 E2E
+
+`tests/acceptance.rs` 는 `coupon-api` 와 `coupon-worker` 를 **실제 프로세스로** 띄우고
+HTTP 로 붙는다. 프로세스 안에서 라우터를 부르는 다른 스위트가 지나가지 않는 층 — 부팅,
+실제 토큰 검증, CORS/Origin, 미들웨어 순서, 별개 워커 — 이 여기서 확인된다.
+emulator 나 `COUPON_TEST_DATABASE_URL` 이 없으면 눈에 보이게 건너뛴다.
 
 ## OpenAPI
 

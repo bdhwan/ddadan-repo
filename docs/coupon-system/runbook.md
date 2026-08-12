@@ -87,7 +87,10 @@
 ./scripts/coupon/db-up.sh
 
 # 2) migration (`sqlx-cli` 는 COUPON_ 접두사를 모르므로 DATABASE_URL 을 export)
-sqlx migrate run
+#    역할명 coupon 과 스키마가 겹치지 않게 search_path 를 고정한다.
+cd apps/coupon-api-server
+PGOPTIONS='-c search_path=public' sqlx migrate run
+cd ../..
 
 # 3) API
 cargo run --bin coupon-api
@@ -95,6 +98,42 @@ cargo run --bin coupon-api
 # 4) Angular 앱 dev server
 # coupon-consumer-app / coupon-store-app / coupon-system-admin-app
 ```
+
+## 실기기 검증용 LAN·HTTPS 기동
+
+사람이 휴대폰으로 수행하는 절차·표·실패 보고는 [device-test-guide.md](./device-test-guide.md) 가 원본이다. 여기서는 개발 머신에서 무엇을 띄울지만 적는다.
+
+전제: 휴대폰과 개발 머신이 같은 Wi-Fi. 개발 머신 LAN IP 는 `192.168.150.185`.
+
+1. 위 「로컬 개발 명령 모음」 1–3으로 DB·마이그레이션·API 를 올린다. API 는 `COUPON_BIND_ADDR=0.0.0.0:7810` 이라 LAN 에서 `http://192.168.150.185:7810/api/coupon/v1/health/live` 로 확인한다.
+2. Angular 는 localhost 기본이라 휴대폰이 붙지 않는다. `--host 0.0.0.0` 을 붙인다.
+   ```bash
+   npm run start --workspace coupon-consumer-app -- --host 0.0.0.0   # :4310
+   npm run start --workspace coupon-store-app -- --host 0.0.0.0      # :4320
+   npm run start --workspace coupon-system-admin-app -- --host 0.0.0.0  # :4330, 필요할 때만
+   ```
+3. 접속 URL: 소비자 `http://192.168.150.185:4310` / 점주 `:4320` / 관리자 `:4330`. 앱 dev server 가 `/api/coupon/v1` 을 API 로 프록시한다.
+4. HTTPS 기동(인증서 경로, 포트, `ng serve --ssl` 여부, 자체 서명 경고 통과): **미정**. 점주 카메라(`getUserMedia`)는 secure context 가 아니면 「HTTPS 연결이 필요함」을 보여 준다. 확정되면 [device-test-guide.md](./device-test-guide.md) §1.3·§1.5 와 이 절을 함께 고친다.
+5. LAN Origin 을 `COUPON_ALLOWED_ORIGINS` 에 넣었는지는 **미정**(예제는 localhost HTTP 만). HTTPS origin 이 정해지면 `.env.coupon` 에 추가하고 API 를 재시작한다.
+6. 시드(아래)로 ACTIVE 상점·계정을 만든 뒤 가이드 추적표를 수행한다.
+7. Firebase Auth emulator 스크립트 `apps/coupon-api-server/scripts/auth-emulator.sh` 가 보이기 시작했다(다른 에이전트, 작성 시점 미커밋). `./apps/coupon-api-server/scripts/auth-emulator.sh up` → `http://192.168.150.185:9099`. 서버가 이 호스트를 읽는 설정 키는 **미정**(`config.rs`에 없음). 계정 생성은 이 스크립트 범위가 아니다.
+
+## 시드 도구
+
+실기기·운영 승인에 필요한 소비자/점주 계정, ACTIVE 상점, 활성 도장 정책 픽스처를 넣는 도구.
+
+**미정** — 다른 작업에서 추가 중이다. 확정 전까지 계정·비밀번호를 추측해 적지 않는다.
+
+채워질 때 적을 것:
+
+| 칸 | 값 |
+|---|---|
+| 명령 (저장소 루트 기준) | 미정 |
+| 표준출력에 나오는 계정 표 | 미정 — 출력을 [device-test-guide.md](./device-test-guide.md) §1.4 에 옮긴다 |
+| 개발 DB(`coupon`)만 건드리는지 | 미정. 테스트 DB(`coupon_test`)를 지우면 안 된다 |
+| 반복 실행 시 동작 (재실행·정리) | 미정 |
+
+도구가 생기면 이 절에 명령과 예시 출력 위치를 넣고, 가이드의 `미정 — 시드 도구 출력 참조` 칸을 갱신한다.
 
 ## 테스트 DB
 

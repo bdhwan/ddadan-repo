@@ -19,6 +19,11 @@ path = "src/main.rs"
 name = "coupon-worker"
 path = "src/bin/coupon_worker.rs"
 
+# 인수 시나리오(§20)와 실기기 검증(§19.5)이 필요로 하는 상태를 만드는 도구.
+[[bin]]
+name = "coupon-seed"
+path = "src/bin/coupon_seed.rs"
+
 [dependencies]
 aes-gcm.workspace = true
 anyhow.workspace = true
@@ -57,3 +62,7 @@ x509-cert.workspace = true
 
 [dev-dependencies]
 tower = { workspace = true, features = ["util"] }
+# `tests/acceptance.rs` 는 서버와 워커를 실제 프로세스로 띄운다. 테스트 바이너리가 죽었을
+# 때 그 프로세스들이 살아남으면 다음 실행이 낡은 서버와 붙어 진단 불가능한 실패를 내므로,
+# prctl(PR_SET_PDEATHSIG) 로 커널에게 같이 죽이라고 시킨다.
+libc = "0.2"
