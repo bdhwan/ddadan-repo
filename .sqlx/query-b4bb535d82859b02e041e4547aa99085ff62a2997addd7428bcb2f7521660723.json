@@ -1,0 +1,94 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, subject_user_id, case_id, status, requested_at, execute_after,\n                   executed_at, deletion_scope, applied_scopes, pseudonym_label,\n                   blocked_reason, reapply_count, job_id\n            FROM coupon.deletion_ledger\n            ORDER BY requested_at DESC\n            LIMIT $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "subject_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "case_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "requested_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "execute_after",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "executed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "deletion_scope",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 8,
+        "name": "applied_scopes",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 9,
+        "name": "pseudonym_label",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "blocked_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "reapply_count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 12,
+        "name": "job_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "b4bb535d82859b02e041e4547aa99085ff62a2997addd7428bcb2f7521660723"
+}

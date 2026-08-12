@@ -1,0 +1,94 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, code, version_no, locale, channel::text AS \"channel!\", purpose,\n                   provider_template_id, provider_approval_status, subject_template,\n                   body_template, variable_schema, priority, active\n            FROM coupon.notification_templates\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "version_no",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "locale",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "channel!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "purpose",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "provider_template_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "provider_approval_status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "subject_template",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "body_template",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "variable_schema",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
+        "name": "priority",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "active",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0d19553cd9508ea9f68bf7a16ff8480f0a3c97004a01fd64a9c1ceb72150d528"
+}

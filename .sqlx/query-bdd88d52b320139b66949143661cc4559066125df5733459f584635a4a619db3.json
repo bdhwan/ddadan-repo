@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.coupon_instances\n                (store_id, user_id, source_type, reward_definition_id, status, title,\n                 description, benefit_type, usable_from, expires_at, condition_snapshot,\n                 issued_at)\n            VALUES ($1, $2, 'LOYALTY_REWARD', $3, 'AVAILABLE', $4, $5,\n                    $6::text::coupon.benefit_type, $7, $8, $9, $7)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Timestamptz",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bdd88d52b320139b66949143661cc4559066125df5733459f584635a4a619db3"
+}

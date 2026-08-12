@@ -157,7 +157,32 @@ curl -s ... -H 'X-Dev-Auth-Age-Secs: 9000'
 
 `COUPON_ENV=production` 에서 이 플래그가 켜져 있으면 **부팅 자체가 실패한다.**
 
-카카오 OIDC 는 Phase 1 범위 밖이다 (`src/auth/kakao.rs` 에 인터페이스와 TODO 만 있다).
+이메일/비밀번호로 가입한 회원은 인증 전이면 `PENDING_VERIFICATION` 이다. 인증을 마친
+토큰으로 `POST /users/bootstrap` 이 다시 오면 `ACTIVE` 로 승격되고 감사 기록이 남는다.
+승격은 그 한 방향뿐이라 정지·탈퇴 계정은 이 경로로 되살아나지 않는다.
+
+### 카카오 로그인 (§9.2)
+
+`GET /auth/kakao/authorize` → `GET /auth/kakao/callback` → `POST /auth/kakao/exchange`
+세 단계로 Firebase Custom Token 을 발급하고, 브라우저가 `signInWithCustomToken` 으로
+세션을 얻는다. 그 뒤로는 다른 로그인과 완전히 같은 ID Token 경로다. 기존 계정에 카카오를
+붙이는 것은 로그인이 아니라 `POST /me/auth-links/kakao` 이고 (AUTH-003), 어느 쪽이든
+토큰은 **그 회원의 canonical Firebase UID** 로 발급된다.
+
+| 설정 | 없을 때 |
+|---|---|
+| `COUPON_KAKAO_CLIENT_ID`, `COUPON_KAKAO_REDIRECT_URI` | 카카오 경로 전체가 503 으로 거절 |
+| `COUPON_KAKAO_CLIENT_SECRET` | 시크릿을 켜지 않은 앱이면 비워 둔다 |
+| `COUPON_KAKAO_WEBHOOK_SECRET` | 연결 해제 웹훅이 전부 거절 |
+| `COUPON_FIREBASE_SERVICE_ACCOUNT_EMAIL` / `..._PRIVATE_KEY` | `exchange` 가 503 (§9.2-7) |
+
+`..._PRIVATE_KEY` 는 PEM 이다. 환경변수 한 줄에 담아야 하므로 줄바꿈을 `\n` 으로 쓴다.
+
+**카카오 앱 키는 아직 등록되지 않았다.** 실제 카카오 서버 연동은 검증된 바 없고,
+`tests/auth.rs` 가 §19.3 대로 contract mock 으로 §9.2 의 절차를 검증한다.
+`COUPON_KAKAO_OIDC_BASE_URL` 이 그 mock 을 가리키게 하는 설정인데, **요청을 어디로
+보낼지만** 바꾼다 — `id_token` 의 `iss` 는 언제나 `https://kauth.kakao.com` 이어야 하고
+그 값은 설정이 아니라 상수다. 운영에서 이 변수가 설정되어 있으면 부팅을 거부한다.
 
 ## 개발
 

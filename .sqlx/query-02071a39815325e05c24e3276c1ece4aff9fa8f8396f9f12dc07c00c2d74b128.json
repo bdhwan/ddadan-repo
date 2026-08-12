@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.campaigns\n            SET global_issued_count = global_issued_count + $2\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "02071a39815325e05c24e3276c1ece4aff9fa8f8396f9f12dc07c00c2d74b128"
+}

@@ -1,0 +1,92 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, store_id, notification_type, purpose, priority, title, body,\n                   deep_link, data, occurred_at, read_at, expires_at\n            FROM coupon.notifications\n            WHERE user_id = $1\n              AND dismissed_at IS NULL\n              AND ($2::bool IS NOT TRUE OR read_at IS NULL)\n              AND ($3::timestamptz IS NULL\n                   OR (occurred_at, id) < ($3::timestamptz, $4::uuid))\n            ORDER BY occurred_at DESC, id DESC\n            LIMIT $5\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "notification_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "purpose",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "priority",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "body",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "deep_link",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 8,
+        "name": "data",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 9,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "read_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 11,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "e0cc2f9d8a3437d65852f941d8eb7de76e75eb7231b5ec0da2e3ffe5ff2fc15f"
+}

@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT COUNT(*) AS \"count!\"\n            FROM coupon.auth_identities\n            WHERE user_id = $1\n              AND provider = 'KAKAO'\n              AND status = 'ACTIVE'\n              AND provider_subject <> $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "b9894bdb4e86df6a483260fc9654f460b2c2500331c87ab488a13c2ca6d011c1"
+}

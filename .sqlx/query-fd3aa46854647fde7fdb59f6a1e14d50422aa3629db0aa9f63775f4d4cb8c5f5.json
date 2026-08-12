@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.user_roles (user_id, role)\n            VALUES ($1, 'CONSUMER')\n            ON CONFLICT DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fd3aa46854647fde7fdb59f6a1e14d50422aa3629db0aa9f63775f4d4cb8c5f5"
+}

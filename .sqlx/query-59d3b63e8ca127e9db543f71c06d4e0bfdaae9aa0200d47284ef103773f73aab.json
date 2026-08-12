@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.coupon_status_events\n                (coupon_id, from_status, to_status, actor_type, reason_code, metadata, occurred_at)\n            VALUES ($1, NULL, 'AVAILABLE', 'SYSTEM', 'CAMPAIGN_ISSUED', $2, $3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "59d3b63e8ca127e9db543f71c06d4e0bfdaae9aa0200d47284ef103773f73aab"
+}

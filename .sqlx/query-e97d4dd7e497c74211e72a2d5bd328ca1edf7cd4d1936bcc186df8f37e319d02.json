@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT i.id AS identity_id,\n                   u.id AS user_id,\n                   u.firebase_uid,\n                   u.status::text AS \"status!\",\n                   i.status::text AS \"identity_status!\"\n            FROM coupon.auth_identities i\n            JOIN coupon.users u ON u.id = i.user_id\n            WHERE i.provider = 'KAKAO' AND i.provider_subject = $1\n            FOR UPDATE OF i\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "identity_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "firebase_uid",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "identity_status!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "e97d4dd7e497c74211e72a2d5bd328ca1edf7cd4d1936bcc186df8f37e319d02"
+}

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.outbox_events\n                (aggregate_type, aggregate_id, aggregate_version, event_type, correlation_id,\n                 payload)\n            SELECT 'coupon_instance', c.id, 1, 'COUPON_EXPIRING', public.gen_random_uuid(),\n                   jsonb_build_object(\n                       'store_id', c.store_id,\n                       'store_name', s.name,\n                       'user_id', c.user_id,\n                       'benefit', c.title,\n                       'expires_at', c.expires_at,\n                       'days_left', GREATEST(\n                           0,\n                           CEIL(EXTRACT(EPOCH FROM (c.expires_at - $1)) / 86400)::bigint\n                       )\n                   )\n            FROM coupon.coupon_instances c\n            JOIN coupon.stores s ON s.id = c.store_id\n            WHERE c.status = 'AVAILABLE'\n              AND c.expires_at > $1\n              AND c.expires_at <= $2\n            ORDER BY c.expires_at\n            LIMIT $3\n            ON CONFLICT (aggregate_type, aggregate_id, aggregate_version, event_type)\n            DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c755b8957becd5e3fbe94e97eca5dc6f38815510ac2fbbf8d441e9a43dd335b4"
+}

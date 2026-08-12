@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.stores\n                (owner_user_id, status, name, slug, business_type, description,\n                 contact_phone_ciphertext, contact_phone_lookup_hash, address_snapshot,\n                 timezone)\n            VALUES ($1, 'DRAFT', $2, $3, $4, $5, $6, $7,\n                    COALESCE($8::jsonb, '{}'::jsonb),\n                    COALESCE($9, 'Asia/Seoul'))\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Bytea",
+        "Bytea",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c21ff23855d66475274678266a86d2bc193c0eb2540c23727322dbf7732826d9"
+}

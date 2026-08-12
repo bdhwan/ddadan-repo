@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            request_hash,\n            status,\n            response_status,\n            response_body\n        FROM coupon.idempotency_requests\n        WHERE actor_user_id = $1 AND operation = $2 AND idempotency_key = $3\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "request_hash",
+        "type_info": "Bpchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "response_status",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "response_body",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "595fcb5824a5d6236d663df2449965b48028350b77c90441c8ab6753a064eecf"
+}

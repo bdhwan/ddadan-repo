@@ -12,12 +12,14 @@ use crate::admin::operations::OperationsService;
 use crate::analytics::AnalyticsService;
 use crate::audit::AuditService;
 use crate::auth::AuthService;
+use crate::auth::custom_token::CustomTokenSigner;
+use crate::auth::kakao::KakaoService;
 use crate::campaigns::CampaignService;
 use crate::catalog::CatalogService;
 use crate::config::Config;
 use crate::consents::ConsentService;
 use crate::crypto::{LookupHash, Sealer};
-use crate::error::ApiResult;
+use crate::error::{ApiError, ApiResult};
 use crate::http::rate_limit::RateLimiter;
 use crate::jobs::JobService;
 use crate::loyalty::{PolicyService, StampService};
@@ -46,6 +48,9 @@ pub struct AppState {
     pub pool: PgPool,
     pub redis: Option<RedisHandle>,
     pub auth: Arc<AuthService>,
+    /// §9.2 카카오 로그인. Present whether or not a Kakao app is registered: an
+    /// unregistered deployment answers with a clear 503 rather than a 404.
+    pub kakao: Arc<KakaoService>,
     pub users: Arc<UserService>,
     pub consents: Arc<ConsentService>,
     pub stores: Arc<StoreService>,
@@ -94,8 +99,12 @@ impl AppState {
         let sealer = Arc::new(sealer);
         let lookup_hash = Arc::new(lookup_hash);
         let notification_preferences = Arc::new(NotificationPreferenceService::new());
-        let users = Arc::new(UserService::new(sealer.clone(), lookup_hash.clone()));
         let audit = Arc::new(AuditService::new());
+        let users = Arc::new(UserService::new(
+            sealer.clone(),
+            lookup_hash.clone(),
+            audit.clone(),
+        ));
         let stores = Arc::new(StoreService::new(
             sealer.clone(),
             lookup_hash.clone(),
@@ -157,7 +166,21 @@ impl AppState {
             None => Arc::new(RecordingProvider::new("alimtalk-stub")),
         };
 
+        // A missing service account is a deployment that has not registered one yet; a
+        // *malformed* one is a typo in a secret, and that stops the process here rather
+        // than turning every Kakao sign-in into a 500 (§9.2-7).
+        let custom_tokens = CustomTokenSigner::from_config(&config).map_err(|error| {
+            ApiError::new(crate::error::ErrorCode::ServiceUnavailable).internal(error.to_string())
+        })?;
+
         Ok(Self {
+            kakao: Arc::new(KakaoService::new(
+                config.clone(),
+                sealer.clone(),
+                lookup_hash.clone(),
+                audit.clone(),
+                custom_tokens,
+            )),
             auth: Arc::new(AuthService::new(config.clone())),
             operations: Arc::new(OperationsService::new(audit.clone())),
             analytics: Arc::new(AnalyticsService::new(config.min_cohort_size())),

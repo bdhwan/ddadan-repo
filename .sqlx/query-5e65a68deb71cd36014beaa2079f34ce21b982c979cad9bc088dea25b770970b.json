@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT action, actor_type::text AS \"actor_type!\", reason, occurred_at\n            FROM coupon.audit_logs\n            WHERE resource_type = 'stamp_transaction' AND resource_id = $1\n            ORDER BY occurred_at, id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "action",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "actor_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      true,
+      false
+    ]
+  },
+  "hash": "5e65a68deb71cd36014beaa2079f34ce21b982c979cad9bc088dea25b770970b"
+}

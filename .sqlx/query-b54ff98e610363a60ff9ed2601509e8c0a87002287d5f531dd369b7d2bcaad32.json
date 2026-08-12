@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM coupon.oauth_exchange_codes WHERE expires_at < $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b54ff98e610363a60ff9ed2601509e8c0a87002287d5f531dd369b7d2bcaad32"
+}

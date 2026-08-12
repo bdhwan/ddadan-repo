@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE coupon.push_subscriptions\n        SET last_seen_at = clock_timestamp(), last_success_at = clock_timestamp(),\n            failure_count = 0\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fcf46432e1aa932ca9aa9251bee27f48492eca4ebd15383b912844f04d357581"
+}

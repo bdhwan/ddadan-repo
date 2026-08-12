@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE coupon.notifications\n                    SET read_at = NULL\n                    WHERE user_id = $1 AND ($2::bool OR id = ANY($3::uuid[]))\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool",
+        "UuidArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6e83d75e7d5db814942ac0d67631eaf73ba03e5e983849f3d13f529ad331b7dd"
+}

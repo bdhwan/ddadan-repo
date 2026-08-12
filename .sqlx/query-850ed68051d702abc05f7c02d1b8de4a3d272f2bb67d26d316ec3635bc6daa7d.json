@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT EXISTS (\n                    SELECT 1 FROM coupon.users WHERE id = $1 AND tombstoned_at IS NULL\n                ) AS \"resurrected!\"\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "resurrected!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "850ed68051d702abc05f7c02d1b8de4a3d272f2bb67d26d316ec3635bc6daa7d"
+}

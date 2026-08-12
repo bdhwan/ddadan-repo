@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE coupon.notification_deliveries\n        SET status = 'SUPPRESSED', suppression_reason = $2, next_attempt_at = NULL,\n            version = version + 1\n        WHERE id = $1 AND status NOT IN ('DELIVERED', 'FAILED_PERMANENT', 'SUPPRESSED')\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e8c3473083f52d8536962e177e6e40ada57b684f2eccce6789fdd7e97def3cf2"
+}

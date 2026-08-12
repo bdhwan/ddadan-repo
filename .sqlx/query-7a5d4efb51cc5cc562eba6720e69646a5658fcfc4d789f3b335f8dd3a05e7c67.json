@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.store_customers\n            SET last_seen_at = $2,\n                interaction_count = interaction_count + 1,\n                risk_flags = CASE\n                    WHEN $3 AND NOT (risk_flags @> '[\"SELF_TRANSACTION\"]'::jsonb)\n                        THEN risk_flags || '[\"SELF_TRANSACTION\"]'::jsonb\n                    ELSE risk_flags\n                END\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7a5d4efb51cc5cc562eba6720e69646a5658fcfc4d789f3b335f8dd3a05e7c67"
+}

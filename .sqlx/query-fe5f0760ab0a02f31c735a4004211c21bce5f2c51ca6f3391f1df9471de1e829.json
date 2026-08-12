@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT provider::text AS \"provider!\", status::text AS \"status!\", linked_at\n            FROM coupon.auth_identities\n            WHERE user_id = $1 AND status = 'ACTIVE'\n            ORDER BY linked_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "linked_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      false
+    ]
+  },
+  "hash": "fe5f0760ab0a02f31c735a4004211c21bce5f2c51ca6f3391f1df9471de1e829"
+}

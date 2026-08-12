@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT user_id\n                FROM coupon.campaign_audience_members\n                WHERE campaign_id = $1 AND status = 'PENDING'\n                  AND ($2::uuid IS NULL OR user_id > $2)\n                ORDER BY user_id\n                LIMIT $3\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "94435de4196fe8720b3d9e9c042b247e660712a9eaddc265ca93dcdd06b55b45"
+}

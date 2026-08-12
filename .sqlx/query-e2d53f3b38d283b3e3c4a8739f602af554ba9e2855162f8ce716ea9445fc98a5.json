@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    SELECT id FROM coupon.notifications\n                    WHERE user_id = $1 AND event_id = $2 AND notification_type = $3\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e2d53f3b38d283b3e3c4a8739f602af554ba9e2855162f8ce716ea9445fc98a5"
+}

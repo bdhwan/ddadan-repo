@@ -1325,6 +1325,154 @@
         ]
       }
     },
+    "/api/coupon/v1/auth/kakao/authorize": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "§9.2 steps 1–2.",
+        "operationId": "authorize",
+        "responses": {
+          "200": {
+            "description": "Where to send the browser",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthorizeStart"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "§16.4 로그인 시작 10회/10분"
+          },
+          "503": {
+            "description": "카카오 앱이 아직 등록되지 않았습니다"
+          }
+        }
+      }
+    },
+    "/api/coupon/v1/auth/kakao/callback": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "§9.2 steps 3–5.",
+        "operationId": "callback",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "description": "Kakao's authorization code. Absent when the user declined.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "description": "Kakao's own error, e.g. `access_denied` when the user cancelled.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "error_description",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "일회용 교환 코드",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CallbackResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "사용자가 취소했습니다"
+          },
+          "401": {
+            "description": "state·nonce·서명 등 보안 검증 실패"
+          },
+          "429": {
+            "description": "§16.4 카카오 callback 실패 20회/10분"
+          },
+          "503": {
+            "description": "카카오 일시 장애"
+          }
+        }
+      }
+    },
+    "/api/coupon/v1/auth/kakao/exchange": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "§9.2 steps 6–7.",
+        "operationId": "exchange",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Firebase Custom Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "코드가 이미 사용되었거나 만료되었습니다"
+          },
+          "403": {
+            "description": "정지·탈퇴 계정"
+          },
+          "503": {
+            "description": "Firebase 서비스 계정이 설정되지 않았습니다"
+          }
+        }
+      }
+    },
     "/api/coupon/v1/campaigns/{campaign_id}/claims": {
       "post": {
         "tags": [
@@ -1514,6 +1662,138 @@
           },
           "409": {
             "description": "Someone else changed the profile first"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/me/auth-links": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Active login methods on my account (§6.1 `/account/security`).",
+        "operationId": "list_auth_links",
+        "responses": {
+          "200": {
+            "description": "연결된 로그인 수단",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuthLink"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      }
+    },
+    "/api/coupon/v1/me/auth-links/kakao": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "AUTH-003: attach a Kakao account to the one I am signed in to.",
+        "operationId": "link_kakao",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "연결됨",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "코드가 이미 사용되었거나 만료되었습니다"
+          },
+          "403": {
+            "description": "최근 로그인이 필요합니다"
+          },
+          "409": {
+            "description": "이미 다른 회원에 연결된 카카오 계정입니다"
+          }
+        },
+        "security": [
+          {
+            "firebase": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "§11.2 연결 해제.",
+        "operationId": "unlink_kakao",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "UUID, required on every mutation",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "해제 후 남은 로그인 수단",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuthLink"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "최근 로그인이 필요합니다"
+          },
+          "404": {
+            "description": "연결된 카카오 계정이 없습니다"
+          },
+          "409": {
+            "description": "마지막 로그인 수단은 해제할 수 없습니다"
           }
         },
         "security": [
@@ -3823,6 +4103,64 @@
           }
         ]
       }
+    },
+    "/api/coupon/v1/webhooks/kakao/unlink": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "카카오 연결 해제 웹훅 (§9.2 마지막).",
+        "description": "Authenticated by an HMAC over the body and its timestamp, exactly like the §15.4\ndelivery callbacks — the same helper, so there is one implementation of \"is this\nreally the provider\" to get right. The timestamp inside the signed material is what\nmakes a captured request unusable after five minutes; the event key derived from that\nsame material is what makes it a no-op even inside the window.",
+        "operationId": "unlink_webhook",
+        "parameters": [
+          {
+            "name": "X-Kakao-Signature",
+            "in": "header",
+            "description": "Hex HMAC-SHA256 over `<timestamp>.<body>`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Kakao-Signature-Timestamp",
+            "in": "header",
+            "description": "RFC 3339, within 5 minutes",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnlinkWebhookBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "처리 결과",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnlinkAck"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "서명 검증 실패"
+          },
+          "503": {
+            "description": "웹훅 비밀이 설정되지 않았습니다"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -4575,6 +4913,51 @@
           }
         }
       },
+      "AuthLink": {
+        "type": "object",
+        "description": "One row of `GET`/`POST`/`DELETE /me/auth-links/kakao`.",
+        "required": [
+          "provider",
+          "status",
+          "linked_at"
+        ],
+        "properties": {
+          "linked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "AuthorizeStart": {
+        "type": "object",
+        "description": "What `GET /auth/kakao/authorize` returns.",
+        "required": [
+          "authorize_url",
+          "state",
+          "expires_at"
+        ],
+        "properties": {
+          "authorize_url": {
+            "type": "string",
+            "description": "Where to send the browser."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "After this the login must be started again."
+          },
+          "state": {
+            "type": "string",
+            "description": "Echoed so the SPA can correlate its own navigation. The server holds the only\ncopy that matters."
+          }
+        }
+      },
       "Benefit": {
         "type": "object",
         "description": "The discount a coupon grants, in the form the calculator needs.",
@@ -4681,6 +5064,24 @@
           "DUPLICATE",
           "IGNORED"
         ]
+      },
+      "CallbackResult": {
+        "type": "object",
+        "description": "What `GET /auth/kakao/callback` returns.",
+        "required": [
+          "exchange_code",
+          "expires_at"
+        ],
+        "properties": {
+          "exchange_code": {
+            "type": "string",
+            "description": "Single use. Spend it at `POST /auth/kakao/exchange` to sign in, or at\n`POST /me/auth-links/kakao` to attach this Kakao account to the one already\nsigned in (AUTH-003)."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       },
       "Campaign": {
         "type": "object",
@@ -6089,6 +6490,18 @@
         "properties": {
           "error": {
             "$ref": "#/components/schemas/ErrorBody"
+          }
+        }
+      },
+      "ExchangeRequest": {
+        "type": "object",
+        "required": [
+          "exchange_code"
+        ],
+        "properties": {
+          "exchange_code": {
+            "type": "string",
+            "description": "The single-use code `GET /auth/kakao/callback` returned."
           }
         }
       },
@@ -8925,6 +9338,35 @@
           }
         }
       },
+      "SignInResult": {
+        "type": "object",
+        "description": "What `POST /auth/kakao/exchange` returns (§9.2-7).",
+        "required": [
+          "custom_token",
+          "expires_at",
+          "user_id",
+          "created"
+        ],
+        "properties": {
+          "created": {
+            "type": "boolean",
+            "description": "`true` when this login created the member. The SPA uses it to route a first-time\nuser through 약관 동의 (AUTH-002 step 5)."
+          },
+          "custom_token": {
+            "type": "string",
+            "description": "Feed this to `signInWithCustomToken` (§9.2-8)."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The member this token signs in as."
+          }
+        }
+      },
       "StampBoard": {
         "type": "object",
         "description": "The stamp board as both apps render it (§8.1: `N/10`, 가장 이른 도장 만료).",
@@ -9512,6 +9954,51 @@
           }
         ],
         "description": "§8.4's two total-quantity expressions, kept apart on the wire.\n\nThe alternative — a nullable number where `null` means unlimited — is exactly what\n§8.4 warns against, because \"no ceiling named\" and \"no ceiling at all\" then look the\nsame to every reader."
+      },
+      "UnlinkAck": {
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/UnlinkOutcome"
+          }
+        }
+      },
+      "UnlinkOutcome": {
+        "type": "string",
+        "description": "What the unlink webhook did.",
+        "enum": [
+          "APPLIED",
+          "ALREADY_PROCESSED",
+          "UNKNOWN_IDENTITY"
+        ]
+      },
+      "UnlinkWebhookBody": {
+        "type": "object",
+        "description": "Kakao's unlink callback payload.",
+        "required": [
+          "user_id"
+        ],
+        "properties": {
+          "app_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "referrer_type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "type": "string",
+            "description": "Kakao's numeric user id — the same value as the OIDC `sub`."
+          }
+        }
       },
       "UpdateCampaignRequest": {
         "type": "object",

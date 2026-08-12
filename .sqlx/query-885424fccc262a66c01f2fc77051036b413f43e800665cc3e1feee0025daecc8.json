@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.auth_identities\n            SET status = 'UNLINKED', unlinked_at = $2\n            WHERE provider = 'KAKAO' AND provider_subject = $1 AND status = 'ACTIVE'\n            RETURNING user_id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "885424fccc262a66c01f2fc77051036b413f43e800665cc3e1feee0025daecc8"
+}

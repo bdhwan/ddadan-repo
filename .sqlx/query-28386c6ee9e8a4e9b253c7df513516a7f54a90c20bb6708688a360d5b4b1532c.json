@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT coupon_id, from_status::text AS \"from_status?\", to_status::text AS \"to_status!\",\n                   reason_code, occurred_at\n            FROM coupon.coupon_status_events\n            WHERE coupon_id = ANY($1) OR transaction_id = $2\n            ORDER BY occurred_at, id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "coupon_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "from_status?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "to_status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "reason_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "28386c6ee9e8a4e9b253c7df513516a7f54a90c20bb6708688a360d5b4b1532c"
+}

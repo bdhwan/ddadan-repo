@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE coupon.deletion_ledger\n                SET status = 'BLOCKED_LEGAL_HOLD', blocked_reason = $2, version = version + 1\n                WHERE id = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6df46f5aa4d7a821acff22d68a0faeac2133e2bb57c2e8da308a04d4009be532"
+}

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE coupon.notification_delivery_callbacks SET applied = true WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "70d4d9bf56f1ef1037d0d7e960ea1c463d70e924baf4a2d6d5ea077cbfe96987"
+}

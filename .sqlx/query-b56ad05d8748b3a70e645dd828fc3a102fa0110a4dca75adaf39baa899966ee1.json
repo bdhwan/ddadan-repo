@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.users\n            SET status = 'ACTIVE',\n                email_verified_at = COALESCE(email_verified_at, $2)\n            WHERE id = $1 AND status = 'PENDING_VERIFICATION'\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b56ad05d8748b3a70e645dd828fc3a102fa0110a4dca75adaf39baa899966ee1"
+}

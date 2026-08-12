@@ -1,0 +1,148 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, case_number, case_type::text AS \"case_type!\", status::text AS \"status!\",\n                   priority, title, description, subject_user_id, subject_store_id,\n                   subject_resource_type, subject_resource_id, assignee_user_id,\n                   resolution_type, public_resolution, internal_resolution, legal_hold_until,\n                   due_at, resolved_at, created_at, updated_at, version\n            FROM coupon.admin_cases\n            WHERE ($1::text IS NULL OR status::text = $1)\n              AND ($2::text IS NULL OR case_type::text = $2)\n              AND ($3::uuid IS NULL OR subject_user_id = $3)\n              AND ($4::uuid IS NULL OR subject_store_id = $4)\n              AND ($5::timestamptz IS NULL OR (created_at, id) < ($5::timestamptz, $6::uuid))\n            ORDER BY created_at DESC, id DESC\n            LIMIT $7\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "case_number",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "case_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "priority",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 5,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "subject_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "subject_store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 9,
+        "name": "subject_resource_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "subject_resource_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 11,
+        "name": "assignee_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 12,
+        "name": "resolution_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 13,
+        "name": "public_resolution",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 14,
+        "name": "internal_resolution",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "legal_hold_until",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 16,
+        "name": "due_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 17,
+        "name": "resolved_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 18,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 19,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 20,
+        "name": "version",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "74330d9b96033fc604977ec4c705e9a10d68340e3c2c81b1ca918ee77e73f1da"
+}

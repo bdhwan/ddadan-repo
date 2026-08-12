@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE coupon.job_registry\n                SET status = CASE\n                        WHEN status = 'RUNNING' THEN 'PAUSE_REQUESTED'::coupon.job_status\n                        ELSE 'PAUSED'::coupon.job_status\n                    END,\n                    pause_requested_at = clock_timestamp(),\n                    paused_at = CASE WHEN status <> 'RUNNING' THEN clock_timestamp() ELSE NULL END\n                WHERE id = $1\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c65389814aa21efdf208f257977e22589e01be66fe16f34135de9f460bdb2fff"
+}

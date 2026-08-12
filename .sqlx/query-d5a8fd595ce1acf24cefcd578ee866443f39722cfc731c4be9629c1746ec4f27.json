@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.stamp_ledger\n                (lot_id, event_type, quantity_delta, source_stamp_transaction_id,\n                 reward_coupon_id, actor_type, actor_user_id, reason_code, metadata)\n            VALUES ($1, $2::text::coupon.stamp_ledger_event_type, $3, $4, $5,\n                    $6::text::coupon.actor_type, $7, $8, $9)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int2",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Varchar",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d5a8fd595ce1acf24cefcd578ee866443f39722cfc731c4be9629c1746ec4f27"
+}

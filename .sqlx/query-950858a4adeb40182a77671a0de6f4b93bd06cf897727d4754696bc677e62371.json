@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT id, token_ciphertext\n        FROM coupon.push_subscriptions\n        WHERE user_id = $1 AND status = 'ACTIVE'\n        ORDER BY last_seen_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "token_ciphertext",
+        "type_info": "Bytea"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "950858a4adeb40182a77671a0de6f4b93bd06cf897727d4754696bc677e62371"
+}

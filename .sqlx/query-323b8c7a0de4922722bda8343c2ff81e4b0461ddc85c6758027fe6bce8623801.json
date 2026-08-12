@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                COALESCE((\n                    SELECT p.enabled FROM coupon.notification_preferences p\n                    WHERE p.user_id = $1 AND p.store_id IS NULL\n                      AND p.purpose = 'TRANSACTIONAL' AND p.channel = 'FCM_WEB_PUSH'\n                ), false) AS \"web_push_transactional!\",\n                COALESCE((\n                    SELECT p.enabled FROM coupon.notification_preferences p\n                    WHERE p.user_id = $1 AND p.store_id IS NULL\n                      AND p.purpose = 'MARKETING' AND p.channel = 'FCM_WEB_PUSH'\n                ), false) AS \"marketing_all!\",\n                COALESCE((\n                    SELECT p.enabled FROM coupon.notification_preferences p\n                    WHERE p.user_id = $1 AND p.store_id = $2\n                      AND p.purpose = 'MARKETING' AND p.channel = 'FCM_WEB_PUSH'\n                ), false) AS \"marketing_store!\",\n                COALESCE((\n                    SELECT p.enabled FROM coupon.notification_preferences p\n                    WHERE p.user_id = $1 AND p.store_id IS NULL\n                      AND p.purpose = 'INFORMATIONAL' AND p.channel = 'KAKAO_ALIMTALK'\n                ), false) AS \"alimtalk_informational!\",\n                EXISTS (\n                    SELECT 1 FROM coupon.push_subscriptions s\n                    WHERE s.user_id = $1 AND s.status = 'ACTIVE'\n                ) AS \"has_active_push!\",\n                COALESCE((\n                    SELECT u.status = 'ACTIVE' FROM coupon.users u WHERE u.id = $1\n                ), false) AS \"recipient_active!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "web_push_transactional!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 1,
+        "name": "marketing_all!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 2,
+        "name": "marketing_store!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 3,
+        "name": "alimtalk_informational!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "has_active_push!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "recipient_active!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "323b8c7a0de4922722bda8343c2ff81e4b0461ddc85c6758027fe6bce8623801"
+}

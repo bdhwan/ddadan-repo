@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.users\n            SET status = 'SUSPENDED', suspended_at = $2, suspension_reason = $3,\n                -- AUTH-008 / ADMIN-002: a suspension that leaves live sessions alone is not\n                -- a suspension.\n                sessions_valid_after = $2,\n                version = version + 1\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "07901d14bb13e8562d8e6fefa78f6c24cb036d863157d8488b08cadd514a004d"
+}

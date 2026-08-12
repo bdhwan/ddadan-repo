@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE coupon.notifications\n                SET title = '삭제된 알림', body = '개인정보 파기로 내용이 삭제되었습니다.',\n                    data = '{}'::jsonb, deep_link = NULL\n                WHERE user_id = $1 AND title <> '삭제된 알림'\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d804a93cd83116458a979bdd3c171216ae37bc1d7bb069a95bf5cb4040e60e57"
+}

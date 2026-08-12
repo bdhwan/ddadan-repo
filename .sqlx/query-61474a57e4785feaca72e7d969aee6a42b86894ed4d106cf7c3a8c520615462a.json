@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.auth_identities\n            SET status = 'UNLINKED', unlinked_at = $2\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "61474a57e4785feaca72e7d969aee6a42b86894ed4d106cf7c3a8c520615462a"
+}

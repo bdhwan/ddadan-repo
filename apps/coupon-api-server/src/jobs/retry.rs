@@ -168,7 +168,15 @@ pub fn classify_api_error(error: &ApiError) -> RetryClass {
         | ErrorCode::RetentionPolicyNotFound
         | ErrorCode::CaseReferenceRequired
         | ErrorCode::LegalHoldActive
-        | ErrorCode::CohortTooSmall => RetryClass::Permanent,
+        | ErrorCode::CohortTooSmall
+        // Kakao sign-in never runs from a job, but the classification must still be
+        // total. Every one of these describes a decision, not a hiccup: a cancelled
+        // consent, a failed security check, a link that belongs to someone else.
+        | ErrorCode::KakaoLoginCancelled
+        | ErrorCode::KakaoSecurityCheckFailed
+        | ErrorCode::AuthLinkNotFound
+        | ErrorCode::AuthLinkAlreadyClaimed
+        | ErrorCode::LastAuthLinkCannotBeRemoved => RetryClass::Permanent,
 
         ErrorCode::RateLimited => RetryClass::ProviderThrottled { retry_after_secs: 60 },
 

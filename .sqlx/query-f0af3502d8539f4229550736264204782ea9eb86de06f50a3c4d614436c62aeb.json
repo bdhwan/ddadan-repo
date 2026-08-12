@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, external_order_ref, confirmed_at\n            FROM coupon.stamp_transactions\n            WHERE store_id = $1 AND user_id = $2 AND status = 'CONFIRMED'\n              AND confirmed_at > $3\n              AND (order_snapshot -> 'gross_amount')::bigint = $4\n            ORDER BY confirmed_at DESC\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "external_order_ref",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "confirmed_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "f0af3502d8539f4229550736264204782ea9eb86de06f50a3c4d614436c62aeb"
+}

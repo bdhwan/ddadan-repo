@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT store_id, id, target_stamp_count, rule_snapshot\n            FROM coupon.loyalty_policies\n            WHERE store_id = ANY($1) AND status = 'ACTIVE'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "target_stamp_count",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 3,
+        "name": "rule_snapshot",
+        "type_info": "Jsonb"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "dc888ef35a08beab975d939252626a3316cfbe175e8c7af97e96e1a1565307c0"
+}

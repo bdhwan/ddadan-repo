@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE coupon.users\n                SET status = 'ACTIVE', suspended_at = NULL, suspension_reason = NULL,\n                    version = version + 1\n                WHERE id = $1\n                  AND status = 'SUSPENDED'\n                  AND withdrawn_at IS NULL\n                  AND NOT EXISTS (\n                      SELECT 1 FROM coupon.user_sanctions s\n                      WHERE s.subject_user_id = $1 AND s.status = 'ACTIVE'\n                  )\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "60f0ef36045f7b501c6ba7ab3fda44ba7bb0835bfbb1c31d531b156a06890d16"
+}

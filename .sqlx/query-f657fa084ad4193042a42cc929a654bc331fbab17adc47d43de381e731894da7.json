@@ -1,0 +1,91 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.user_sanctions\n                (subject_user_id, case_id, sanction_type, status, public_reason,\n                 internal_reason, requested_by_user_id, approved_by_user_id, approved_at,\n                 effective_from, expires_at)\n            VALUES ($1, $2, $3::text::coupon.sanction_type, 'ACTIVE', $4, $5, $6, $7, $8, $9,\n                    $10)\n            ON CONFLICT DO NOTHING\n            RETURNING id, subject_user_id, case_id, sanction_type::text AS \"sanction_type!\",\n                      status::text AS \"status!\", public_reason, requested_by_user_id,\n                      approved_by_user_id, effective_from, expires_at, lifted_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "subject_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "case_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "sanction_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "public_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "requested_by_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "approved_by_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "effective_from",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "lifted_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      null,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "f657fa084ad4193042a42cc929a654bc331fbab17adc47d43de381e731894da7"
+}

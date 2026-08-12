@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.stores\n            SET status = $2::text::coupon.store_status,\n                activated_at = CASE WHEN $2 = 'ACTIVE' THEN COALESCE(activated_at, clock_timestamp())\n                                    ELSE activated_at END\n            WHERE id = $1 AND status = 'PENDING_REVIEW'\n            RETURNING name, status::text AS \"status!\"\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "status!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "4a97e49b0c1936e76b9839c495d063771ba2ffa8795b84a46914c13d97da1c3a"
+}

@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                s.id,\n                s.status::text AS \"status!\",\n                s.name,\n                s.slug,\n                s.business_type,\n                s.description,\n                s.contact_phone_ciphertext,\n                s.address_snapshot,\n                s.timezone,\n                to_char(s.business_day_cutoff, 'HH24:MI:SS') AS \"business_day_cutoff!\",\n                s.business_hours,\n                s.created_at,\n                s.updated_at,\n                s.version,\n                (p.store_id IS NOT NULL) AS \"business_profile_complete!\",\n                r.id AS \"review_id?\",\n                r.status::text AS \"review_status?\",\n                r.submitted_at AS \"review_submitted_at?\",\n                r.decided_at AS \"review_decided_at?\",\n                r.public_reason AS \"review_public_reason?\"\n            FROM coupon.stores s\n            LEFT JOIN coupon.store_business_profiles p ON p.store_id = s.id\n            LEFT JOIN LATERAL (\n                SELECT id, status, submitted_at, decided_at, public_reason\n                FROM coupon.store_reviews\n                WHERE store_id = s.id\n                ORDER BY submitted_at DESC\n                LIMIT 1\n            ) r ON true\n            WHERE s.owner_user_id = $1 AND s.status <> 'CLOSED'\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "slug",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "business_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "contact_phone_ciphertext",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 7,
+        "name": "address_snapshot",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 8,
+        "name": "timezone",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "business_day_cutoff!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 10,
+        "name": "business_hours",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "version",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 14,
+        "name": "business_profile_complete!",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 15,
+        "name": "review_id?",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 16,
+        "name": "review_status?",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 17,
+        "name": "review_submitted_at?",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 18,
+        "name": "review_decided_at?",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 19,
+        "name": "review_public_reason?",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      null,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "2fe21060999bd2c38e4a40b0d7c8912fc15dab99d995e2f45ed1cf27d88d796f"
+}

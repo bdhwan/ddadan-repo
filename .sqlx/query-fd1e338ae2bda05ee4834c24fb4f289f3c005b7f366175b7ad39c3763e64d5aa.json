@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE coupon.notification_deliveries d\n                SET rendered_variables = '{}'::jsonb\n                FROM coupon.notifications n\n                WHERE d.notification_id = n.id AND n.user_id = $1\n                  AND d.rendered_variables <> '{}'::jsonb\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fd1e338ae2bda05ee4834c24fb4f289f3c005b7f366175b7ad39c3763e64d5aa"
+}

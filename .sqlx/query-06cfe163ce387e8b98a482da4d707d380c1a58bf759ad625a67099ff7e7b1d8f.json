@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.coupon_instances\n            SET status = 'USED', used_at = $2\n            WHERE id = $1 AND status = 'RESERVED'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "06cfe163ce387e8b98a482da4d707d380c1a58bf759ad625a67099ff7e7b1d8f"
+}

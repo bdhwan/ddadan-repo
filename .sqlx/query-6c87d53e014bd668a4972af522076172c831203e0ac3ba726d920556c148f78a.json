@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                t.id,\n                t.store_id,\n                s.name AS store_name,\n                u.consumer_key,\n                u.display_name,\n                t.policy_id,\n                t.business_day,\n                t.quantity,\n                t.status::text AS \"status!\",\n                t.external_order_ref,\n                t.order_snapshot,\n                t.approved_by_user_id,\n                t.confirmed_at,\n                t.voided_at,\n                t.void_reason,\n                t.version\n            FROM coupon.stamp_transactions t\n            JOIN coupon.stores s ON s.id = t.store_id\n            JOIN coupon.users u ON u.id = t.user_id\n            WHERE t.id = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "store_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "consumer_key",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "display_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "policy_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "business_day",
+        "type_info": "Date"
+      },
+      {
+        "ordinal": 7,
+        "name": "quantity",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 8,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "external_order_ref",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "order_snapshot",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
+        "name": "approved_by_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 12,
+        "name": "confirmed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "voided_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "void_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 15,
+        "name": "version",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "6c87d53e014bd668a4972af522076172c831203e0ac3ba726d920556c148f78a"
+}

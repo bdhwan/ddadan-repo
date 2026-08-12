@@ -1,0 +1,58 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                u.id,\n                u.firebase_uid,\n                u.consumer_key,\n                u.display_name,\n                u.status::text AS \"status!\",\n                u.version,\n                COALESCE(\n                    ARRAY(\n                        SELECT r.role::text\n                        FROM coupon.user_roles r\n                        WHERE r.user_id = u.id AND r.revoked_at IS NULL\n                        ORDER BY r.granted_at\n                    ),\n                    ARRAY[]::text[]\n                ) AS \"roles!: Vec<String>\"\n            FROM coupon.users u\n            WHERE u.firebase_uid = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "firebase_uid",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "consumer_key",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "display_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "version",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "roles!: Vec<String>",
+        "type_info": "TextArray"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      null
+    ]
+  },
+  "hash": "0e4fb2adca134746b48eb88f2abfdcbe8b6b8e08188d6fca630be21da3aedbab"
+}

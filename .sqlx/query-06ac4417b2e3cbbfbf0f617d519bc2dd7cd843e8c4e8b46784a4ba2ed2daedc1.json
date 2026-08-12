@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.notification_deliveries\n                (notification_id, channel, template_id, status, correlation_id, purpose,\n                 template_code, template_version_no, suppression_reason, scheduled_at,\n                 deliver_before, dedupe_key)\n            VALUES ($1, $2::text::coupon.notification_channel, $3, 'SUPPRESSED', $4, $5, $6,\n                    $7, $8, $9, $10, $11)\n            ON CONFLICT (notification_id, channel) DO UPDATE\n            SET suppression_reason = EXCLUDED.suppression_reason\n            WHERE coupon.notification_deliveries.status = 'SUPPRESSED'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Int4",
+        "Varchar",
+        "Timestamptz",
+        "Timestamptz",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "06ac4417b2e3cbbfbf0f617d519bc2dd7cd843e8c4e8b46784a4ba2ed2daedc1"
+}

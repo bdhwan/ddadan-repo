@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.admin_adjustments\n            SET status = 'APPROVED', approved_by_user_id = $2, approved_at = $3,\n                approval_reason = $4, execution_job_id = $5\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f24f831c92bcdfc6e3b66e3876566c1c23d690bf15317780bec15b9fdf529fd5"
+}

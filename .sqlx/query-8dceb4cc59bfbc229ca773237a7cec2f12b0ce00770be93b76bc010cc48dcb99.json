@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id FROM coupon.stamp_ledger\n            WHERE reason_code = 'ADMIN_STAMP_GRANT'\n              AND metadata ->> 'adjustment_id' = $1\n            LIMIT 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8dceb4cc59bfbc229ca773237a7cec2f12b0ce00770be93b76bc010cc48dcb99"
+}

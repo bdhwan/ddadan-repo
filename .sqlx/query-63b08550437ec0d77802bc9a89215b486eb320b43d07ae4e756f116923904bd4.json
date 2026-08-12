@@ -1,0 +1,122 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, actor_type::text AS \"actor_type!\", actor_user_id, action,\n                   resource_type, resource_id, store_id, case_id, reason, request_id,\n                   metadata, before_hash, after_hash, previous_entry_hash, entry_hash,\n                   occurred_at\n            FROM coupon.audit_logs\n            WHERE ($1::uuid IS NULL OR actor_user_id = $1)\n              AND ($2::text IS NULL OR action = $2)\n              AND ($3::text IS NULL OR resource_type = $3)\n              AND ($4::uuid IS NULL OR resource_id = $4)\n              AND ($5::uuid IS NULL OR store_id = $5)\n              AND ($6::uuid IS NULL OR case_id = $6)\n              AND ($7::timestamptz IS NULL OR occurred_at >= $7)\n              AND ($8::timestamptz IS NULL OR occurred_at < $8)\n              AND ($9::timestamptz IS NULL OR (occurred_at, id) < ($9::timestamptz, $10::uuid))\n            ORDER BY occurred_at DESC, id DESC\n            LIMIT $11\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "actor_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "actor_user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "action",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "resource_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "resource_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 7,
+        "name": "case_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 9,
+        "name": "request_id",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "metadata",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 11,
+        "name": "before_hash",
+        "type_info": "Bpchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "after_hash",
+        "type_info": "Bpchar"
+      },
+      {
+        "ordinal": 13,
+        "name": "previous_entry_hash",
+        "type_info": "Bpchar"
+      },
+      {
+        "ordinal": 14,
+        "name": "entry_hash",
+        "type_info": "Bpchar"
+      },
+      {
+        "ordinal": 15,
+        "name": "occurred_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false
+    ]
+  },
+  "hash": "63b08550437ec0d77802bc9a89215b486eb320b43d07ae4e756f116923904bd4"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO coupon.idempotency_requests\n            (actor_user_id, operation, idempotency_key, request_hash, status, expires_at)\n        VALUES ($1, $2, $3, $4, 'PROCESSING', $5)\n        ON CONFLICT (actor_user_id, operation, idempotency_key) DO NOTHING\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Uuid",
+        "Bpchar",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c66d7dbbb14643a0046aa1ff33d069e2bdc632ef94b7997fed72995b097f3a21"
+}

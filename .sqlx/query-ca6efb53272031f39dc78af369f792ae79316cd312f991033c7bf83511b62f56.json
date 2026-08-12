@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE coupon.oauth_exchange_codes\n        SET consumed_at = $4\n        WHERE provider = $1::text::coupon.auth_provider\n          AND code_hash = $2\n          AND consumed_at IS NULL\n          AND expires_at > $3\n        RETURNING provider_subject, email_ciphertext, email_verified\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_subject",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "email_ciphertext",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 2,
+        "name": "email_verified",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Bytea",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "ca6efb53272031f39dc78af369f792ae79316cd312f991033c7bf83511b62f56"
+}

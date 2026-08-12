@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.provider_webhook_events (provider, event_type, event_key, payload)\n            VALUES ('KAKAO', 'UNLINK', $1, $2)\n            ON CONFLICT (provider, event_type, event_key) DO NOTHING\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "3574c8440ac2277dc1123107900e877ffa39884202d9de555b6de63a821d5d39"
+}

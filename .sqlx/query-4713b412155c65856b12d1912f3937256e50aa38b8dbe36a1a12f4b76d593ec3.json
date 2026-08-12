@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT id, status::text AS \"status!\"\n                FROM coupon.coupon_instances\n                WHERE campaign_id = $1\n                  AND status IN ('AVAILABLE', 'RESERVED', 'PENDING')\n                  AND ($2::uuid IS NULL OR id > $2)\n                ORDER BY id\n                LIMIT $3\n                FOR UPDATE SKIP LOCKED\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "status!",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "4713b412155c65856b12d1912f3937256e50aa38b8dbe36a1a12f4b76d593ec3"
+}

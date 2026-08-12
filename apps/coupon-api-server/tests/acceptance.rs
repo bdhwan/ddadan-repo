@@ -295,13 +295,11 @@ impl EmulatorClient {
 
     /// 이메일/비밀번호 가입 후 이메일 인증까지 마친 사람. `(uid, id_token, refresh_token)`.
     ///
-    /// 인증을 마친 상태로 만드는 데는 이유가 있다. `POST /users/bootstrap` 은 토큰의
-    /// `email_verified` 를 보고 계정 상태를 정하고, 그 뒤로 다시 보지 않는다. 인증 전에
-    /// 계정을 만들면 `PENDING_VERIFICATION` 으로 굳고, 캠페인 대상 질의는 `ACTIVE` 만
-    /// 세므로 그 사람은 대상자 지급에서 조용히 빠진다 — 아래
-    /// `an_unverified_email_quietly_falls_out_of_every_campaign_audience` 가 그 사실을
-    /// 못 박아 둔다. 그래서 나머지 시나리오는 실제 사용자가 밟는 순서, 즉 인증을 마치고
-    /// 로그인한 상태에서 시작한다.
+    /// 인증을 마친 상태로 만드는 데는 이유가 있다. 나머지 시나리오는 실제 사용자가 밟는
+    /// 순서, 즉 인증을 마치고 로그인한 상태에서 시작해야 한다. 인증 전에 가입하면 계정은
+    /// `PENDING_VERIFICATION` 이고, 그 상태에서는 캠페인 대상에 들어오지 않는다 —
+    /// 인증 후 bootstrap 이 `ACTIVE` 로 승격시키는 흐름은 아래
+    /// `verifying_an_email_promotes_the_account_that_was_created_before_it` 가 따로 본다.
     async fn sign_up(&self, label: &str) -> (String, String, String) {
         let (uid, email, ..) = self.sign_up_unverified(label).await;
         self.verify_email(&uid).await;
@@ -954,16 +952,19 @@ async fn the_emulator_path_is_not_a_second_bypass() {
 }
 
 #[tokio::test]
-async fn an_unverified_email_quietly_falls_out_of_every_campaign_audience() {
-    // 이 스위트가 처음 드러낸 것. 프로세스 안에서 도는 스위트들은 `COUPON_AUTH_DEV_BYPASS`
-    // 를 쓰고, 그 가짜 토큰은 언제나 `email_verified: true` 라서 이 경로를 밟지 않는다.
+async fn verifying_an_email_promotes_the_account_that_was_created_before_it() {
+    // 이 스위트가 처음 드러낸 결함의 자리. 프로세스 안에서 도는 스위트들은
+    // `COUPON_AUTH_DEV_BYPASS` 를 쓰고, 그 가짜 토큰은 언제나 `email_verified: true` 라서
+    // 이 경로를 밟지 않는다 — 실제 Firebase 토큰으로만 드러난다.
     //
-    // `POST /users/bootstrap` 은 토큰의 `email_verified` 로 계정 상태를 정하고 `ON CONFLICT
-    // DO NOTHING` 으로 끝난다 — 나중에 이메일을 인증해도 그 행은 그대로다. 대상자 질의는
-    // `users.status = 'ACTIVE'` 만 세므로, 인증 전에 가입한 사람은 그 뒤 무엇을 하든
-    // 대상자 직접 지급에서 영원히 빠진다. 아무 오류도 나지 않는다는 점이 특히 나쁘다.
+    // 예전 동작: `POST /users/bootstrap` 이 처음 본 토큰의 `email_verified` 로 상태를 정하고
+    // `ON CONFLICT DO NOTHING` 으로 끝냈다. 나중에 이메일을 인증해도 그 행은 그대로였고,
+    // 대상자 질의는 `users.status = 'ACTIVE'` 만 세므로 인증 전에 가입한 사람은 그 뒤
+    // 무엇을 하든 캠페인 대상에서 영원히 빠졌다. 아무 오류도 나지 않았다.
     //
-    // 이 테스트는 그 동작을 고정한다. 고치는 쪽으로 결정되면 여기가 먼저 빨개진다.
+    // 지금 동작: 인증된 토큰으로 bootstrap 이 다시 오면 `PENDING_VERIFICATION → ACTIVE`
+    // 로 승격한다. 승격 이후 실제로 대상자에 들어오는지는 `tests/auth.rs` 가 캠페인까지
+    // 세워 확인한다. 여기서는 **실제 Firebase 토큰**으로 그 승격이 일어나는지를 본다.
     let stack = stack_or_skip!();
 
     let (uid, email, token) = stack.emulator.sign_up_unverified("acc-unverified").await;
@@ -981,6 +982,17 @@ async fn an_unverified_email_quietly_falls_out_of_every_campaign_audience() {
         "인증 전 가입은 대기 상태로 만들어진다"
     );
 
+    // 인증 전 토큰으로는 아무리 다시 불러도 승격되지 않는다. 승격의 근거는 토큰이 실제로
+    // 인증됐다고 말하는 것 하나뿐이다.
+    let unchanged = stack
+        .send("POST", "/users/bootstrap", &token, Some(json!({})))
+        .await;
+    assert_eq!(
+        unchanged.expect_ok("bootstrap")["status"],
+        "PENDING_VERIFICATION",
+        "미인증 토큰은 승격의 근거가 아니다"
+    );
+
     // 사용자가 인증 메일을 누르고 다시 로그인한다.
     stack.emulator.verify_email(&uid).await;
     let verified_token = stack.emulator.sign_in(&email).await["idToken"]
@@ -988,12 +1000,27 @@ async fn an_unverified_email_quietly_falls_out_of_every_campaign_audience() {
         .expect("idToken")
         .to_owned();
 
-    let me = stack.send("GET", "/me", &verified_token, None).await;
+    // 아직은 그대로다 — 승격은 bootstrap 이 한다. §6.1 `/verify-email` 의 "인증 완료
+    // 재조회"가 바로 이 호출이다.
+    let before = stack.send("GET", "/me", &verified_token, None).await;
     assert_eq!(
-        me.expect_ok("/me")["status"],
+        before.expect_ok("/me")["status"],
         "PENDING_VERIFICATION",
-        "토큰은 인증됐다고 말하지만 계정 상태는 따라오지 않는다 — 알려진 간극이다"
+        "토큰만으로는 계정 상태가 바뀌지 않는다"
     );
+
+    let promoted = stack
+        .send("POST", "/users/bootstrap", &verified_token, Some(json!({})))
+        .await;
+    assert_eq!(
+        promoted.expect_ok("re-bootstrap")["status"],
+        "ACTIVE",
+        "인증된 토큰으로 다시 오면 승격된다"
+    );
+    assert_eq!(promoted.expect_ok("re-bootstrap")["email_verified"], true);
+
+    let after = stack.send("GET", "/me", &verified_token, None).await;
+    assert_eq!(after.expect_ok("/me")["status"], "ACTIVE");
 }
 
 #[tokio::test]

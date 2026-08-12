@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id FROM coupon.coupon_instances\n            WHERE status = 'AVAILABLE' AND expires_at <= $1\n            ORDER BY expires_at\n            LIMIT $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c8b3387f91d652c754715ded16ecb6466ac64a77b27c7eac24b81f76275bbae9"
+}

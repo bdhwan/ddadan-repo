@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    UPDATE coupon.auth_identities\n                    SET status = 'ACTIVE', unlinked_at = NULL\n                    WHERE id = $1\n                    RETURNING linked_at\n                    ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "linked_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8115f454351446b3cdb9e9bbea2d4b74fceef84d61ddf7790f94b948c2c9759d"
+}

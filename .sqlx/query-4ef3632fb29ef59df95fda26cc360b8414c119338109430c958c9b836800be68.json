@@ -1,0 +1,43 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE coupon.oauth_login_sessions\n        SET consumed_at = $4\n        WHERE provider = $1::text::coupon.auth_provider\n          AND state_hash = $2\n          AND consumed_at IS NULL\n          AND expires_at > $3\n        RETURNING id, nonce, code_verifier_ciphertext, redirect_uri\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "nonce",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "code_verifier_ciphertext",
+        "type_info": "Bytea"
+      },
+      {
+        "ordinal": 3,
+        "name": "redirect_uri",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Bytea",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4ef3632fb29ef59df95fda26cc360b8414c119338109430c958c9b836800be68"
+}

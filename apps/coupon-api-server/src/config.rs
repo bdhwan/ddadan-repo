@@ -88,6 +88,52 @@ pub struct Config {
     #[serde(default = "default_recent_auth_secs")]
     pub recent_auth_max_age_secs: u64,
 
+    /// Service account that signs Firebase Custom Tokens (§9.2-7).
+    ///
+    /// Absent means Kakao sign-in cannot complete, and `/auth/kakao/exchange` says so
+    /// rather than inventing a credential. Every other endpoint is unaffected, which is
+    /// why this is not a boot-time requirement even in production: an operator who has
+    /// not registered a Kakao app yet should still be able to run the rest of the API.
+    #[serde(default)]
+    pub firebase_service_account_email: Option<String>,
+    /// The matching RS256 private key, PEM. `\n` escapes are accepted so the whole key
+    /// fits on one environment-variable line.
+    #[serde(default)]
+    pub firebase_service_account_private_key: Option<String>,
+    /// §9.2-7: 최대 1시간.
+    #[serde(default = "default_custom_token_ttl_secs")]
+    pub firebase_custom_token_ttl_secs: i64,
+
+    /// Kakao REST API key — the OIDC `client_id` (§9.2).
+    #[serde(default)]
+    pub kakao_client_id: Option<String>,
+    /// Kakao client secret, when the app has one enabled.
+    #[serde(default)]
+    pub kakao_client_secret: Option<String>,
+    /// The redirect URI registered with the Kakao app. Sent on both legs of the code
+    /// exchange, so it must match the registration exactly.
+    #[serde(default)]
+    pub kakao_redirect_uri: Option<String>,
+    /// Shared secret for the 연결 해제 웹훅 signature (§9.2 마지막). Without it the
+    /// webhook refuses everything: an unauthenticated unlink would let a stranger cut
+    /// anyone's login.
+    #[serde(default)]
+    pub kakao_webhook_secret: Option<String>,
+    /// Where Kakao's OIDC endpoints are reached over the network.
+    ///
+    /// Only the *transport* moves. The accepted `iss` stays `https://kauth.kakao.com`
+    /// either way (§9.2-5), so a contract mock exercises the real issuer check rather
+    /// than a lookalike. Refused in production for the same reason as the Auth emulator.
+    #[serde(default)]
+    pub kakao_oidc_base_url: Option<String>,
+    /// How long an authorize → callback login session (state, nonce, PKCE verifier)
+    /// stays usable.
+    #[serde(default = "default_oauth_login_session_ttl_secs")]
+    pub oauth_login_session_ttl_secs: i64,
+    /// How long the callback's single-use exchange code stays usable.
+    #[serde(default = "default_oauth_exchange_code_ttl_secs")]
+    pub oauth_exchange_code_ttl_secs: i64,
+
     /// How long a completed idempotency record stays replayable.
     #[serde(default = "default_idempotency_ttl_hours")]
     pub idempotency_ttl_hours: i64,
@@ -137,6 +183,12 @@ pub struct Config {
     pub rate_limit_stamp_approval_per_min: u32,
     #[serde(default = "default_campaign_claim_rate_limit")]
     pub rate_limit_campaign_claim_per_min: u32,
+    /// §16.4 로그인/가입 시작 10회/10분.
+    #[serde(default = "default_login_start_rate_limit")]
+    pub rate_limit_login_start_per_10min: u32,
+    /// §16.4 카카오 callback 실패 20회/10분.
+    #[serde(default = "default_kakao_callback_failure_rate_limit")]
+    pub rate_limit_kakao_callback_failure_per_10min: u32,
 
     /// Shared secret for provider delivery callbacks (§15.4). Without it the callback
     /// endpoint refuses everything, because an unauthenticated status change would let a
@@ -307,6 +359,33 @@ fn default_campaign_claim_rate_limit() -> u32 {
     5
 }
 
+/// §16.4: 로그인/가입 시작 10회/10분.
+fn default_login_start_rate_limit() -> u32 {
+    10
+}
+
+/// §16.4: 카카오 callback 실패 20회/10분.
+fn default_kakao_callback_failure_rate_limit() -> u32 {
+    20
+}
+
+/// §9.2-7 caps the custom token at an hour.
+fn default_custom_token_ttl_secs() -> i64 {
+    3600
+}
+
+/// Long enough for the Kakao consent screen, short enough that an abandoned login is not
+/// a standing invitation.
+fn default_oauth_login_session_ttl_secs() -> i64 {
+    600
+}
+
+/// The exchange code travels from the callback redirect straight to the SPA's next
+/// request. Two minutes is generous for that hop.
+fn default_oauth_exchange_code_ttl_secs() -> i64 {
+    120
+}
+
 /// §23.1: 사용 예약 2분.
 fn default_redemption_reservation_ttl_secs() -> i64 {
     120
@@ -376,6 +455,14 @@ impl Config {
             return Err(ConfigError::Invalid(
                 "COUPON_FIREBASE_AUTH_EMULATOR_HOST must not be set when COUPON_ENV=production"
                     .to_owned(),
+            ));
+        }
+
+        // Same class of mistake once more: pointing the OIDC client at a host we control
+        // would let that host mint identities for anyone.
+        if self.env.is_production() && self.kakao_oidc_base_url.is_some() {
+            return Err(ConfigError::Invalid(
+                "COUPON_KAKAO_OIDC_BASE_URL must not be set when COUPON_ENV=production".to_owned(),
             ));
         }
 
@@ -519,6 +606,44 @@ impl Config {
             .filter(|host| !host.is_empty())
     }
 
+    /// Origin of Kakao's OIDC endpoints. Defaults to the real one.
+    pub fn kakao_oidc_base_url(&self) -> String {
+        self.kakao_oidc_base_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|url| !url.is_empty())
+            .unwrap_or(crate::auth::kakao::KAKAO_ISSUER)
+            .trim_end_matches('/')
+            .to_owned()
+    }
+
+    /// The service-account private key with `\n` escapes turned back into newlines.
+    ///
+    /// A PEM cannot survive an environment variable with its line breaks intact, so the
+    /// documented spelling is a single line with `\n`. A key that already has real
+    /// newlines passes through unchanged.
+    pub fn firebase_service_account_key_pem(&self) -> Option<String> {
+        self.firebase_service_account_private_key
+            .as_deref()
+            .map(str::trim)
+            .filter(|key| !key.is_empty())
+            .map(|key| key.replace("\\n", "\n"))
+    }
+
+    pub fn oauth_login_session_ttl(&self) -> chrono::Duration {
+        chrono::Duration::seconds(self.oauth_login_session_ttl_secs.clamp(60, 1800))
+    }
+
+    pub fn oauth_exchange_code_ttl(&self) -> chrono::Duration {
+        chrono::Duration::seconds(self.oauth_exchange_code_ttl_secs.clamp(30, 600))
+    }
+
+    /// §9.2-7 caps this at an hour; a longer configured value is clamped rather than
+    /// honoured, because the ceiling is Firebase's and not ours to raise.
+    pub fn firebase_custom_token_ttl(&self) -> chrono::Duration {
+        chrono::Duration::seconds(self.firebase_custom_token_ttl_secs.clamp(60, 3600))
+    }
+
     /// Every accepted `aud`: the project id plus any explicitly allowed extra tenant.
     pub fn firebase_audiences(&self) -> Vec<String> {
         let mut audiences = Vec::new();
@@ -548,6 +673,16 @@ mod tests {
             auth_dev_bypass: false,
             firebase_auth_emulator_host: None,
             recent_auth_max_age_secs: 600,
+            firebase_service_account_email: None,
+            firebase_service_account_private_key: None,
+            firebase_custom_token_ttl_secs: default_custom_token_ttl_secs(),
+            kakao_client_id: None,
+            kakao_client_secret: None,
+            kakao_redirect_uri: None,
+            kakao_webhook_secret: None,
+            kakao_oidc_base_url: None,
+            oauth_login_session_ttl_secs: default_oauth_login_session_ttl_secs(),
+            oauth_exchange_code_ttl_secs: default_oauth_exchange_code_ttl_secs(),
             idempotency_ttl_hours: 24,
             data_encryption_key: None,
             lookup_hash_secret: None,
@@ -561,6 +696,9 @@ mod tests {
             rate_limit_qr_resolve_failure_per_min: default_qr_resolve_failure_rate_limit(),
             rate_limit_stamp_approval_per_min: default_stamp_approval_rate_limit(),
             rate_limit_campaign_claim_per_min: default_campaign_claim_rate_limit(),
+            rate_limit_login_start_per_10min: default_login_start_rate_limit(),
+            rate_limit_kakao_callback_failure_per_10min:
+                default_kakao_callback_failure_rate_limit(),
             notification_callback_secret: None,
             fcm_endpoint: None,
             fcm_authorization: None,
@@ -626,6 +764,56 @@ mod tests {
         config.auth_dev_bypass = true;
         let error = config.validate().expect_err("must demand a project id");
         assert!(error.to_string().contains("COUPON_FIREBASE_PROJECT_ID"));
+    }
+
+    #[test]
+    fn a_kakao_endpoint_override_is_refused_in_production() {
+        // The override moves only the transport, but a transport we do not control is a
+        // transport that can mint identities. Same treatment as the Auth emulator.
+        let mut config = base_config();
+        config.kakao_oidc_base_url = Some("http://127.0.0.1:9000".to_owned());
+        config.validate().expect("a contract mock is a local affair");
+        assert_eq!(config.kakao_oidc_base_url(), "http://127.0.0.1:9000");
+
+        config.env = Environment::Production;
+        let error = config.validate().expect_err("production must refuse it");
+        assert!(error.to_string().contains("COUPON_KAKAO_OIDC_BASE_URL"));
+    }
+
+    #[test]
+    fn kakao_endpoints_default_to_the_real_issuer_origin() {
+        let mut config = base_config();
+        assert_eq!(config.kakao_oidc_base_url(), "https://kauth.kakao.com");
+
+        // A trailing slash would produce `//.well-known/...` once a path is appended.
+        config.kakao_oidc_base_url = Some("  http://127.0.0.1:9000/  ".to_owned());
+        assert_eq!(config.kakao_oidc_base_url(), "http://127.0.0.1:9000");
+    }
+
+    #[test]
+    fn a_one_line_service_account_key_is_restored_to_a_pem() {
+        let mut config = base_config();
+        assert_eq!(config.firebase_service_account_key_pem(), None);
+
+        config.firebase_service_account_private_key =
+            Some("-----BEGIN PRIVATE KEY-----\\nAAAA\\n-----END PRIVATE KEY-----".to_owned());
+        assert_eq!(
+            config.firebase_service_account_key_pem().as_deref(),
+            Some("-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----")
+        );
+    }
+
+    #[test]
+    fn the_custom_token_lifetime_cannot_be_stretched_past_firebases_ceiling() {
+        // §9.2-7 fixes the maximum at an hour. It is Firebase's limit, so a configured
+        // value above it is clamped rather than honoured and then rejected at sign-in.
+        let mut config = base_config();
+        assert_eq!(config.firebase_custom_token_ttl().num_seconds(), 3600);
+
+        config.firebase_custom_token_ttl_secs = 86_400;
+        assert_eq!(config.firebase_custom_token_ttl().num_seconds(), 3600);
+        config.firebase_custom_token_ttl_secs = 1;
+        assert_eq!(config.firebase_custom_token_ttl().num_seconds(), 60);
     }
 
     #[test]

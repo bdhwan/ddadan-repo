@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.auth_identities\n                (user_id, provider, provider_subject, provider_profile_snapshot)\n            VALUES ($1, 'KAKAO', $2, $3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "895c57e5054ec70e3d6a4003cf7bc8f291a2cf391e12844e97f486cffa277f2d"
+}

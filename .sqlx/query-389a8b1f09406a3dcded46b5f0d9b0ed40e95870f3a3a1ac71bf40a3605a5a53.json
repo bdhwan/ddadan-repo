@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE coupon.push_subscriptions\n        SET status = 'INACTIVE', disabled_at = clock_timestamp(), disabled_reason = $2,\n            failure_count = failure_count + 1, version = version + 1\n        WHERE id = $1 AND status = 'ACTIVE'\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "389a8b1f09406a3dcded46b5f0d9b0ed40e95870f3a3a1ac71bf40a3605a5a53"
+}

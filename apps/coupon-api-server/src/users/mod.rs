@@ -14,6 +14,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
+use crate::audit::{ActorType, AuditEntry, AuditService};
 use crate::auth::VerifiedToken;
 use crate::crypto::{LookupHash, Sealer};
 use crate::db::changed_one_row;
@@ -144,17 +145,24 @@ pub struct RolesResponse {
 pub struct UserService {
     sealer: Arc<Sealer>,
     lookup_hash: Arc<LookupHash>,
+    audit: Arc<AuditService>,
 }
 
 impl UserService {
-    pub fn new(sealer: Arc<Sealer>, lookup_hash: Arc<LookupHash>) -> Self {
+    pub fn new(
+        sealer: Arc<Sealer>,
+        lookup_hash: Arc<LookupHash>,
+        audit: Arc<AuditService>,
+    ) -> Self {
         Self {
             sealer,
             lookup_hash,
+            audit,
         }
     }
 
-    /// Create the internal account for a Firebase user, or return the existing one.
+    /// Create the internal account for a Firebase user, or return the existing one —
+    /// promoted, if the email has been verified since it was made.
     ///
     /// Idempotent by construction: `users.firebase_uid` is unique, so a concurrent
     /// duplicate loses the insert and reads the winner's row.
@@ -165,7 +173,7 @@ impl UserService {
         request: &BootstrapRequest,
     ) -> ApiResult<(UserProfile, bool)> {
         if let Some(existing) = self.find_by_firebase_uid(pool, &token.firebase_uid).await? {
-            return Ok((existing, false));
+            return Ok((self.promote_if_verified(pool, existing, token).await?, false));
         }
 
         let display_name = resolve_display_name(
@@ -254,6 +262,83 @@ impl UserService {
             .await?
             .ok_or_else(|| ApiError::new(ErrorCode::UserNotFound))?;
         Ok((profile, true))
+    }
+
+    /// Lift a `PENDING_VERIFICATION` account to `ACTIVE` once Firebase says the email is
+    /// verified.
+    ///
+    /// Without this, `bootstrap` decided the account's status from the very first token
+    /// it ever saw and never looked again. Because every audience query counts
+    /// `users.status = 'ACTIVE'` (§14.3), anyone who signed up before clicking the
+    /// verification link was silently excluded from every campaign for good — no error,
+    /// no warning, nothing to notice.
+    ///
+    /// The promotion is deliberately one-directional. `SUSPENDED`,
+    /// `WITHDRAWAL_PENDING` and `WITHDRAWN` are decisions somebody made about this
+    /// account, and signing in with a verified email is not grounds to reverse any of
+    /// them — so the `WHERE` clause, not a branch in Rust, is what makes that impossible.
+    async fn promote_if_verified(
+        &self,
+        pool: &PgPool,
+        existing: UserProfile,
+        token: &VerifiedToken,
+    ) -> ApiResult<UserProfile> {
+        if !token.email_verified || existing.status != UserStatus::PendingVerification {
+            return Ok(existing);
+        }
+
+        let mut tx = pool.begin().await?;
+
+        let promoted = sqlx::query!(
+            r#"
+            UPDATE coupon.users
+            SET status = 'ACTIVE',
+                email_verified_at = COALESCE(email_verified_at, $2)
+            WHERE id = $1 AND status = 'PENDING_VERIFICATION'
+            RETURNING id
+            "#,
+            existing.id,
+            Utc::now(),
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
+
+        if promoted.is_none() {
+            // Two bootstraps raced, or the status moved under us. Either way somebody
+            // else's write is now the truth; re-read rather than assert ours.
+            tx.rollback().await?;
+            return self
+                .find_by_id(pool, existing.id)
+                .await?
+                .ok_or_else(|| ApiError::new(ErrorCode::UserNotFound));
+        }
+
+        // A state change nobody asked for out loud still has to be explainable later
+        // (§12.5): which account, on whose sign-in, and with what before/after.
+        self.audit
+            .record(
+                &mut tx,
+                AuditEntry::new(ActorType::User, "user.email_verified", "user")
+                    .resource(existing.id)
+                    .actor(existing.id)
+                    .reason("이메일 인증 완료")
+                    .metadata(serde_json::json!({
+                        "sign_in_provider": token.sign_in_provider,
+                    }))
+                    .transition(
+                        &serde_json::json!({ "status": UserStatus::PendingVerification.as_db() }),
+                        &serde_json::json!({ "status": UserStatus::Active.as_db() }),
+                    ),
+            )
+            .await?;
+
+        tx.commit().await?;
+
+        tracing::info!(user_id = %existing.id, "users.promoted_to_active");
+
+        self.find_by_id(pool, existing.id)
+            .await?
+            .ok_or_else(|| ApiError::new(ErrorCode::UserNotFound))
     }
 
     pub async fn find_by_id(&self, pool: &PgPool, user_id: Uuid) -> ApiResult<Option<UserProfile>> {

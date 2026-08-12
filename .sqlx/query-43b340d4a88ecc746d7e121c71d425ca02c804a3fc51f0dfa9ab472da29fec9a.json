@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.qr_nonces\n            SET consumed_at = $2,\n                consumed_transaction_type = $3,\n                consumed_transaction_id = $4\n            WHERE id = $1 AND consumed_at IS NULL AND revoked_at IS NULL\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Varchar",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "43b340d4a88ecc746d7e121c71d425ca02c804a3fc51f0dfa9ab472da29fec9a"
+}

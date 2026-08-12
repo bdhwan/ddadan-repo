@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.users\n                (firebase_uid, display_name, status, primary_email_ciphertext,\n                 primary_email_lookup_hash, email_verified_at)\n            VALUES ($1, $2, 'ACTIVE', $3, $4, $5)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Varchar",
+        "Bytea",
+        "Bytea",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6d56812067ece7f09de954adde202362acac747c8a4f013a66ffda653087d1bb"
+}

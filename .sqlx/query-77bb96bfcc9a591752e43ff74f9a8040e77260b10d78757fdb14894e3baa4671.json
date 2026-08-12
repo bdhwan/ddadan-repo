@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT s.id\n            FROM coupon.stores s\n            WHERE s.status IN ('ACTIVE', 'SUSPENDED')\n              AND NOT EXISTS (\n                  SELECT 1 FROM coupon.analytics_daily_store a\n                  WHERE a.store_id = s.id AND a.business_day = $1 AND a.is_final\n              )\n            ORDER BY s.id\n            LIMIT $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Date",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "77bb96bfcc9a591752e43ff74f9a8040e77260b10d78757fdb14894e3baa4671"
+}

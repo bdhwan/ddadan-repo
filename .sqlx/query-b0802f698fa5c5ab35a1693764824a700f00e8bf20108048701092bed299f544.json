@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE coupon.notification_deliveries\n        SET status = $2::text::coupon.notification_delivery_status,\n            provider_status = $3,\n            delivered_at = CASE WHEN $2 = 'DELIVERED' THEN clock_timestamp() ELSE delivered_at END,\n            version = version + 1\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b0802f698fa5c5ab35a1693764824a700f00e8bf20108048701092bed299f544"
+}

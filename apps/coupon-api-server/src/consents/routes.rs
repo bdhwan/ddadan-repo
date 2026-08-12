@@ -9,6 +9,7 @@ use validator::Validate;
 use crate::auth::extractors::CurrentUser;
 use crate::consents::{ConsentEvidence, ConsentsResponse, UpdateConsentsRequest};
 use crate::error::ApiResult;
+use crate::http::client_ip;
 use crate::http::response::{ApiMutation, ApiOk, TransactionId};
 use crate::state::AppState;
 use crate::telemetry;
@@ -81,26 +82,6 @@ pub async fn post_consents(
         ConsentsResponse { consents },
         transaction_id,
     ))
-}
-
-/// Client IP for the consent record (§9.4).
-///
-/// Only ever hashed, never stored. `X-Forwarded-For` is trusted because the API sits
-/// behind our own reverse proxy; a direct-to-internet deployment would need the proxy to
-/// overwrite the header.
-fn client_ip(headers: &HeaderMap) -> Option<String> {
-    headers
-        .get("x-forwarded-for")
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(',').next())
-        .or_else(|| {
-            headers
-                .get("x-real-ip")
-                .and_then(|value| value.to_str().ok())
-        })
-        .map(str::trim)
-        .filter(|ip| !ip.is_empty())
-        .map(str::to_owned)
 }
 
 #[cfg(test)]

@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.store_business_profiles\n                (store_id, registration_no_ciphertext, registration_no_lookup_hash,\n                 representative_name_ciphertext, business_address_ciphertext)\n            VALUES ($1, $2, $3, $4, $5)\n            ON CONFLICT (store_id) DO UPDATE SET\n                registration_no_ciphertext = EXCLUDED.registration_no_ciphertext,\n                registration_no_lookup_hash = EXCLUDED.registration_no_lookup_hash,\n                representative_name_ciphertext = EXCLUDED.representative_name_ciphertext,\n                business_address_ciphertext = EXCLUDED.business_address_ciphertext\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Bytea",
+        "Bytea",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0e3d4a9eb63fc7fddb37a06d7314cc5a4d5c932de72f00cae4df19c432f658b1"
+}

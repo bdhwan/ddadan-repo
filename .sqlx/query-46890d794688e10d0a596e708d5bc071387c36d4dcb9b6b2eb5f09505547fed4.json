@@ -1,0 +1,301 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            id, store_id, status::text AS \"status!\", version_no, name, customer_description,\n            benefit_type::text AS \"benefit_type!\", fixed_amount, percentage,\n            maximum_discount_amount, free_item_ids, minimum_order_amount, eligible_item_ids,\n            eligible_category_ids, excluded_item_ids, issue_mode::text AS \"issue_mode!\",\n            audience_type, audience_criteria, audience_size, audience_snapshot_at,\n            total_quantity, unlimited_total_cap, per_user_quantity,\n            per_business_day_quantity, restore_quantity_on_revoke, revoke_policy,\n            global_issued_count, global_revoked_count, issue_starts_at, issue_ends_at,\n            usable_from, usable_until, relative_validity_days, allowed_weekdays,\n            allowed_local_time_ranges, external_discount_stackable, notification_channels,\n            notification_message, published_at, paused_at, cancelled_at, cancellation_reason,\n            emergency_stopped_at, issue_generation, created_at, updated_at, version\n        FROM coupon.campaigns\n        WHERE store_id = $1\n          AND ($2::timestamptz IS NULL OR (created_at, id) < ($2::timestamptz, $3::uuid))\n        ORDER BY created_at DESC, id DESC\n        LIMIT $4\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "store_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "version_no",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 4,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "customer_description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 6,
+        "name": "benefit_type!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "fixed_amount",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 8,
+        "name": "percentage",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 9,
+        "name": "maximum_discount_amount",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 10,
+        "name": "free_item_ids",
+        "type_info": "UuidArray"
+      },
+      {
+        "ordinal": 11,
+        "name": "minimum_order_amount",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 12,
+        "name": "eligible_item_ids",
+        "type_info": "UuidArray"
+      },
+      {
+        "ordinal": 13,
+        "name": "eligible_category_ids",
+        "type_info": "UuidArray"
+      },
+      {
+        "ordinal": 14,
+        "name": "excluded_item_ids",
+        "type_info": "UuidArray"
+      },
+      {
+        "ordinal": 15,
+        "name": "issue_mode!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 16,
+        "name": "audience_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 17,
+        "name": "audience_criteria",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 18,
+        "name": "audience_size",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 19,
+        "name": "audience_snapshot_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 20,
+        "name": "total_quantity",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 21,
+        "name": "unlimited_total_cap",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 22,
+        "name": "per_user_quantity",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 23,
+        "name": "per_business_day_quantity",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 24,
+        "name": "restore_quantity_on_revoke",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 25,
+        "name": "revoke_policy",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 26,
+        "name": "global_issued_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 27,
+        "name": "global_revoked_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 28,
+        "name": "issue_starts_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 29,
+        "name": "issue_ends_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 30,
+        "name": "usable_from",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 31,
+        "name": "usable_until",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 32,
+        "name": "relative_validity_days",
+        "type_info": "Int2"
+      },
+      {
+        "ordinal": 33,
+        "name": "allowed_weekdays",
+        "type_info": "Int2Array"
+      },
+      {
+        "ordinal": 34,
+        "name": "allowed_local_time_ranges",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 35,
+        "name": "external_discount_stackable",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 36,
+        "name": "notification_channels",
+        "type_info": "Jsonb"
+      },
+      {
+        "ordinal": 37,
+        "name": "notification_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 38,
+        "name": "published_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 39,
+        "name": "paused_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 40,
+        "name": "cancelled_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 41,
+        "name": "cancellation_reason",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 42,
+        "name": "emergency_stopped_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 43,
+        "name": "issue_generation",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 44,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 45,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 46,
+        "name": "version",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      false,
+      false,
+      false,
+      null,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "46890d794688e10d0a596e708d5bc071387c36d4dcb9b6b2eb5f09505547fed4"
+}

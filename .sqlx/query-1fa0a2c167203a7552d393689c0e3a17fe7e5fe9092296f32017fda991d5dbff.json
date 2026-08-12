@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.loyalty_reward_definitions\n                (policy_id, benefit_type, fixed_amount, percentage, maximum_discount_amount,\n                 free_item_ids, minimum_order_amount, validity_days, condition_snapshot)\n            VALUES ($1, $2::text::coupon.benefit_type, $3, $4, $5, $6, $7, $8, $9)\n            ON CONFLICT (policy_id) DO UPDATE SET\n                benefit_type = EXCLUDED.benefit_type,\n                fixed_amount = EXCLUDED.fixed_amount,\n                percentage = EXCLUDED.percentage,\n                maximum_discount_amount = EXCLUDED.maximum_discount_amount,\n                free_item_ids = EXCLUDED.free_item_ids,\n                minimum_order_amount = EXCLUDED.minimum_order_amount,\n                validity_days = EXCLUDED.validity_days,\n                condition_snapshot = EXCLUDED.condition_snapshot\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int8",
+        "Int2",
+        "Int8",
+        "UuidArray",
+        "Int8",
+        "Int2",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1fa0a2c167203a7552d393689c0e3a17fe7e5fe9092296f32017fda991d5dbff"
+}

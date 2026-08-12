@@ -17,6 +17,7 @@ use tower_http::timeout::TimeoutLayer;
 
 use crate::admin::admin_router;
 use crate::analytics::owner_analytics_router;
+use crate::auth::kakao::routes::{kakao_auth_router, me_auth_links_router};
 use crate::campaigns::{campaign_claim_router, owner_campaign_router};
 use crate::catalog::owner_catalog_router;
 use crate::consents::consents_router;
@@ -44,11 +45,17 @@ pub fn build(state: AppState) -> Router {
     // (§15.4), so they sit on the public tree beside the probes. Putting them on the
     // authenticated tree and exempting them would leave the exemption one refactor away
     // from being forgotten.
-    let public = health::health_router().merge(notification_webhook_router());
+    // Kakao's endpoints join them for the same structural reason and one of their own:
+    // none of them can carry a Firebase ID token, because producing one is what they are
+    // for (§9.2).
+    let public = health::health_router()
+        .merge(notification_webhook_router())
+        .merge(kakao_auth_router());
 
     let protected = Router::new()
         .merge(users_router())
         .merge(me_router())
+        .merge(me_auth_links_router())
         .merge(consents_router())
         .merge(owner_store_router())
         .merge(owner_catalog_router())

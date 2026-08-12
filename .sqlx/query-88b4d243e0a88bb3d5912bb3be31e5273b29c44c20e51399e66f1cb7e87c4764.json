@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.admin_adjustments\n            SET status = 'SUCCEEDED', executed_at = $2, execution_job_id = $3,\n                execution_result = $4\n            WHERE id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "88b4d243e0a88bb3d5912bb3be31e5273b29c44c20e51399e66f1cb7e87c4764"
+}

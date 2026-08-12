@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.stores\n            SET status = 'PENDING_REVIEW'\n            WHERE id = $1 AND owner_user_id = $2 AND status = 'DRAFT'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9ed602b53c4437068d7b6eaa6a8fadfcad69dd60b0f5d4c6abd1d89be17e1c32"
+}

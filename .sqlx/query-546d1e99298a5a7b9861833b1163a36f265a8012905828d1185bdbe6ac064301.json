@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM coupon.qr_nonces\n            WHERE expires_at < $1 AND consumed_at IS NULL\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "546d1e99298a5a7b9861833b1163a36f265a8012905828d1185bdbe6ac064301"
+}

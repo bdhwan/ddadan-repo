@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.redemption_transactions\n                (coupon_id, reservation_id, store_id, user_id, approved_by_user_id,\n                 external_order_ref, order_snapshot, discount_snapshot, gross_amount,\n                 eligible_amount, discount_amount, status, confirmed_at, idempotency_key)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'CONFIRMED', $12, $13)\n            RETURNING id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Jsonb",
+        "Jsonb",
+        "Int8",
+        "Int8",
+        "Int8",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "426a8f507f4c1ca5c002a8e4a46585d55019ab88d50de65789448bb5a7b9b613"
+}

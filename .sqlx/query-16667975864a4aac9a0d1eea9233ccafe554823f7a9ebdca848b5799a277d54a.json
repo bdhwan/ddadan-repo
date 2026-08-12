@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.users\n            SET display_name = COALESCE($2, display_name)\n            WHERE id = $1\n              AND ($3::bigint IS NULL OR version = $3)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "16667975864a4aac9a0d1eea9233ccafe554823f7a9ebdca848b5799a277d54a"
+}

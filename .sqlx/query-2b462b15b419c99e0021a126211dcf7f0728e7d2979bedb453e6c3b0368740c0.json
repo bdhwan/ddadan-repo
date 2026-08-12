@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                    INSERT INTO coupon.coupon_status_events\n                        (coupon_id, from_status, to_status, actor_type, actor_user_id,\n                         reason_code, transaction_id, metadata, occurred_at)\n                    SELECT $1,\n                           (SELECT to_status FROM coupon.coupon_status_events\n                            WHERE coupon_id = $1 ORDER BY occurred_at DESC, id DESC LIMIT 1),\n                           'REVOKED', 'SYSTEM_ADMIN', $2, 'ADMIN_ADJUSTMENT', $3, $4, $5\n                    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Jsonb",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2b462b15b419c99e0021a126211dcf7f0728e7d2979bedb453e6c3b0368740c0"
+}

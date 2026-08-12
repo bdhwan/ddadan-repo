@@ -7,6 +7,7 @@
 //! 2. The development bypass is a boot-time decision, not a request-time one, so a
 //!    production process physically cannot honour it.
 
+pub mod custom_token;
 pub mod extractors;
 pub mod firebase;
 pub mod kakao;

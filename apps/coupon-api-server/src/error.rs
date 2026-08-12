@@ -22,6 +22,9 @@ pub enum ErrorCode {
     IdempotencyKeyInvalid,
     InvalidCursor,
     InvalidVersion,
+    /// §6.1: the user declined on Kakao's consent screen. Not a failure — the app should
+    /// simply return to `/login` — so it must not be reported as one.
+    KakaoLoginCancelled,
 
     // 401 — authentication.
     Unauthenticated,
@@ -30,6 +33,11 @@ pub enum ErrorCode {
     /// §15.4: a provider callback whose signature or freshness window did not hold.
     /// Deliberately one code for both, so a caller cannot probe which half failed.
     WebhookSignatureInvalid,
+    /// §6.1: 카카오 오류는 취소, 일시 장애, 보안 검증 실패 셋으로만 구분한다. This is the
+    /// third — a `state`/`nonce` mismatch, an `id_token` that did not verify, or a code
+    /// presented twice. One code covers all of them so an attacker learns nothing about
+    /// *which* check refused them; the internal detail says which, for the operator.
+    KakaoSecurityCheckFailed,
 
     // 403 — role, account state, terms, origin.
     Forbidden,
@@ -56,6 +64,8 @@ pub enum ErrorCode {
     CampaignNotFound,
     ReservationNotFound,
     NotificationNotFound,
+    /// §11.2 `DELETE /me/auth-links/kakao` on an account that has no Kakao link.
+    AuthLinkNotFound,
     /// §11.5: 민원·보안 사건.
     CaseNotFound,
     /// §17.3: 보존기간 설정 항목.
@@ -87,6 +97,12 @@ pub enum ErrorCode {
     OrderAlreadyDiscounted,
     /// ADMIN-002: 한 회원에게 동시에 유효한 제재는 하나다.
     SanctionAlreadyActive,
+    /// AUTH-003: 이 카카오 계정은 이미 다른 내부 회원에 연결되어 있다. 자동 이전하지
+    /// 않고 고객센터 본인 확인 절차로 보낸다.
+    AuthLinkAlreadyClaimed,
+    /// AUTH-002: 다른 로그인 수단이 없으면 마지막 연결을 스스로 끊게 두지 않는다 —
+    /// 끊는 순간 다시 들어올 방법이 없어진다.
+    LastAuthLinkCannotBeRemoved,
 
     // 422 — well-formed but the business rule says no.
     UnprocessableRequest,
@@ -141,6 +157,8 @@ impl ErrorCode {
             ErrorCode::IdempotencyKeyInvalid => "IDEMPOTENCY_KEY_INVALID",
             ErrorCode::InvalidCursor => "INVALID_CURSOR",
             ErrorCode::InvalidVersion => "INVALID_VERSION",
+            ErrorCode::KakaoLoginCancelled => "KAKAO_LOGIN_CANCELLED",
+            ErrorCode::KakaoSecurityCheckFailed => "KAKAO_SECURITY_CHECK_FAILED",
             ErrorCode::Unauthenticated => "UNAUTHENTICATED",
             ErrorCode::TokenExpired => "TOKEN_EXPIRED",
             ErrorCode::TokenInvalid => "TOKEN_INVALID",
@@ -200,9 +218,12 @@ impl ErrorCode {
             ErrorCode::CouponOutsideUsageWindow => "COUPON_OUTSIDE_USAGE_WINDOW",
             ErrorCode::WebhookSignatureInvalid => "WEBHOOK_SIGNATURE_INVALID",
             ErrorCode::NotificationNotFound => "NOTIFICATION_NOT_FOUND",
+            ErrorCode::AuthLinkNotFound => "AUTH_LINK_NOT_FOUND",
             ErrorCode::CaseNotFound => "CASE_NOT_FOUND",
             ErrorCode::RetentionPolicyNotFound => "RETENTION_POLICY_NOT_FOUND",
             ErrorCode::SanctionAlreadyActive => "SANCTION_ALREADY_ACTIVE",
+            ErrorCode::AuthLinkAlreadyClaimed => "AUTH_LINK_ALREADY_CLAIMED",
+            ErrorCode::LastAuthLinkCannotBeRemoved => "LAST_AUTH_LINK_CANNOT_BE_REMOVED",
             ErrorCode::CaseReferenceRequired => "CASE_REFERENCE_REQUIRED",
             ErrorCode::LegalHoldActive => "LEGAL_HOLD_ACTIVE",
             ErrorCode::CohortTooSmall => "COHORT_TOO_SMALL",
@@ -221,15 +242,15 @@ impl ErrorCode {
             | ErrorCode::IdempotencyKeyRequired
             | ErrorCode::IdempotencyKeyInvalid
             | ErrorCode::InvalidCursor
-            | ErrorCode::InvalidVersion => StatusCode::BAD_REQUEST,
+            | ErrorCode::InvalidVersion
+            | ErrorCode::KakaoLoginCancelled => StatusCode::BAD_REQUEST,
 
             // 401: no credential, or one we cannot accept.
             ErrorCode::Unauthenticated
             | ErrorCode::TokenExpired
             | ErrorCode::TokenInvalid
-            | ErrorCode::WebhookSignatureInvalid => {
-                StatusCode::UNAUTHORIZED
-            }
+            | ErrorCode::WebhookSignatureInvalid
+            | ErrorCode::KakaoSecurityCheckFailed => StatusCode::UNAUTHORIZED,
 
             // 403: authenticated, but role / account state / terms / origin forbid it.
             ErrorCode::Forbidden
@@ -254,6 +275,7 @@ impl ErrorCode {
             | ErrorCode::CampaignNotFound
             | ErrorCode::ReservationNotFound
             | ErrorCode::NotificationNotFound
+            | ErrorCode::AuthLinkNotFound
             | ErrorCode::CaseNotFound
             | ErrorCode::RetentionPolicyNotFound => StatusCode::NOT_FOUND,
 
@@ -274,7 +296,9 @@ impl ErrorCode {
             | ErrorCode::ReservationExpired
             | ErrorCode::ReservationAlreadyActive
             | ErrorCode::OrderAlreadyDiscounted
-            | ErrorCode::SanctionAlreadyActive => StatusCode::CONFLICT,
+            | ErrorCode::SanctionAlreadyActive
+            | ErrorCode::AuthLinkAlreadyClaimed
+            | ErrorCode::LastAuthLinkCannotBeRemoved => StatusCode::CONFLICT,
 
             // 422: shape is fine, the business condition is not met.
             ErrorCode::UnprocessableRequest
@@ -330,6 +354,10 @@ impl ErrorCode {
             ErrorCode::IdempotencyKeyInvalid => "Idempotency-Key 는 UUID 여야 합니다.",
             ErrorCode::InvalidCursor => "잘못된 페이지 커서입니다.",
             ErrorCode::InvalidVersion => "잘못된 버전 값입니다.",
+            ErrorCode::KakaoLoginCancelled => "카카오 로그인이 취소되었습니다.",
+            ErrorCode::KakaoSecurityCheckFailed => {
+                "카카오 로그인의 보안 검증에 실패했습니다. 처음부터 다시 시도해 주세요."
+            }
             ErrorCode::Unauthenticated => "로그인이 필요합니다.",
             ErrorCode::TokenExpired => "로그인이 만료되었습니다. 다시 로그인해 주세요.",
             ErrorCode::TokenInvalid => "인증 정보를 확인할 수 없습니다.",
@@ -350,6 +378,13 @@ impl ErrorCode {
             ErrorCode::CouponNotFound => "쿠폰을 찾을 수 없습니다.",
             ErrorCode::CampaignNotFound => "캠페인을 찾을 수 없습니다.",
             ErrorCode::ReservationNotFound => "사용 예약을 찾을 수 없습니다.",
+            ErrorCode::AuthLinkNotFound => "연결된 카카오 계정이 없습니다.",
+            ErrorCode::AuthLinkAlreadyClaimed => {
+                "이미 다른 회원에 연결된 카카오 계정입니다. 고객센터 본인 확인이 필요합니다."
+            }
+            ErrorCode::LastAuthLinkCannotBeRemoved => {
+                "마지막 로그인 수단은 해제할 수 없습니다. 다른 로그인 수단을 먼저 추가해 주세요."
+            }
             ErrorCode::ApprovalSeparationRequired => {
                 "요청자와 승인자가 같을 수 없습니다. 다른 관리자의 승인이 필요합니다."
             }
@@ -622,6 +657,11 @@ mod tests {
             (ErrorCode::IdempotencyKeyInvalid, 400),
             (ErrorCode::InvalidCursor, 400),
             (ErrorCode::InvalidVersion, 400),
+            // §6.1 splits Kakao failures three ways and no further: 취소 is the user's
+            // choice (400), 보안 검증 실패 is a refusal (401), 일시 장애 is DEPENDENCY_
+            // UNAVAILABLE (503).
+            (ErrorCode::KakaoLoginCancelled, 400),
+            (ErrorCode::KakaoSecurityCheckFailed, 401),
             (ErrorCode::Unauthenticated, 401),
             (ErrorCode::TokenExpired, 401),
             (ErrorCode::TokenInvalid, 401),
@@ -642,6 +682,9 @@ mod tests {
             (ErrorCode::CouponNotFound, 404),
             (ErrorCode::CampaignNotFound, 404),
             (ErrorCode::ReservationNotFound, 404),
+            (ErrorCode::AuthLinkNotFound, 404),
+            (ErrorCode::AuthLinkAlreadyClaimed, 409),
+            (ErrorCode::LastAuthLinkCannotBeRemoved, 409),
             (ErrorCode::ApprovalSeparationRequired, 403),
             (ErrorCode::Conflict, 409),
             (ErrorCode::VersionConflict, 409),

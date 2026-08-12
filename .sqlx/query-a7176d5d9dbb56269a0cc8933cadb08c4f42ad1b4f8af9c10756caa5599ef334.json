@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.campaign_counters (campaign_id, business_day)\n            VALUES ($1, $2)\n            ON CONFLICT (campaign_id, business_day) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a7176d5d9dbb56269a0cc8933cadb08c4f42ad1b4f8af9c10756caa5599ef334"
+}

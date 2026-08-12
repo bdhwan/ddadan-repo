@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE coupon.notification_deliveries\n        SET status = $2::text::coupon.notification_delivery_status,\n            provider = $3,\n            provider_reference = COALESCE($4, provider_reference),\n            provider_status = $5,\n            last_error_code = $6,\n            last_error_message = $7,\n            delivered_at = CASE WHEN $2 = 'DELIVERED' THEN $8 ELSE delivered_at END,\n            next_attempt_at = NULL,\n            version = version + 1\n        WHERE id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8585e5a7e8b2a6b2337b38ed9539f751a8cd2c1de7754a45e7e83bbd19c4eea6"
+}

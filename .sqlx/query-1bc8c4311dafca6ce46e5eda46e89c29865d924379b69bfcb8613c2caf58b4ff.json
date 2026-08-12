@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                UPDATE coupon.loyalty_policies\n                SET status = 'SCHEDULED', starts_at = $3, published_at = $4\n                WHERE id = $1 AND store_id = $2 AND status = 'DRAFT'\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1bc8c4311dafca6ce46e5eda46e89c29865d924379b69bfcb8613c2caf58b4ff"
+}

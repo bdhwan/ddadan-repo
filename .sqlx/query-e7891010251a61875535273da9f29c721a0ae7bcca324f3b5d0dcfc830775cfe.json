@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.loyalty_policies\n            SET status = 'ENDED', ends_at = COALESCE(ends_at, $2)\n            WHERE store_id = $1 AND status = 'ACTIVE'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e7891010251a61875535273da9f29c721a0ae7bcca324f3b5d0dcfc830775cfe"
+}

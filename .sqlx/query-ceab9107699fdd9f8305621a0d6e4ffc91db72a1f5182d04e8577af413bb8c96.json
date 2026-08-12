@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO coupon.auth_identities (user_id, provider, provider_subject)\n            VALUES ($1, 'FIREBASE_PASSWORD', $2)\n            ON CONFLICT (provider, provider_subject) DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ceab9107699fdd9f8305621a0d6e4ffc91db72a1f5182d04e8577af413bb8c96"
+}

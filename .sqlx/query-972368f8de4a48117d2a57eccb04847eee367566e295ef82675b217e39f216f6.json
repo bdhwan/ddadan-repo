@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE coupon.push_subscriptions\n            SET status = 'ARCHIVED', disabled_at = clock_timestamp(),\n                disabled_reason = 'USER_REVOKED'\n            WHERE id = $1 AND user_id = $2 AND status <> 'ARCHIVED'\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "972368f8de4a48117d2a57eccb04847eee367566e295ef82675b217e39f216f6"
+}

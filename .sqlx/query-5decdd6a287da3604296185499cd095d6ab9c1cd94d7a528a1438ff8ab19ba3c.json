@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                i.id,\n                i.category_id,\n                c.name AS \"category_name?\",\n                i.sku,\n                i.name,\n                i.reference_price,\n                i.status::text AS \"status!\",\n                i.created_at,\n                i.updated_at,\n                i.version\n            FROM coupon.catalog_items i\n            LEFT JOIN coupon.catalog_categories c ON c.id = i.category_id\n            WHERE i.store_id = $1\n              AND (i.status = 'ACTIVE' OR $2)\n              AND i.status <> 'ARCHIVED'\n            ORDER BY i.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "category_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "category_name?",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "sku",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "reference_price",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "status!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "version",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      null,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5decdd6a287da3604296185499cd095d6ab9c1cd94d7a528a1438ff8ab19ba3c"
+}

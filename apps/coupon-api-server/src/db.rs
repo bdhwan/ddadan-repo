@@ -63,8 +63,8 @@ mod tests {
     fn the_binary_knows_which_migration_it_expects() {
         assert_eq!(
             expected_migration_version(),
-            Some(20260813000400),
-            "embedded migrations must include the phase 4 notification and operations core"
+            Some(20260814000500),
+            "embedded migrations must include the Kakao login tables"
         );
     }
 }
