@@ -65,14 +65,22 @@ curl -s http://100.96.152.109:7800/api/devices | python3 -m json.tool   # 버전
 ## 알아둘 것
 
 - **API 에 인증이 없다.** Tailscale/LAN 등 사설 경로로만 접근하고 인터넷에 노출하지 말 것.
-- **백업**: display-4 가 매일 04:00 에 DB+에셋을 구글드라이브(`gdrive:ddadan-backups`)로 올린다.
-  cron 1줄(`0 4 * * *`). 아카이브 1개 ≈ 119MB, 30일 초과분은 자동 정리 → 원격에 항상 30개.
-  수동 실행은 `ssh display-4 '~/.local/bin/ddadan-backup.sh'`.
-  확인할 때는 **로그를 믿지 말고 원격 목록을 직접 볼 것**. `rclone` 이 `~/.local/bin` 에 있어
-  비대화형 ssh 의 PATH 에 없으므로 앞에 PATH 를 붙여야 한다:
+- **백업**: **rtx-5090 외장 하드로 pull** 한다(2026-11-15 전환, 구글드라이브 안 씀).
+  rtx-5090 cron `30 4 * * *` 이 `/home/bdhwan/bin/ddadan-pull-backup-extdrive.sh` 를 돌려
+  display-4 에서 ssh 로 DB+에셋을 직접 받아 `/mnt/extdrive/ddadan-backups/daily` 에
+  **최근 90개**까지 보관한다. 아카이브 1개 ≈ 119MB, 구조는 예전과 같다(`d/` SQLite, `a/` 에셋).
+  DB 볼륨을 받는 동안만 api 를 `docker pause` 하고, 받은 아카이브는 `tar tzf` 검증을 통과한
+  것만 남긴다.
+  - **외장 하드가 안 붙어 있으면 스크립트가 즉시 실패하고 내장 디스크에는 쓰지 않는다.**
+    백업이 안 보이면 `/mnt/extdrive` 마운트부터 확인할 것.
+  - 구글드라이브 시절 30개(10/17~11/15)는 `/mnt/extdrive/ddadan-backups/gdrive-import` 에 보관.
+  - display-4 의 04:00 업로드 cron(`ddadan-backup.sh`)은 **꺼져 있다**(crontab 주석 처리).
   ```bash
-  ssh display-4 'export PATH=$HOME/.local/bin:$PATH; rclone lsl gdrive:ddadan-backups/ | sort -k2 | tail'
-  # 무결성까지: rclone cat <원격파일> | tar tzf - | wc -l   (디스크에 쓰지 않음)
+  # 수동 실행 (rtx-5090 에서)
+  /home/bdhwan/bin/ddadan-pull-backup-extdrive.sh
+  # 확인 (rtx-5090 에서)
+  tail -3 /mnt/extdrive/ddadan-backups/daily/backup.log
+  ls /mnt/extdrive/ddadan-backups/daily
   ```
 - **자가복구**: 정전·재부팅 시 docker(`unless-stopped`)와 워치독이 알아서 복구한다. 실측 검증됨.
 - **디스크**: 워치독이 85% 초과 시 캐시를 스스로 비운다. admin 기기 목록은 80% 부터 빨간 배지.

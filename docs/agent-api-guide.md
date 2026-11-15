@@ -172,8 +172,9 @@ curl -s -X PATCH "$API/monitors/9/rotation" -H "Content-Type: application/json" 
 ## 5. 안전 수칙 (에이전트가 지킬 것)
 
 1. **PATCH 전 항상 GET.** layout은 통째 교체다. 최신 상태를 받아 수정 후 되돌려보낼 것.
-2. **변경 전 백업 인지.** 서버는 매일 04:00 구글드라이브 자동 백업(`ddadan-backup.sh`). 큰 변경 전
-   해당 screen을 `GET`해서 원본 JSON을 남겨두면 즉시 롤백 가능.
+2. **변경 전 백업 인지.** 백업은 매일 04:30 KST, rtx-5090 이 display-4 에서 ssh 로 직접 받아
+   외장 하드에 쌓는다(`ddadan-pull-backup-extdrive.sh`). 직전 백업이 최대 하루 전이라는 뜻이니,
+   큰 변경 전에는 해당 screen 을 `GET` 해서 원본 JSON 을 남겨둘 것 — 그래야 즉시 롤백된다.
 3. **DELETE는 신중히.** 로테이션에 물린 screen을 지우면 그 박스가 해당 슬라이드에서 깨진다.
    먼저 `GET /devices`로 어느 monitor의 `rotationScreenIds`에 있는지 확인.
 4. **assetId 스왑은 새 업로드 → 교체 → (원하면) 옛 에셋 삭제** 순서.
