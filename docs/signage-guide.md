@@ -169,7 +169,7 @@ cd apps/ddadan-android-app
 API=http://192.168.150.222:7800/api
 curl -s -X POST "$API/apks/upload" \
   -F "file=@app/build/outputs/apk/release/app-release.apk" \
-  -F "versionCode=22" -F "versionName=1.6" -F "applicationId=com.ddadan.player"
+  -F "versionCode=27" -F "versionName=1.11" -F "applicationId=com.ddadan.player"
 # 4) 즉시 적용하려면 특정 박스에 updateApp 명령 큐잉(워치독 commandLoop ~10s가 처리):
 curl -s -X POST "$API/devices/{DEVICE_ID}/commands" -H "Content-Type: application/json" -d '{"type":"updateApp"}'
 ```
@@ -177,7 +177,7 @@ curl -s -X POST "$API/devices/{DEVICE_ID}/commands" -H "Content-Type: applicatio
   - 상단에 **서버 최신 APK 버전**(OTA 페이로드) + **"안드로이드 전체 업데이트" 버튼**(전체 디바이스에 `updateApp` 명령 큐잉).
   - 각 행에 **설치 버전을 플레이어/워치독 분리 표시**(워치독 텔레메트리가 `appVersion`=플레이어, `watchdogVersion`=워치독 자신을 각각 보고) + **마지막 온라인**.
 - 개발 중 즉시 반영은 `adb install -r`(위 프로비저닝 참고, force-stop 후). **OTA 경로 자체를 검증**하려면 버전 올려 업로드 후 워치독이 받아가는지 확인.
-- 현재 버전(참고): 플레이어 `1.7 (23)`, 워치독 `8.0 (8)`. OTA는 플레이어·워치독 각각의 `apks/latest?applicationId=`로 독립 갱신.
+- 현재 버전(2026-11-15 확인): 플레이어 `1.10 (26)`, 워치독 `10.0 (10)` — 박스 3대 모두 동일. OTA는 플레이어·워치독 각각의 `apks/latest?applicationId=`로 독립 갱신.
 - 워치독 주기(참고): 플레이어 감시 `2s` · 원격명령 폴링 `10s` · 텔레메트리(하트비트) `120s` · OTA 확인 `10분`. 서버 오프라인 판정은 `360s`(하트비트의 3배).
 
 ### 5.3 서명 키 (⚠ OTA 생명줄)
@@ -274,7 +274,7 @@ admin 은 `apps/ddadan-admin-app/Dockerfile` + `ddadan-repo-admin` 으로 같은
   같은 APK 를 같은 캐시 파일에 **동시에** 내려받던 문제. 겹쳐 쓴 APK 는 설치에 실패하고 그 명령이
   끝나지 않아 위의 "명령 전부 pending" 으로 이어졌다. 워치독 v10.0 에서 뮤텍스로 차단하고,
   updateApp 은 별도 코루틴으로 돌려 명령 루프를 붙잡지 않게 했다.
-- **화면 우측 하단 `v10.0/v1.9` 배지**(워치독/플레이어): 어느 박스가 구버전인지 화면만 보고 판단.
+- **화면 우측 하단 `v10.0/v1.10` 배지**(워치독/플레이어): 어느 박스가 구버전인지 화면만 보고 판단.
   배지가 안 보이면 플레이어가 1.9 미만이라는 뜻.
 
 ---

@@ -27,8 +27,9 @@
 | 서버 | display-4 — LAN `192.168.150.222`, Tailscale `100.96.152.109` |
 | 개발 머신 | rtx-5090-ubuntu — LAN `192.168.150.185`, Tailscale `100.126.172.59` |
 | API / Admin | `:7800` / `:4200` (player `:7300` 은 이 구성에서 미사용 — override 로 비활성) |
-| 박스 3대 | `U4XCSTB03230301025`(dev 7/mon 8) · `...034`(dev 8/mon 9) · `...031`(dev 9/mon 10) |
-| 현재 보드 | 025=BEVERAGE / 034=BAKERY / 031=제품 사진 로테이션 (18초) |
+| 박스 3대 | `U4XCSTB03230301025`=android-2(dev 7/mon 8) · `...034`=android-3(dev 8/mon 9) · `...031`=android-1(dev 9/mon 10) |
+| 앱 버전 | 워치독 `10.0`(vc 10) · 플레이어 `1.10`(vc 26) — 3대 모두 동일 |
+| 현재 보드 | 025=BEVERAGE(screen 98·99·100) / 034=BAKERY(104·105·106) / 031=제품 사진(25~34, 10장) — 모두 18초 로테이션 |
 | 매장 네트워크 | 전용 공유기 지참, 사무실과 **동일 SSID/비번** → 매장에서 자동 연결 |
 
 박스는 **하드웨어 시리얼**로 자기를 식별하고, 서버를 못 찾으면 LAN 을 스캔해 자동 발견한다.
@@ -59,13 +60,20 @@ curl -s -X PATCH "$API/screens/98" -H "Content-Type: application/json" -d @/tmp/
 ```bash
 curl -s http://100.96.152.109:7800/api/devices | python3 -m json.tool   # 버전·online·디스크
 ```
-화면 우측 하단 `v10.0/v1.9` 배지(워치독/플레이어)로도 버전을 바로 확인할 수 있다.
+화면 우측 하단 `v10.0/v1.10` 배지(워치독/플레이어)로도 버전을 바로 확인할 수 있다.
 
 ## 알아둘 것
 
 - **API 에 인증이 없다.** Tailscale/LAN 등 사설 경로로만 접근하고 인터넷에 노출하지 말 것.
 - **백업**: display-4 가 매일 04:00 에 DB+에셋을 구글드라이브(`gdrive:ddadan-backups`)로 올린다.
-  30일 초과분은 자동 정리. 수동 실행은 `ssh display-4 '~/.local/bin/ddadan-backup.sh'`.
+  cron 1줄(`0 4 * * *`). 아카이브 1개 ≈ 119MB, 30일 초과분은 자동 정리 → 원격에 항상 30개.
+  수동 실행은 `ssh display-4 '~/.local/bin/ddadan-backup.sh'`.
+  확인할 때는 **로그를 믿지 말고 원격 목록을 직접 볼 것**. `rclone` 이 `~/.local/bin` 에 있어
+  비대화형 ssh 의 PATH 에 없으므로 앞에 PATH 를 붙여야 한다:
+  ```bash
+  ssh display-4 'export PATH=$HOME/.local/bin:$PATH; rclone lsl gdrive:ddadan-backups/ | sort -k2 | tail'
+  # 무결성까지: rclone cat <원격파일> | tar tzf - | wc -l   (디스크에 쓰지 않음)
+  ```
 - **자가복구**: 정전·재부팅 시 docker(`unless-stopped`)와 워치독이 알아서 복구한다. 실측 검증됨.
 - **디스크**: 워치독이 85% 초과 시 캐시를 스스로 비운다. admin 기기 목록은 80% 부터 빨간 배지.
 - **막혔을 때 마지막 수단은 전원 재인가**다. 박스는 명령을 하나씩 처리하므로 앞의 명령이 끝나지
