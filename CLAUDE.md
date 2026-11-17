@@ -95,3 +95,9 @@ curl -s http://100.96.152.109:7800/api/devices | python3 -m json.tool   # 버전
   `GET /devices/{id}/screenshots?limit=1`. 서버 데이터만 보고 "됐다"고 판단하지 말 것.
 - 로테이션에 물린 screen 을 지우면 해당 박스가 그 슬라이드에서 깨진다. 지우기 전에
   `GET /devices` 로 `rotationScreenIds` 를 확인할 것.
+
+## Modern Web Guidance (동환님 2026-11-17)
+- 웹 부분(admin 앱, 사이니지 플레이어, 쿠폰 웹)을 만들거나 고칠 때는 Google Chrome Modern Web Guidance를 따른다. 플러그인 `modern-web-guidance@googlechrome`이 이 저장소에 local 범위로 설치되어 있다.
+- 작업 전에 관련 가이드를 찾는다: `npx modern-web-guidance@latest search "<할 일>"`, `npx modern-web-guidance@latest retrieve <guide-id>`.
+- 바꾼 뒤에는 `npx modern-web-guidance@latest legacy-scan .`으로 레거시 패턴을 확인한다. 사이니지는 매장 안드로이드 박스 브라우저에서 돌아가므로, 새 API는 대체 동작(fallback)을 갖춰 쓴다.
+- 운영 중인 브로트베르크 사이니지에 대한 commit·push·배포는 기존처럼 동환님 승인 후에 한다.
